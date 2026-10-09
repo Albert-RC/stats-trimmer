@@ -10,6 +10,7 @@ globals = {
 
 -- Read-only WoW API (extend as needed)
 read_globals = {
+	"C_CreatureInfo",
 	"C_Item",
 	"CreateFrame",
 	"DEFAULT_CHAT_FRAME",

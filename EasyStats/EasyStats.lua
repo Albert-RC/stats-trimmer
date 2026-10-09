@@ -1,18 +1,37 @@
 -- Localized "Equip:" prefix, provided by the client in every locale
 local EQUIP_PREFIX = ITEM_SPELL_TRIGGER_ONEQUIP
 
--- Link of the item whose tooltip data is being processed. Mirrors TooltipUtil.GetDisplayedItem,
+-- Creature types that attack power can be restricted to: stat key suffix -> creature type ID and output label
+local VS_CREATURE_TYPES = {
+	BEAST = { id = 1, label = "beasts" },
+}
+
+-- Link and data lines of the item whose tooltip data is being processed. Mirrors TooltipUtil.GetDisplayedItem,
 -- but reads the info being processed instead of the primary one, so appended infos are handled too.
-local function GetProcessingItemLink(tooltip)
+local function GetProcessingItem(tooltip)
 	local info = tooltip:GetProcessingTooltipInfo()
 	local data = info and info.tooltipData
 	if not data or data.type ~= Enum.TooltipDataType.Item then
 		return nil
 	end
-	if data.guid then
-		return C_Item.GetItemLinkByGUID(data.guid)
+	local link = data.guid and C_Item.GetItemLinkByGUID(data.guid) or data.hyperlink
+	return link, data.lines
+end
+
+-- Lowercase localized creature type name ("bestia" on esES), or nil if the type is unknown
+local function GetCreatureTypeName(creature)
+	local creatureType = VS_CREATURE_TYPES[creature]
+	local info = creatureType and C_CreatureInfo.GetCreatureTypeInfo(creatureType.id)
+	return info and info.name:lower()
+end
+
+local function AnyLineMentions(lines, lowerName)
+	for _, line in ipairs(lines) do
+		if line.leftText and line.leftText:lower():find(lowerName, 1, true) then
+			return true
+		end
 	end
-	return data.hyperlink
+	return false
 end
 
 -- The tooltip wording varies per locale and per item, so the line is identified by its numbers:
@@ -65,8 +84,9 @@ local function HasOtherRating(stats, ratingKey)
 	return false
 end
 
--- Compact lines for an equip line, or nil when it isn't one of this item's stat lines
-local function GetReplacement(text, stats)
+-- Compact lines for an equip line, or nil when it isn't one of this item's stat lines.
+-- itemLines are all the item's tooltip data lines, for rules that need to look at sibling lines.
+local function GetReplacement(text, stats, itemLines)
 	-- "Damage and healing by up to X" is a single spell power stat that counts as both
 	local power = stats.ITEM_MOD_SPELL_POWER_SHORT
 	if power and NumbersMatch(text, power) then
@@ -98,8 +118,23 @@ local function GetReplacement(text, stats)
 		return { ("+%d HP5"):format(hp5) }
 	end
 
+	-- Attack power, plain or against a creature type ("+6 attack power vs beasts"). Both can share the
+	-- same number, so the client's localized creature type name tells the lines apart. When that name
+	-- can't be found in the tooltip, lines with that number are left untouched rather than guessed.
+	local ambiguous = false
+	for key, value in pairs(stats) do
+		local creature = key:match("^ITEM_MOD_ATTACK_POWER_VS_(%u+)_SHORT$")
+		if creature and NumbersMatch(text, value) then
+			local name = GetCreatureTypeName(creature)
+			if name and text:lower():find(name, 1, true) then
+				return { ("+%d attack power vs %s"):format(value, VS_CREATURE_TYPES[creature].label) }
+			end
+			ambiguous = ambiguous or not (name and AnyLineMentions(itemLines, name))
+		end
+	end
+
 	local attackPower = stats.ITEM_MOD_ATTACK_POWER_SHORT
-	if attackPower and NumbersMatch(text, attackPower) then
+	if attackPower and not ambiguous and NumbersMatch(text, attackPower) then
 		return { ("+%d attack power"):format(attackPower) }
 	end
 
@@ -129,9 +164,9 @@ local function ReplaceEquipLine(tooltip, lineData)
 		return false
 	end
 
-	local link = GetProcessingItemLink(tooltip)
+	local link, itemLines = GetProcessingItem(tooltip)
 	local stats = link and C_Item.GetItemStats(link)
-	local lines = stats and GetReplacement(text, stats)
+	local lines = stats and GetReplacement(text, stats, itemLines)
 	if not lines then
 		return false
 	end
