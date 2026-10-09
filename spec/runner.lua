@@ -1,5 +1,6 @@
 -- Minimal runner for busted-style specs (describe / it / before_each / assert.*), for machines where
 -- busted can't be installed. Specs stay busted-compatible, so they also run unchanged under busted.
+-- Supported assertions: assert.are.same/equal/near, assert.is_nil/is_not_nil/is_true/is_false.
 -- Usage: luajit spec/runner.lua spec/a_spec.lua [spec/b_spec.lua ...]   (from the repo root)
 
 local passed, failures = 0, {}
@@ -94,9 +95,15 @@ assert = setmetatable({
 		equal = function(expected, actual)
 			Check(expected == actual, expected, actual)
 		end,
+		near = function(expected, actual, tolerance)
+			Check(type(actual) == "number" and math.abs(expected - actual) <= tolerance, expected, actual)
+		end,
 	},
 	is_nil = function(actual)
 		Check(actual == nil, nil, actual)
+	end,
+	is_not_nil = function(actual)
+		Check(actual ~= nil, "a value", actual)
 	end,
 	is_true = function(actual)
 		Check(actual == true, true, actual)

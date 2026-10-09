@@ -34,6 +34,14 @@ winget install --id DEVCOM.LuaJIT -e   # once
 ./scripts/test.ps1
 ```
 
+Game-facing code is tested against a small fake of the WoW API (`spec/fakes.lua`).
+
+Coverage uses [LuaCov](https://github.com/lunarmodules/luacov) 0.17.0, which is pure Lua. Copy its `src/` folder to `%LOCALAPPDATA%\Programs\luacov` once, then run:
+
+```powershell
+./scripts/coverage.ps1   # fails if EasyStats/ line coverage is below 85%
+```
+
 ## Workflow
 
 Edit → `stylua --check .`, `luacheck .` and `./scripts/test.ps1` → `/reload` in game → test.
