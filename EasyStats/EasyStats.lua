@@ -1,9 +1,17 @@
 -- Localized "Equip:" prefix, provided by the client in every locale
 local EQUIP_PREFIX = ITEM_SPELL_TRIGGER_ONEQUIP
 
--- Creature types that attack power can be restricted to: stat key suffix -> creature type ID and output label
+-- Creature types that attack power can be restricted to: stat key suffix -> creature type ID and output label.
+-- Only BEAST and ELEMENTAL have been seen in-game; the other keys follow the same naming. A wrong key
+-- just never matches, which leaves the line untouched.
 local VS_CREATURE_TYPES = {
 	BEAST = { id = 1, label = "beasts" },
+	DRAGONKIN = { id = 2, label = "dragonkin" },
+	DEMON = { id = 3, label = "demons" },
+	ELEMENTAL = { id = 4, label = "elementals" },
+	GIANT = { id = 5, label = "giants" },
+	UNDEAD = { id = 6, label = "undead" },
+	HUMANOID = { id = 7, label = "humanoids" },
 }
 
 -- Link and data lines of the item whose tooltip data is being processed. Mirrors TooltipUtil.GetDisplayedItem,
