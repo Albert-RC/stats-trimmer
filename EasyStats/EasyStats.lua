@@ -98,6 +98,11 @@ local function GetReplacement(text, stats)
 		return { ("+%d HP5"):format(hp5) }
 	end
 
+	local attackPower = stats.ITEM_MOD_ATTACK_POWER_SHORT
+	if attackPower and NumbersMatch(text, attackPower) then
+		return { ("+%d attack power"):format(attackPower) }
+	end
+
 	-- "+1.0% chance to block with a shield". The stat is a rating (5 for 1% seen so far), so the
 	-- percentage is read from the text, and only when no other rating could own that percentage.
 	if stats.ITEM_MOD_BLOCK_RATING_SHORT and not HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT") then
