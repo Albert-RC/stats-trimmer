@@ -41,10 +41,11 @@ function ns.GetOnlyPercent(text)
 	return value and tostring(value)
 end
 
--- True when the item has a rating stat other than the given one
+-- True when the item has a rating stat other than the given one. Skill ratings (e.g. defense) are
+-- shown as plain points, not percentages, so they don't count.
 function ns.HasOtherRating(stats, ratingKey)
 	for key in pairs(stats) do
-		if key ~= ratingKey and key:find("_RATING_SHORT$") then
+		if key ~= ratingKey and key:find("_RATING_SHORT$") and not key:find("_SKILL_RATING_SHORT$") then
 			return true
 		end
 	end

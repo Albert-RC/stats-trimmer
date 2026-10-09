@@ -57,6 +57,11 @@ describe("HasOtherRating", function()
 		assert.is_false(ns.HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT"))
 	end)
 
+	it("ignores skill ratings, which are plain points", function()
+		local stats = { ITEM_MOD_BLOCK_RATING_SHORT = 5, ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = 3 }
+		assert.is_false(ns.HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT"))
+	end)
+
 	it("finds another rating stat", function()
 		local stats = { ITEM_MOD_BLOCK_RATING_SHORT = 5, ITEM_MOD_CRIT_RATING_SHORT = 14 }
 		assert.is_true(ns.HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT"))
