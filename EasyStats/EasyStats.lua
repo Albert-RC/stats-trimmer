@@ -92,6 +92,12 @@ local function GetReplacement(text, stats)
 		return { ("+%d MP5"):format(mp5) }
 	end
 
+	-- "Restores X health per 5 sec." -> "+X HP5"
+	local hp5 = stats.ITEM_MOD_HEALTH_REGEN_SHORT
+	if hp5 and NumbersMatch(text, hp5, 5) then
+		return { ("+%d HP5"):format(hp5) }
+	end
+
 	-- "+1.0% chance to block with a shield". The stat is a rating (5 for 1% seen so far), so the
 	-- percentage is read from the text, and only when no other rating could own that percentage.
 	if stats.ITEM_MOD_BLOCK_RATING_SHORT and not HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT") then
