@@ -42,8 +42,39 @@ local function NumbersMatch(text, damage, healing)
 	return true
 end
 
+-- Compact lines for an equip line, or nil when it isn't one of this item's spell stat lines
+local function GetReplacement(text, stats)
+	-- "Damage and healing by up to X" is a single spell power stat that counts as both
+	local power = stats.ITEM_MOD_SPELL_POWER_SHORT
+	if power and NumbersMatch(text, power) then
+		return { ("≤ %d spell power"):format(power), ("≤ %d healing power"):format(power) }
+	end
+
+	local damage = stats.ITEM_MOD_SPELL_DAMAGE_DONE_SHORT
+	local healing = stats.ITEM_MOD_SPELL_HEALING_DONE_SHORT
+	if (damage or healing) and NumbersMatch(text, damage, healing) then
+		local lines = {}
+		if damage then
+			table.insert(lines, ("≤ %d spell power"):format(damage))
+		end
+		if healing then
+			table.insert(lines, ("≤ %d healing power"):format(healing))
+		end
+		return lines
+	end
+
+	-- Single school damage, e.g. ITEM_MOD_FROST_DAMAGE_DONE_SHORT -> "≤ 32 frost damage"
+	for key, value in pairs(stats) do
+		local school = key:match("^ITEM_MOD_(%u+)_DAMAGE_DONE_SHORT$")
+		if school and school ~= "SPELL" and NumbersMatch(text, value) then
+			return { ("≤ %d %s damage"):format(value, school:lower()) }
+		end
+	end
+	return nil
+end
+
 -- Line pre-call: returning true keeps the original line out of the tooltip
-local function ReplaceSpellPowerLine(tooltip, lineData)
+local function ReplaceEquipLine(tooltip, lineData)
 	local text = lineData.leftText
 	if not text or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX then
 		return false
@@ -51,30 +82,17 @@ local function ReplaceSpellPowerLine(tooltip, lineData)
 
 	local link = GetProcessingItemLink(tooltip)
 	local stats = link and C_Item.GetItemStats(link)
-	if not stats then
-		return false
-	end
-
-	local power = stats.ITEM_MOD_SPELL_POWER_SHORT
-	local damage = stats.ITEM_MOD_SPELL_DAMAGE_DONE_SHORT
-	local healing = stats.ITEM_MOD_SPELL_HEALING_DONE_SHORT
-
-	-- "Damage and healing by up to X" is a single spell power stat that counts as both
-	if power and NumbersMatch(text, power) then
-		damage, healing = power, power
-	elseif not (damage or healing) or not NumbersMatch(text, damage, healing) then
+	local lines = stats and GetReplacement(text, stats)
+	if not lines then
 		return false
 	end
 
 	local r, g, b = (lineData.leftColor or NORMAL_FONT_COLOR):GetRGB()
-	if damage then
-		tooltip:AddLine(("≤ %d spell power"):format(damage), r, g, b)
-	end
-	if healing then
-		tooltip:AddLine(("≤ %d healing power"):format(healing), r, g, b)
+	for _, line in ipairs(lines) do
+		tooltip:AddLine(line, r, g, b)
 	end
 	return true
 end
 
 -- In Forever, equip lines arrive with type None, not ItemSpellTriggerOnEquip
-TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.None, ReplaceSpellPowerLine)
+TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.None, ReplaceEquipLine)
