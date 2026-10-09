@@ -16,14 +16,14 @@ local function GetProcessingItemLink(tooltip)
 end
 
 -- The tooltip wording varies per locale and per item, so the line is identified by its numbers:
--- they must be exactly the item's spell damage/healing values, nothing more and nothing less.
-local function NumbersMatch(text, damage, healing)
+-- they must be exactly the expected values (a and/or b), nothing more and nothing less.
+local function NumbersMatch(text, a, b)
 	local expected = {}
-	if damage then
-		expected[damage] = true
+	if a then
+		expected[a] = true
 	end
-	if healing then
-		expected[healing] = true
+	if b then
+		expected[b] = true
 	end
 
 	local found = {}
@@ -40,6 +40,29 @@ local function NumbersMatch(text, damage, healing)
 		end
 	end
 	return true
+end
+
+-- The percentage in a line ("1.0%", "1,0 %") as a short string ("1", "1.5").
+-- nil unless it is the only number in the line.
+local PERCENT_PATTERN = "%d+[%.,]?%d*%s*%%"
+
+local function GetOnlyPercent(text)
+	local percent = text:match(PERCENT_PATTERN)
+	if not percent or text:gsub(PERCENT_PATTERN, ""):find("%d") then
+		return nil
+	end
+	local value = tonumber((percent:match("[%d%.,]+"):gsub(",", ".")))
+	return value and tostring(value)
+end
+
+-- True when the item has a rating stat other than the given one
+local function HasOtherRating(stats, ratingKey)
+	for key in pairs(stats) do
+		if key ~= ratingKey and key:find("_RATING_SHORT$") then
+			return true
+		end
+	end
+	return false
 end
 
 -- Compact lines for an equip line, or nil when it isn't one of this item's stat lines
@@ -67,6 +90,15 @@ local function GetReplacement(text, stats)
 	local mp5 = stats.ITEM_MOD_MANA_REGENERATION_SHORT
 	if mp5 and NumbersMatch(text, mp5, 5) then
 		return { ("+%d MP5"):format(mp5) }
+	end
+
+	-- "+1.0% chance to block with a shield". The stat is a rating (5 for 1% seen so far), so the
+	-- percentage is read from the text, and only when no other rating could own that percentage.
+	if stats.ITEM_MOD_BLOCK_RATING_SHORT and not HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT") then
+		local percent = GetOnlyPercent(text)
+		if percent then
+			return { ("+%s%% block chance"):format(percent) }
+		end
 	end
 
 	-- Single school damage, e.g. ITEM_MOD_FROST_DAMAGE_DONE_SHORT -> "≤32 frost damage"
