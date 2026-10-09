@@ -10,7 +10,12 @@ globals = {
 
 -- Read-only WoW API (extend as needed)
 read_globals = {
+	"C_Item",
 	"CreateFrame",
 	"DEFAULT_CHAT_FRAME",
+	"Enum",
+	"ITEM_SPELL_TRIGGER_ONEQUIP",
+	"NORMAL_FONT_COLOR",
+	"TooltipDataProcessor",
 	"UIParent",
 }

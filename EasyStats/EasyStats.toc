@@ -1,0 +1,18 @@
+## Interface: 16001
+## Title: Easy Stats
+## Notes: Rewrites verbose stat lines in item tooltips into compact ones.
+## Author: Albert-RC
+## Version: 0.1.0
+## Category: User Interface
+## Category-deDE: Benutzerinterface
+## Category-esES: Interfaz de usuario
+## Category-esMX: Interfaz de usuario
+## Category-frFR: Interface utilisateur
+## Category-itIT: Interfaccia utente
+## Category-koKR: 사용자 인터페이스
+## Category-ptBR: Interface do usuário
+## Category-ruRU: Интерфейс пользователя
+## Category-zhCN: 用户界面
+## Category-zhTW: 使用者介面
+
+EasyStats.lua
