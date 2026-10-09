@@ -21,27 +21,63 @@ local function GetCreatureTypeName(id)
 	return info and info.name
 end
 
+local KEY_DOWN_CHECKS = {
+	CTRL = IsControlKeyDown,
+	ALT = IsAltKeyDown,
+	SHIFT = IsShiftKeyDown,
+}
+
+-- True while the user holds the key chosen to see the original tooltip text
+local function IsShowingOriginal()
+	local isKeyDown = ns.db and KEY_DOWN_CHECKS[ns.db.originalTextKey]
+	return isKeyDown and isKeyDown() or false
+end
+
 -- Line pre-call: returning true keeps the original line out of the tooltip
 local function ReplaceEquipLine(tooltip, lineData)
 	local text = lineData.leftText
-	if not text or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX then
+	if not text or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX or IsShowingOriginal() then
 		return false
 	end
 
 	local link, itemLines = GetProcessingItem(tooltip)
 	local stats = link and C_Item.GetItemStats(link)
-	local context = { lines = itemLines, GetCreatureTypeName = GetCreatureTypeName }
+	local context = { lines = itemLines, equipPrefix = EQUIP_PREFIX, GetCreatureTypeName = GetCreatureTypeName }
 	local lines = stats and ns.GetReplacement(text, stats, context)
 	if not lines then
 		return false
 	end
 
-	local r, g, b = (lineData.leftColor or NORMAL_FONT_COLOR):GetRGB()
+	-- Each line uses the color the user picked for its kind; the original line color is the fallback
+	local colors = ns.db and ns.db.colors or {}
+	local fallback = lineData.leftColor or NORMAL_FONT_COLOR
 	for _, line in ipairs(lines) do
-		tooltip:AddLine(line, r, g, b)
+		local color = colors[line.kind]
+		if color then
+			tooltip:AddLine(line.text, color.r, color.g, color.b)
+		else
+			tooltip:AddLine(line.text, fallback:GetRGB())
+		end
 	end
 	return true
 end
 
 -- In Forever, equip lines arrive with type None, not ItemSpellTriggerOnEquip
 TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.None, ReplaceEquipLine)
+
+-- Rebuilding re-runs the line pre-calls on the tooltip's original data (they never change it), so the
+-- tooltip switches between original and compact text. Comparison tooltips follow their main tooltip.
+local function RefreshItemTooltip(tooltip)
+	if tooltip:IsShown() and tooltip:IsTooltipType(Enum.TooltipDataType.Item) then
+		tooltip:RefreshData()
+	end
+end
+
+local modifierWatcher = CreateFrame("Frame")
+modifierWatcher:RegisterEvent("MODIFIER_STATE_CHANGED")
+modifierWatcher:SetScript("OnEvent", function(_, _, key)
+	if ns.db and ns.IsOriginalTextEventKey(ns.db.originalTextKey, key) then
+		RefreshItemTooltip(GameTooltip)
+		RefreshItemTooltip(ItemRefTooltip)
+	end
+end)

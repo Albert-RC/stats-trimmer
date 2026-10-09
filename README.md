@@ -4,7 +4,7 @@ Addons for World of Warcraft: Forever (`## Interface: 16001`, Lua 5.1).
 
 ## Layout
 
-- `EasyStats/`: rewrites verbose equip lines in item tooltips into compact ones, e.g. `≤10 spell power` / `≤30 healing power`. Works on any client locale.
+- `EasyStats/`: rewrites verbose equip lines in item tooltips into compact ones, e.g. `≤10 spell power` / `≤30 healing power`. Works on any client locale. Settings (a color per line kind with a live preview, and the key that shows the original text) open from the minimap button, which MinimapButtonButton also collects, or from Options > AddOns > Easy Stats.
 - `HelloForever/`: test addon. Shows a button that prints to chat and stores the click count in `HelloForeverDB`. `/helloforever` shows or hides it.
 
 Each addon folder is linked into the client through a directory junction; the rest of the repository never reaches the game.

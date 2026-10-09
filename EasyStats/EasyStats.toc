@@ -3,6 +3,8 @@
 ## Notes: Rewrites verbose stat lines in item tooltips into compact ones.
 ## Author: Albert-RC
 ## Version: 0.1.0
+## IconTexture: Interface\Icons\INV_Misc_Note_01
+## SavedVariables: EasyStatsDB
 ## Category: User Interface
 ## Category-deDE: Benutzerinterface
 ## Category-esES: Interfaz de usuario
@@ -16,5 +18,10 @@
 ## Category-zhTW: 使用者介面
 
 Util.lua
+Config.lua
 Rules.lua
 Tooltip.lua
+OptionsWindow.lua
+MinimapButton.lua
+SettingsCategory.lua
+Core.lua
