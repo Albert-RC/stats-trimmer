@@ -25,8 +25,17 @@ To remove the link without deleting the code: `rmdir "F:\World of Warcraft\_clas
 - StyLua (`stylua .`) and Luacheck (`luacheck .`)
 - In-game: BugSack + !BugGrabber to capture Lua errors
 
+## Tests
+
+The pure logic (e.g. `EasyStats/Util.lua`, `EasyStats/Rules.lua`) has unit tests in `spec/`, written in busted syntax. They run with LuaJIT and a small busted-compatible runner:
+
+```powershell
+winget install --id DEVCOM.LuaJIT -e   # once
+./scripts/test.ps1
+```
+
 ## Workflow
 
-Edit → `stylua --check .` and `luacheck .` → `/reload` in game → test.
+Edit → `stylua --check .`, `luacheck .` and `./scripts/test.ps1` → `/reload` in game → test.
 Restart the client when adding files to the `.toc` or adding new addons.
 Debugging: `/console scriptErrors 1`, `/etrace`, `/fstack`.

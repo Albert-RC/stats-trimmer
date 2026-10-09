@@ -20,3 +20,7 @@ read_globals = {
 	"TooltipDataProcessor",
 	"UIParent",
 }
+
+-- Specs use busted's globals; the runner is what defines them when busted isn't available
+files["spec"] = { std = "+busted" }
+files["spec/runner.lua"] = { globals = { "assert", "before_each", "describe", "it" } }
