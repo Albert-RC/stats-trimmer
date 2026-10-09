@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: Hello Forever
+## Notes: Test addon: a button that prints a message to chat.
+## Author: Albert-RC
+## Version: 0.1.0
+## SavedVariables: HelloForeverDB
+
+HelloForever.lua
