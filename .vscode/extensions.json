@@ -1,0 +1,4 @@
+{
+	"recommendations": ["sumneko.lua", "ketho.wow-api", "JohnnyMorganz.stylua"],
+	"unwantedRecommendations": ["septh.wow-bundle"]
+}

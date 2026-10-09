@@ -1,0 +1,9 @@
+{
+	"Lua.runtime.version": "Lua 5.1",
+	"[lua]": {
+		"editor.defaultFormatter": "JohnnyMorganz.stylua",
+		"editor.formatOnSave": true
+	},
+	"files.eol": "\n",
+	"files.encoding": "utf8"
+}
