@@ -55,9 +55,14 @@ local function ReplaceSpellPowerLine(tooltip, lineData)
 		return false
 	end
 
+	local power = stats.ITEM_MOD_SPELL_POWER_SHORT
 	local damage = stats.ITEM_MOD_SPELL_DAMAGE_DONE_SHORT
 	local healing = stats.ITEM_MOD_SPELL_HEALING_DONE_SHORT
-	if not (damage or healing) or not NumbersMatch(text, damage, healing) then
+
+	-- "Damage and healing by up to X" is a single spell power stat that counts as both
+	if power and NumbersMatch(text, power) then
+		damage, healing = power, power
+	elseif not (damage or healing) or not NumbersMatch(text, damage, healing) then
 		return false
 	end
 
