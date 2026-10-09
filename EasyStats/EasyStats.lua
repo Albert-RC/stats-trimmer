@@ -42,7 +42,7 @@ local function NumbersMatch(text, damage, healing)
 	return true
 end
 
--- Compact lines for an equip line, or nil when it isn't one of this item's spell stat lines
+-- Compact lines for an equip line, or nil when it isn't one of this item's stat lines
 local function GetReplacement(text, stats)
 	-- "Damage and healing by up to X" is a single spell power stat that counts as both
 	local power = stats.ITEM_MOD_SPELL_POWER_SHORT
@@ -61,6 +61,12 @@ local function GetReplacement(text, stats)
 			table.insert(lines, ("≤%d healing power"):format(healing))
 		end
 		return lines
+	end
+
+	-- "Restores X mana per 5 sec." -> "+X MP5"; the 5 seconds are also a number in the line
+	local mp5 = stats.ITEM_MOD_MANA_REGENERATION_SHORT
+	if mp5 and NumbersMatch(text, mp5, 5) then
+		return { ("+%d MP5"):format(mp5) }
 	end
 
 	-- Single school damage, e.g. ITEM_MOD_FROST_DAMAGE_DONE_SHORT -> "≤32 frost damage"
