@@ -1,5 +1,5 @@
--- LuaCov settings for scripts/coverage.ps1. Only the shipped addon code is measured; HelloForever is the
--- dev-setup test addon and specs/tools aren't addon code.
+-- LuaCov settings for scripts/coverage.ps1. Only the shipped addon code is measured: specs and tools
+-- aren't addon code.
 return {
 	include = { "^StatsTrimmer/" },
 	statsfile = "luacov.stats.out",
