@@ -51,6 +51,31 @@ describe("Minimap button", function()
 		end)
 	end)
 
+	describe("when the minimap is resized", function()
+		it("moves to the new edge", function()
+			ns.db.minimap.angle = 0
+			wow.env.Minimap.width = 200
+			fakes.Fire(wow.env.Minimap, "OnSizeChanged")
+			local x, y = Position()
+			assert.are.near(110, x, 0.001)
+			assert.are.near(0, y, 0.001)
+		end)
+
+		it("stays where MinimapButtonButton put it", function()
+			button:SetParent(fakes.NewFrame(wow, "Frame", "MinimapButtonButtonContainer"))
+			local points = button.points
+			fakes.Fire(wow.env.Minimap, "OnSizeChanged")
+			assert.are.equal(points, button.points)
+		end)
+
+		it("waits for the saved angle", function()
+			wow = fakes.NewWoW()
+			helpers.LoadAddon("StatsTrimmer", helpers.TocFiles("StatsTrimmer"), wow.env)
+			fakes.Fire(wow.env.Minimap, "OnSizeChanged")
+			assert.are.same({}, wow.env.StatsTrimmerMinimapButton.points)
+		end)
+	end)
+
 	describe("dragging", function()
 		-- Cursor positions are in screen pixels: the minimap's UI scale converts them to its coordinates
 		before_each(function()

@@ -57,6 +57,17 @@ function Frame:GetScript(name)
 	return self.scripts[name]
 end
 
+-- Like the client: the hook runs after the frame's own handler, if it has one
+function Frame:HookScript(name, hook)
+	local handler = self.scripts[name]
+	self.scripts[name] = function(...)
+		if handler then
+			handler(...)
+		end
+		hook(...)
+	end
+end
+
 function Frame:RegisterEvent(event)
 	self.events[event] = true
 end

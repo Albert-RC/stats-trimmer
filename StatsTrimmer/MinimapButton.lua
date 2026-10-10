@@ -35,6 +35,14 @@ function ns.UpdateMinimapButtonPosition()
 	button:SetPoint("CENTER", Minimap, "CENTER", math.cos(angle) * radius, math.sin(angle) * radius)
 end
 
+-- Minimap addons can resize the minimap after login. The button follows the new edge, unless it is still
+-- waiting for the saved angle or MinimapButtonButton has collected it.
+Minimap:HookScript("OnSizeChanged", function()
+	if ns.db and button:GetParent() == Minimap then
+		ns.UpdateMinimapButtonPosition()
+	end
+end)
+
 local function FollowCursor()
 	local centerX, centerY = Minimap:GetCenter()
 	local cursorX, cursorY = GetCursorPosition()

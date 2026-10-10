@@ -63,12 +63,18 @@ local function IsColor(value)
 		return false
 	end
 	for _, channel in ipairs({ "r", "g", "b" }) do
+		-- Written so that nan, which fails every comparison, is rejected too
 		local number = value[channel]
-		if type(number) ~= "number" or number < 0 or number > 1 then
+		if type(number) ~= "number" or not (number >= 0 and number <= 1) then
 			return false
 		end
 	end
 	return true
+end
+
+-- A number the button can be placed at: not nan or infinite
+local function IsAngle(value)
+	return type(value) == "number" and value > -math.huge and value < math.huge
 end
 
 local function IsOriginalTextKey(value)
@@ -107,7 +113,7 @@ function ns.LoadSettings(saved)
 	if type(settings.minimap) ~= "table" then
 		settings.minimap = {}
 	end
-	if type(settings.minimap.angle) ~= "number" then
+	if not IsAngle(settings.minimap.angle) then
 		settings.minimap.angle = ns.DEFAULTS.minimap.angle
 	end
 
