@@ -4,6 +4,8 @@
 -- context.lines                  all the item's tooltip data lines ({ leftText = ... })
 -- context.equipPrefix            localized "Equip:" prefix
 -- context.GetCreatureTypeName(id) localized creature type name ("Bestia" on esES), or nil
+-- context.GetStatName(key)        the client's name for a stat key ("Poder de ataque contra bestias"), or nil
+-- context.FoldCase(text)          text folded to lowercase, Unicode-aware ("Élémentaire" -> "élémentaire")
 --
 -- The tooltip wording varies per locale, so lines are matched to the item's stats by their numbers. Each
 -- rule turns the item's stats into claims on its equip lines; a line is only rewritten when exactly one
@@ -13,6 +15,7 @@ local _, ns = ...
 
 local NumbersMatch = ns.NumbersMatch
 local GetOnlyPercent = ns.GetOnlyPercent
+local FormatLine = ns.FormatLine
 
 -- Creature types a stat can be restricted to: stat key suffix -> creature type ID and output label.
 -- All of these ITEM_MOD_<STAT>_VS_<TYPE>_SHORT keys exist in the client; BEAST and ELEMENTAL have been
@@ -28,20 +31,21 @@ local VS_CREATURE_TYPES = {
 	MECHANICAL = { id = 9, label = "mechanicals" },
 }
 
--- Stats that can be restricted to a creature type: ITEM_MOD_<stat>_VS_<TYPE>_SHORT -> line kind and format
+-- Stats that can be restricted to a creature type: ITEM_MOD_<stat>_VS_<TYPE>_SHORT -> line kind, sign and
+-- English name
 local VS_STATS = {
-	ATTACK_POWER = { kind = "attackPowerVs", format = "+%d attack power vs %s" },
-	SPELL_DAMAGE = { kind = "spellDamageVs", format = "≤%d spell damage vs %s" },
+	ATTACK_POWER = { kind = "attackPowerVs", sign = "+", name = "attack power" },
+	SPELL_DAMAGE = { kind = "spellDamageVs", sign = "≤", name = "spell damage" },
 }
 
 -- Stats whose equip line shows exactly the stat value
 local POINT_STATS = {
 	-- The key says RATING, but defense shows plain skill points ("Increased Defense +3.")
-	{ key = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT", kind = "defense", format = "+%d defense" },
-	{ key = "ITEM_MOD_RANGED_ATTACK_POWER_SHORT", kind = "rangedAttackPower", format = "+%d ranged attack power" },
-	{ key = "ITEM_MOD_FERAL_ATTACK_POWER_SHORT", kind = "feralAttackPower", format = "+%d feral attack power" },
-	{ key = "ITEM_MOD_BLOCK_VALUE_SHORT", kind = "blockValue", format = "+%d block value" },
-	{ key = "ITEM_MOD_SPELL_PENETRATION_SHORT", kind = "spellPenetration", format = "+%d spell penetration" },
+	{ key = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT", kind = "defense", name = "defense" },
+	{ key = "ITEM_MOD_RANGED_ATTACK_POWER_SHORT", kind = "rangedAttackPower", name = "ranged attack power" },
+	{ key = "ITEM_MOD_FERAL_ATTACK_POWER_SHORT", kind = "feralAttackPower", name = "feral attack power" },
+	{ key = "ITEM_MOD_BLOCK_VALUE_SHORT", kind = "blockValue", name = "block value" },
+	{ key = "ITEM_MOD_SPELL_PENETRATION_SHORT", kind = "spellPenetration", name = "spell penetration" },
 }
 
 -- Weapon skills, in output order: ITEM_MOD_<key>_SHORT -> label
@@ -74,16 +78,25 @@ local PERCENT_RATINGS = {
 	ITEM_MOD_PARRY_RATING_SHORT = { kind = "parryRating", label = "parry rating" },
 }
 
--- A compact line; `kind` picks its color (ns.COLOR_KINDS), unknown kinds keep the original line color
-local function Line(kind, text)
-	return { kind = kind, text = text }
+-- A compact line. `text` is the English line; `sign`, `value`, `percent` and the stat keys in `stats` let
+-- ns.LocalizeLines rebuild it with Blizzard's stat names. Without `stats` it is never translated. `kind` picks its color (ns.COLOR_KINDS);
+-- unknown kinds keep the original line color.
+local function Line(kind, sign, value, name, stats, percent)
+	return {
+		kind = kind,
+		text = FormatLine(sign, value, percent, name),
+		sign = sign,
+		value = value,
+		percent = percent,
+		stats = stats,
+	}
 end
 
 -- A claim is a stat (or a group of stats) that can own equip lines:
 --   numbers   { a[, b] }: the numbers its line shows, exactly (ns.NumbersMatch)
 --   percent   true instead of numbers: its line shows a lone percentage
 --   size      how many equip lines it owns; a group of weapon skills owns one line per skill
---   creature  { name, label, stat, value } for a "<stat> vs <creature type>" stat whose type is known
+--   creature  { terms, label, stat, key, value } for a "<stat> vs <creature type>" stat whose type is known
 --   Render    function(text) -> compact lines. nil when the owner is known but has no compact form: it
 --             still keeps other stats from taking its line.
 local function Claim(numbers, lines)
@@ -96,18 +109,67 @@ local function Claim(numbers, lines)
 	}
 end
 
+local function LastWord(text)
+	return text and text:match("(%S+)%s*$")
+end
+
+-- The last word of the client's name for "<stat> vs <creature type>" ("bestias"), or nil
+local function VsWord(GetStatName, stat, typeKey)
+	return LastWord(GetStatName("ITEM_MOD_" .. stat .. "_VS_" .. typeKey .. "_SHORT"))
+end
+
+-- The client's name for a stat key, or nil. Names of "<stat> vs <creature type>" stats are checked first:
+-- the esES client calls spell damage vs beasts "Daño con hechizos contra mecánicos" and vs mechanicals
+-- "…contra humanoides". Attack power, the vs stat seen on items, is the reference: its name is trusted
+-- when no other creature type's name ends in the same word, and other stats' names must end in the same
+-- word as the attack power name for their type.
+local function GetTrustedStatName(GetStatName, key)
+	local name = GetStatName(key)
+	local typeKey = key:match("_VS_(%u+)_SHORT$")
+	if not (name and VS_CREATURE_TYPES[typeKey]) then
+		return name
+	end
+	local reference = VsWord(GetStatName, "ATTACK_POWER", typeKey)
+	if not reference or LastWord(name) ~= reference then
+		return nil
+	end
+	for otherKey in pairs(VS_CREATURE_TYPES) do
+		if otherKey ~= typeKey and VsWord(GetStatName, "ATTACK_POWER", otherKey) == reference then
+			return nil
+		end
+	end
+	return name
+end
+
+-- Folded words that name a creature type in a tooltip line: the client's type name ("Bestia") and the last
+-- word of the stat's own localized name ("Poder de ataque contra bestias"), which is usually the form the
+-- tooltip uses, even in locales that decline it
+local function CreatureTerms(context, creatureType, key)
+	local terms = {}
+	local typeName = context.GetCreatureTypeName(creatureType.id)
+	if typeName then
+		table.insert(terms, context.FoldCase(typeName))
+	end
+	local lastWord = LastWord(GetTrustedStatName(context.GetStatName, key))
+	if lastWord then
+		table.insert(terms, context.FoldCase(lastWord))
+	end
+	return terms
+end
+
 -- Turns the item's stats into claims; each rule calls Add(claim) for every claim it makes. The order
 -- doesn't matter: a line with more than one possible owner is left alone.
 ns.Rules = {
 	{
-		-- "Damage and healing by up to X" is a single spell power stat that counts as both
+		-- "Damage and healing by up to X" is a single spell power stat that counts as both: it shows as the
+		-- same two lines as an item with separate spell damage and healing
 		name = "combined spell power",
 		claims = function(stats, _, Add)
 			local power = stats.ITEM_MOD_SPELL_POWER_SHORT
 			if power then
 				Add(Claim({ power }, {
-					Line("spellPower", ("≤%d spell power"):format(power)),
-					Line("healingPower", ("≤%d healing power"):format(power)),
+					Line("spellDamage", "≤", power, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" }),
+					Line("spellHealing", "≤", power, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" }),
 				}))
 			end
 		end,
@@ -123,31 +185,38 @@ ns.Rules = {
 			end
 			local lines = {}
 			if damage then
-				table.insert(lines, Line("spellPower", ("≤%d spell power"):format(damage)))
+				table.insert(
+					lines,
+					Line("spellDamage", "≤", damage, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" })
+				)
 			end
 			if healing then
-				table.insert(lines, Line("healingPower", ("≤%d healing power"):format(healing)))
+				table.insert(
+					lines,
+					Line("spellHealing", "≤", healing, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" })
+				)
 			end
 			Add(Claim({ damage, healing }, lines))
 		end,
 	},
 	{
-		-- "Restores X mana per 5 sec." -> "+X MP5"; the 5 seconds are also a number in the line
+		-- "Restores X mana per 5 sec." -> "+X MP5" in every language: the line has no stat names to translate.
+		-- The 5 seconds are also a number in the line.
 		name = "MP5",
 		claims = function(stats, _, Add)
 			local mp5 = stats.ITEM_MOD_MANA_REGENERATION_SHORT
 			if mp5 then
-				Add(Claim({ mp5, 5 }, { Line("mp5", ("+%d MP5"):format(mp5)) }))
+				Add(Claim({ mp5, 5 }, { Line("mp5", "+", mp5, "MP5") }))
 			end
 		end,
 	},
 	{
-		-- "Restores X health per 5 sec." -> "+X HP5"
+		-- "Restores X health per 5 sec." -> "+X HP5", like MP5
 		name = "HP5",
 		claims = function(stats, _, Add)
 			local hp5 = stats.ITEM_MOD_HEALTH_REGEN_SHORT
 			if hp5 then
-				Add(Claim({ hp5, 5 }, { Line("hp5", ("+%d HP5"):format(hp5)) }))
+				Add(Claim({ hp5, 5 }, { Line("hp5", "+", hp5, "HP5") }))
 			end
 		end,
 	},
@@ -156,14 +225,15 @@ ns.Rules = {
 		claims = function(stats, _, Add)
 			local attackPower = stats.ITEM_MOD_ATTACK_POWER_SHORT
 			if attackPower then
-				Add(Claim({ attackPower }, { Line("attackPower", ("+%d attack power"):format(attackPower)) }))
+				local line = Line("attackPower", "+", attackPower, "attack power", { "ITEM_MOD_ATTACK_POWER_SHORT" })
+				Add(Claim({ attackPower }, { line }))
 			end
 		end,
 	},
 	{
 		-- "<stat> vs <creature type>", e.g. ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT -> "+6 attack power vs
-		-- beasts". A plain line and a vs line can share the same number, so the client's localized creature
-		-- type name tells them apart (see LocateCreatures). An unknown type still claims its number.
+		-- beasts". A plain line and a vs line can share the same number, so words naming the creature type
+		-- tell them apart (see LocateCreatures). An unknown type still claims its number.
 		name = "stat vs creature type",
 		claims = function(stats, context, Add)
 			for key, value in pairs(stats) do
@@ -172,11 +242,12 @@ ns.Rules = {
 				if vs then
 					local creatureType = VS_CREATURE_TYPES[typeKey]
 					if creatureType then
-						local claim = Claim({ value }, { Line(vs.kind, vs.format:format(value, creatureType.label)) })
-						local name = context.GetCreatureTypeName(creatureType.id)
-						if name then
+						local name = vs.name .. " vs " .. creatureType.label
+						local claim = Claim({ value }, { Line(vs.kind, vs.sign, value, name, { key }) })
+						local terms = CreatureTerms(context, creatureType, key)
+						if #terms > 0 then
 							claim.creature =
-								{ name = name:lower(), label = creatureType.label, stat = stat, value = value }
+								{ terms = terms, label = creatureType.label, stat = stat, key = key, value = value }
 						end
 						Add(claim)
 					else
@@ -192,7 +263,7 @@ ns.Rules = {
 			for _, stat in ipairs(POINT_STATS) do
 				local value = stats[stat.key]
 				if value then
-					Add(Claim({ value }, { Line(stat.kind, stat.format:format(value)) }))
+					Add(Claim({ value }, { Line(stat.kind, "+", value, stat.name, { stat.key }) }))
 				end
 			end
 		end,
@@ -203,18 +274,20 @@ ns.Rules = {
 		-- line becomes a combined line ("+7 axes/daggers/swords skill") and whose other lines are removed.
 		name = "weapon skills",
 		claims = function(stats, _, Add)
-			local labelsByValue = {}
+			local groups = {}
 			for _, skill in ipairs(WEAPON_SKILLS) do
-				local value = stats["ITEM_MOD_" .. skill.key .. "_SHORT"]
+				local key = "ITEM_MOD_" .. skill.key .. "_SHORT"
+				local value = stats[key]
 				if value then
-					labelsByValue[value] = labelsByValue[value] or {}
-					table.insert(labelsByValue[value], skill.label)
+					groups[value] = groups[value] or { labels = {}, keys = {} }
+					table.insert(groups[value].labels, skill.label)
+					table.insert(groups[value].keys, key)
 				end
 			end
-			for value, labels in pairs(labelsByValue) do
-				local text = ("+%d %s skill"):format(value, table.concat(labels, "/"))
-				local claim = Claim({ value }, { Line("weaponSkill", text) })
-				claim.size = #labels
+			for value, group in pairs(groups) do
+				local name = table.concat(group.labels, "/") .. " skill"
+				local claim = Claim({ value }, { Line("weaponSkill", "+", value, name, group.keys) })
+				claim.size = #group.keys
 				Add(claim)
 			end
 		end,
@@ -233,7 +306,7 @@ ns.Rules = {
 					local claim = { percent = true, size = 1 }
 					if rating then
 						claim.Render = function(text)
-							return { Line(rating.kind, ("+%s%% %s"):format(GetOnlyPercent(text), rating.label)) }
+							return { Line(rating.kind, "+", GetOnlyPercent(text), rating.label, { key }, true) }
 						end
 					end
 					Add(claim)
@@ -249,7 +322,7 @@ ns.Rules = {
 				local school = key:match("^ITEM_MOD_(%u+)_DAMAGE_DONE_SHORT$")
 				if school and school ~= "SPELL" then
 					local name = school:lower()
-					Add(Claim({ value }, { Line(name .. "Damage", ("≤%d %s damage"):format(value, name)) }))
+					Add(Claim({ value }, { Line(name .. "Damage", "≤", value, name .. " damage", { key }) }))
 				end
 			end
 		end,
@@ -293,16 +366,28 @@ local function Matches(claim, text)
 	return NumbersMatch(text, claim.numbers[1], claim.numbers[2])
 end
 
+-- Where a folded line first names the claim's creature type, or nil
+local function FindCreature(claim, foldedText)
+	local first
+	for _, term in ipairs(claim.creature and claim.creature.terms or {}) do
+		local position = foldedText:find(term, 1, true)
+		if position and (not first or position < first) then
+			first = position
+		end
+	end
+	return first
+end
+
 -- A creature claim is located in the lines it matches that name its creature type. Once located it
 -- leaves its other lines, and a line where some claim is located keeps only the claims located there.
 -- Only equip lines are searched: the item name can mention a creature type too.
-local function LocateCreatures(lines, matches)
+local function LocateCreatures(lines, matches, FoldCase)
 	local locatedIn, locatedAnywhere = {}, {}
 	for i, text in ipairs(lines) do
 		locatedIn[i] = {}
-		local lowerText = text:lower()
+		local foldedText = FoldCase(text)
 		for _, claim in ipairs(matches[i]) do
-			if claim.creature and lowerText:find(claim.creature.name, 1, true) then
+			if FindCreature(claim, foldedText) then
 				locatedIn[i][claim] = true
 				locatedAnywhere[claim] = true
 			end
@@ -321,7 +406,7 @@ local function LocateCreatures(lines, matches)
 end
 
 -- matches[i]: the claims that could own equip line i
-local function MatchClaims(lines, claims)
+local function MatchClaims(lines, claims, FoldCase)
 	local matches = {}
 	for i, text in ipairs(lines) do
 		matches[i] = {}
@@ -331,42 +416,44 @@ local function MatchClaims(lines, claims)
 			end
 		end
 	end
-	LocateCreatures(lines, matches)
+	LocateCreatures(lines, matches, FoldCase)
 	return matches
 end
 
 -- One line that names several creature types for the same stat ("+150 Attack Power when fighting Undead
 -- and Demons") becomes one compact line with every type, in the order the line names them. nil unless
 -- every claim is a creature type of that stat named in the line.
-local function CombineCreatures(claims, text)
+local function CombineCreatures(claims, text, FoldCase)
 	local stat = claims[1].creature and claims[1].creature.stat
-	local lowerText = text:lower()
+	local foldedText = FoldCase(text)
 	local found = {}
 	for _, claim in ipairs(claims) do
 		local creature = claim.creature
-		local position = creature and creature.stat == stat and lowerText:find(creature.name, 1, true)
+		local position = creature and creature.stat == stat and FindCreature(claim, foldedText)
 		if not position then
 			return nil
 		end
-		table.insert(found, { position = position, label = creature.label })
+		table.insert(found, { position = position, creature = creature })
 	end
 	table.sort(found, function(a, b)
 		return a.position < b.position
 	end)
 
-	local labels = {}
+	local labels, keys = {}, {}
 	for _, entry in ipairs(found) do
-		table.insert(labels, entry.label)
+		table.insert(labels, entry.creature.label)
+		table.insert(keys, entry.creature.key)
 	end
 	local vs = VS_STATS[stat]
-	return { Line(vs.kind, vs.format:format(claims[1].creature.value, table.concat(labels, "/"))) }
+	local name = vs.name .. " vs " .. table.concat(labels, "/")
+	return { Line(vs.kind, vs.sign, claims[1].creature.value, name, keys) }
 end
 
 -- Compact lines for an equip line (possibly empty, meaning "remove it"), or nil to keep its text: it isn't
 -- one of this item's stat lines, or more than one stat could own it.
 function ns.GetReplacement(text, stats, context)
 	local lines, index = GetEquipLines(text, context)
-	local matches = MatchClaims(lines, GetClaims(stats, context))
+	local matches = MatchClaims(lines, GetClaims(stats, context), context.FoldCase)
 
 	-- Each claim must match exactly its own number of lines: an extra line with the same numbers could be
 	-- an unrelated effect or a stat no rule knows
@@ -387,7 +474,7 @@ function ns.GetReplacement(text, stats, context)
 		end
 	end
 	if #claims > 1 then
-		return CombineCreatures(claims, text)
+		return CombineCreatures(claims, text, context.FoldCase)
 	end
 
 	local claim = claims[1]
@@ -403,4 +490,43 @@ function ns.GetReplacement(text, stats, context)
 		end
 	end
 	return claim.Render(text)
+end
+
+-- The names for a line's stats, or nil if any is missing or the line has no stat names (MP5, HP5, or a line
+-- already localized)
+local function GetStatNames(line, GetStatName)
+	if not line.stats then
+		return nil
+	end
+	local names = {}
+	for i, key in ipairs(line.stats) do
+		local name = GetTrustedStatName(GetStatName, key)
+		if not name then
+			return nil
+		end
+		names[i] = name
+	end
+	return names
+end
+
+-- The compact lines with Blizzard's stat names from GetStatName instead of English ("≤10 Daño con
+-- hechizos"). A line naming several stats (a group of weapon skills, several creature types) becomes one
+-- line per stat. A line stays as it is when one of its names is missing or untrusted, so a second pass with
+-- other names can still translate it.
+function ns.LocalizeLines(lines, GetStatName)
+	local localized = {}
+	for _, line in ipairs(lines) do
+		local names = GetStatNames(line, GetStatName)
+		if names then
+			for _, name in ipairs(names) do
+				table.insert(
+					localized,
+					{ kind = line.kind, text = FormatLine(line.sign, line.value, line.percent, name) }
+				)
+			end
+		else
+			table.insert(localized, line)
+		end
+	end
+	return localized
 end

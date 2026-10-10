@@ -45,3 +45,8 @@ function ns.GetOnlyPercent(text)
 	local value = tonumber((percent:match("[%d%.,]+"):gsub(",", ".")))
 	return value and tostring(value)
 end
+
+-- A compact line's text, in English or with the client's stat name: "≤10 spell damage", "+1% golpe"
+function ns.FormatLine(sign, value, percent, name)
+	return ("%s%s%s %s"):format(sign, value, percent and "%" or "", name)
+end
