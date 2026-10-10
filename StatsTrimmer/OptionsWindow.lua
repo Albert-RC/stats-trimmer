@@ -150,13 +150,13 @@ local function CreatePreviewPanel(colorsPanel)
 	CreateHeader(panel, "Preview")
 
 	-- Kept in the window's strata so the color picker (DIALOG) stays on top of it
-	previewTooltip = CreateFrame("GameTooltip", "EasyStatsPreviewTooltip", panel, "GameTooltipTemplate")
+	previewTooltip = CreateFrame("GameTooltip", "StatsTrimmerPreviewTooltip", panel, "GameTooltipTemplate")
 	previewTooltip:SetFrameStrata(frame:GetFrameStrata())
 	previewTooltip:SetFrameLevel(panel:GetFrameLevel() + 10)
 end
 
 local function CreateWindow()
-	frame = CreateFrame("Frame", "EasyStatsOptionsFrame", UIParent, "PortraitFrameTemplate")
+	frame = CreateFrame("Frame", "StatsTrimmerOptionsFrame", UIParent, "PortraitFrameTemplate")
 	frame:Hide()
 	frame:SetSize(WIDTH, HEIGHT)
 	frame:SetPoint("CENTER")
@@ -168,7 +168,7 @@ local function CreateWindow()
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-	frame:SetTitle("Easy Stats")
+	frame:SetTitle("Stats Trimmer")
 	frame:SetPortraitToAsset(ns.ICON)
 	-- Plain Hide: this window isn't managed by the UI panel system
 	frame.CloseButton:SetScript("OnClick", function()

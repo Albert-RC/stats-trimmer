@@ -1,4 +1,4 @@
--- A small fake of the WoW API pieces Easy Stats uses. It records what the addon does (scripts, events,
+-- A small fake of the WoW API pieces Stats Trimmer uses. It records what the addon does (scripts, events,
 -- tooltip lines, colors, positions, registrations) so specs can assert on observable behavior.
 -- fakes.NewWoW() returns a fresh, independent world; load addon files into `wow.env` with helpers.LoadAddon.
 local fakes = {}

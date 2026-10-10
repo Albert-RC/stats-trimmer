@@ -14,8 +14,8 @@ describe("Minimap button", function()
 
 	before_each(function()
 		wow = fakes.NewWoW()
-		ns = helpers.StartEasyStats(wow)
-		button = wow.env.EasyStatsMinimapButton
+		ns = helpers.StartStatsTrimmer(wow)
+		button = wow.env.StatsTrimmerMinimapButton
 	end)
 
 	it("is a Minimap child whose name MinimapButtonButton collects", function()
@@ -42,9 +42,9 @@ describe("Minimap button", function()
 
 		it("starts at the angle saved in a previous session", function()
 			wow = fakes.NewWoW()
-			wow.env.EasyStatsDB = { minimap = { angle = 180 } }
-			helpers.StartEasyStats(wow)
-			button = wow.env.EasyStatsMinimapButton
+			wow.env.StatsTrimmerDB = { minimap = { angle = 180 } }
+			helpers.StartStatsTrimmer(wow)
+			button = wow.env.StatsTrimmerMinimapButton
 			local x, y = Position()
 			assert.are.near(-80, x, 0.001)
 			assert.are.near(0, y, 0.001)
@@ -85,16 +85,16 @@ describe("Minimap button", function()
 
 	it("opens and closes the settings window when clicked", function()
 		fakes.Fire(button, "OnClick")
-		assert.is_true(wow.env.EasyStatsOptionsFrame:IsShown())
+		assert.is_true(wow.env.StatsTrimmerOptionsFrame:IsShown())
 		fakes.Fire(button, "OnClick")
-		assert.is_false(wow.env.EasyStatsOptionsFrame:IsShown())
+		assert.is_false(wow.env.StatsTrimmerOptionsFrame:IsShown())
 	end)
 
 	it("explains itself on hover", function()
 		fakes.Fire(button, "OnEnter")
 		local tooltip = wow.env.GameTooltip
 		assert.are.equal(button, tooltip:GetOwner())
-		assert.are.equal("Easy Stats", tooltip.lines[1].text)
+		assert.are.equal("Stats Trimmer", tooltip.lines[1].text)
 		assert.are.equal("Click to open settings.", tooltip.lines[2].text)
 		assert.is_true(tooltip:IsShown())
 

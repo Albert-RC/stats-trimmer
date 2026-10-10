@@ -1,7 +1,7 @@
 local helpers = require("spec.helpers")
 
 local function LoadConfig()
-	return helpers.LoadAddon("EasyStats", { "Config.lua" })
+	return helpers.LoadAddon("StatsTrimmer", { "Config.lua" })
 end
 
 describe("DEFAULTS", function()

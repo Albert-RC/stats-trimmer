@@ -16,7 +16,7 @@ local CRIT_LINE = "Equipar: Mejora tu probabilidad de conseguir un golpe crític
 -- namespace and the registered line pre-call.
 local function Setup()
 	local wow = fakes.NewWoW()
-	local ns = helpers.LoadAddon("EasyStats", { "Util.lua", "Config.lua", "Rules.lua", "Tooltip.lua" }, wow.env)
+	local ns = helpers.LoadAddon("StatsTrimmer", { "Util.lua", "Config.lua", "Rules.lua", "Tooltip.lua" }, wow.env)
 	ns.db = ns.LoadSettings(nil)
 	wow.items["item:cosedora"] = COSEDORA_STATS
 	wow.items["item:crit"] = { ITEM_MOD_CRIT_RATING_SHORT = 14 }

@@ -1,4 +1,4 @@
-# Runs the unit tests under LuaCov and checks the line coverage of EasyStats/.
+# Runs the unit tests under LuaCov and checks the line coverage of StatsTrimmer/.
 # Needs LuaJIT and LuaCov 0.17.0 in %LOCALAPPDATA%\Programs\luacov (see README).
 # Usage: ./scripts/coverage.ps1 [-Minimum 85]
 param([double]$Minimum = 85)
@@ -21,7 +21,7 @@ try {
 
 	# The report ends with a Summary table: "<file> <hits> <missed> <coverage>%" rows and a Total row
 	$summary = ((Get-Content luacov.report.out -Raw) -split '(?m)^Summary\s*$')[-1]
-	$rows = $summary -split "`r?`n" | Where-Object { $_ -match '^(EasyStats[\\/]\S+|Total)\s+\d+\s+\d+\s+[\d.]+%' }
+	$rows = $summary -split "`r?`n" | Where-Object { $_ -match '^(StatsTrimmer[\\/]\S+|Total)\s+\d+\s+\d+\s+[\d.]+%' }
 	$rows | ForEach-Object { $_ }
 
 	$total = [double](($rows | Where-Object { $_ -like 'Total*' }) -replace '.*\s([\d.]+)%.*', '$1')

@@ -7,8 +7,8 @@ loader:SetScript("OnEvent", function(self, event, name)
 	if name ~= addonName then
 		return
 	end
-	EasyStatsDB = ns.LoadSettings(EasyStatsDB)
-	ns.db = EasyStatsDB
+	StatsTrimmerDB = ns.LoadSettings(StatsTrimmerDB)
+	ns.db = StatsTrimmerDB
 
 	ns.UpdateMinimapButtonPosition()
 	ns.RegisterSettingsCategory()

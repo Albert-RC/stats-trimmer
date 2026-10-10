@@ -1,6 +1,6 @@
 -- Real cases seen in-game on an esES client (text and GetItemStats output), plus enUS variants
 local helpers = require("spec.helpers")
-local ns = helpers.LoadAddon("EasyStats", { "Util.lua", "Rules.lua" })
+local ns = helpers.LoadAddon("StatsTrimmer", { "Util.lua", "Rules.lua" })
 
 -- Creature type names as C_CreatureInfo.GetCreatureTypeInfo returns them. ruRU stands for a locale whose
 -- tooltip uses a declined form that doesn't contain the type name.
