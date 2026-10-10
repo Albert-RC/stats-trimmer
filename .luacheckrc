@@ -19,6 +19,7 @@ read_globals = {
 	"Enum",
 	"GameTooltip",
 	"GetCursorPosition",
+	"issecretvalue",
 	"IsAltKeyDown",
 	"IsControlKeyDown",
 	"IsShiftKeyDown",

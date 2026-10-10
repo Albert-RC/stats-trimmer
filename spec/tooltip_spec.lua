@@ -84,6 +84,18 @@ describe("Tooltip line pre-call", function()
 		assert.are.equal("+6 attack power vs beasts", vsBeasts[1].text)
 	end)
 
+	it("doesn't read the item's lines whose text is a secret", function()
+		-- Without the vs line, nothing tells the plain line apart from it
+		wow.items["item:nudillos"] = { ITEM_MOD_ATTACK_POWER_SHORT = 6, ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = 6 }
+		local lines = {
+			{ leftText = "Equipar: +6 p. de poder de ataque." },
+			{ leftText = "Equipar: +6 p. de poder de ataque contra bestias." },
+		}
+		wow.secretTexts[lines[2].leftText] = true
+		local consumed = ProcessLine(wow, preCall, lines[1].leftText, { hyperlink = "item:nudillos", lines = lines })
+		assert.is_false(consumed)
+	end)
+
 	it("removes the extra lines of weapon skills that share a number", function()
 		wow.items["item:edgemaster"] =
 			{ ITEM_MOD_AXES_SHORT = 7, ITEM_MOD_DAGGERS_SHORT = 7, ITEM_MOD_SWORDS_SHORT = 7 }
@@ -124,6 +136,11 @@ describe("Tooltip line pre-call", function()
 
 		it("when no rule recognizes it", function()
 			AssertUntouched(ProcessLine(wow, preCall, "Equipar: Permite respirar bajo el agua."))
+		end)
+
+		it("when its text is a secret", function()
+			wow.secretTexts[COSEDORA_LINE] = true
+			AssertUntouched(ProcessLine(wow, preCall, COSEDORA_LINE))
 		end)
 
 		it("when more than one stat could own it", function()

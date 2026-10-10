@@ -245,6 +245,7 @@ function fakes.NewWoW(options)
 		items = {}, -- link -> GetItemStats result
 		guids = {}, -- guid -> link
 		keysDown = {}, -- "CTRL" / "ALT" / "SHIFT" -> true
+		secretTexts = {}, -- text -> true: issecretvalue reports it as a secret
 		cursor = { 0, 0 },
 		preCalls = {}, -- { lineType, handler }
 		categories = {}, -- Options categories
@@ -312,6 +313,9 @@ function fakes.NewWoW(options)
 			return creatureTypes[id] and { id = id, name = creatureTypes[id] }
 		end,
 	}
+	env.issecretvalue = function(value)
+		return wow.secretTexts[value] == true
+	end
 	env.IsControlKeyDown = function()
 		return wow.keysDown.CTRL == true
 	end
