@@ -2,7 +2,7 @@
 -- can be unit tested outside the game.
 local _, ns = ...
 
-ns.ICON = "Interface\\Icons\\INV_Misc_Note_01"
+ns.ICON = "Interface\\Icons\\inv_magicalfishpet"
 
 -- Modifier keys that can be held to see the original tooltip text, in menu order. `eventKeys` are the
 -- names MODIFIER_STATE_CHANGED reports for each side of the keyboard.
