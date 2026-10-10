@@ -10,7 +10,7 @@ local BUTTON_TEXT_PADDING = 24
 
 local frame, previewTooltip, keyDropdown
 local swatches = {} -- kind key -> ColorSwatchTemplate button
-local translated = {} -- { widget, GetText, isButton }: texts set again when the language changes
+local translated = {} -- { widget, GetValue, isButton, width }: texts set again when the language changes
 
 -- A Blizzard text in the chosen language, then in English, then the addon's fallback
 local function Text(globalName, fallback)
@@ -52,6 +52,23 @@ local function ApplyText(entry)
 	end
 end
 
+-- The preview's compact lines in the chosen language, made again only when it changes: the color picker
+-- refreshes the preview on every change
+local sampleLines, sampleLanguage
+
+local function GetSampleLines()
+	local language = ns.GetLanguage()
+	if language ~= sampleLanguage then
+		sampleLines, sampleLanguage = {}, language
+		for _, kind in ipairs(ns.COLOR_KINDS) do
+			for _, line in ipairs(ns.InLanguage({ ns.GetSampleLine(kind) })) do
+				table.insert(sampleLines, line)
+			end
+		end
+	end
+	return sampleLines
+end
+
 local function RefreshPreview()
 	if not (previewTooltip and frame:IsShown()) then
 		return
@@ -63,11 +80,9 @@ local function RefreshPreview()
 	previewTooltip:AddLine("Sample Item", 0.12, 1, 0)
 	previewTooltip:AddLine(Text("ITEM_BIND_ON_EQUIP", "Binds when equipped"), 1, 1, 1)
 	previewTooltip:AddLine(ns.FormatLine("+", 5, false, Text("ITEM_MOD_STAMINA_SHORT", "Stamina")), 1, 1, 1)
-	for _, kind in ipairs(ns.COLOR_KINDS) do
-		local color = ns.db.colors[kind.key]
-		for _, line in ipairs(ns.InLanguage({ ns.GetSampleLine(kind) })) do
-			previewTooltip:AddLine(line.text, color.r, color.g, color.b)
-		end
+	for _, line in ipairs(GetSampleLines()) do
+		local color = ns.db.colors[line.kind]
+		previewTooltip:AddLine(line.text, color.r, color.g, color.b)
 	end
 	previewTooltip:Show()
 end
@@ -180,24 +195,16 @@ local function CreateOriginalTextRow()
 	return help
 end
 
--- The client's language first, then the bundled ones its font can show: all of them on a client with the
--- Latin alphabet, only English on the others (Cyrillic, Korean and Chinese fonts may lack accented letters)
+-- The client's language first, then the bundled ones its font can show (ns.GetOfferedLanguages)
 local function LanguageOptions()
 	local client = GetLocale()
 	local options = { { LocaleUtil.GetLocaleDisplayName(client), "CLIENT" } }
-	local offered = ns.LOCALE_STRINGS[client] and ns.LOCALES or { "enUS" }
-	for _, locale in ipairs(offered) do
+	for _, locale in ipairs(ns.GetOfferedLanguages(client)) do
 		if locale ~= client then
 			table.insert(options, { LocaleUtil.GetLocaleDisplayName(locale), locale })
 		end
 	end
 	return options
-end
-
--- The saved language as a menu value: the client's own language, saved by name, is the "CLIENT" entry
-local function SelectedLanguage()
-	local language = ns.db.language
-	return language == GetLocale() and "CLIENT" or language
 end
 
 local function SetLanguage(language)
@@ -214,7 +221,7 @@ local function CreateLanguageRow(above)
 	local label, dropdown = CreateDropdownRow("Language", 160)
 	label:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -14)
 	MenuUtil.CreateRadioMenu(dropdown, function(language)
-		return SelectedLanguage() == language
+		return ns.GetLanguage() == language
 	end, SetLanguage, unpack(LanguageOptions()))
 end
 

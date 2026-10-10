@@ -13,9 +13,12 @@ local COSEDORA_STATS = {
 local CRIT_LINE = "Equipar: Mejora tu probabilidad de conseguir un golpe crítico un 1%."
 
 -- The tooltip glue with settings loaded, as it runs after ADDON_LOADED. Returns the world, the addon
--- namespace and the registered line pre-call.
-local function Setup()
+-- namespace and the registered line pre-call. `prepare(wow)` can change the world before the addon loads.
+local function Setup(prepare)
 	local wow = fakes.NewWoW()
+	if prepare then
+		prepare(wow)
+	end
 	local ns = helpers.LoadAddon(
 		"StatsTrimmer",
 		{ "Util.lua", "Config.lua", "Locales.lua", "Rules.lua", "Tooltip.lua" },
@@ -85,6 +88,16 @@ describe("Tooltip line pre-call", function()
 			assert.are.same({ "≤10 daño con hechizos", "≤30 sanación con hechizos" }, Texts(COSEDORA_LINE))
 		end)
 
+		it("uses the client's strings for a saved language the client's font can't show", function()
+			-- Saved on another client; the fake client's own strings stay esES
+			wow.env.GetLocale = function()
+				return "ruRU"
+			end
+			ns.db.language = "deDE"
+			assert.are.same({ "≤10 daño con hechizos", "≤30 sanación con hechizos" }, Texts(COSEDORA_LINE))
+			assert.are.equal("deDE", ns.db.language)
+		end)
+
 		it("leaves MP5 as it is in every language", function()
 			wow.items["item:mp5"] = { ITEM_MOD_MANA_REGENERATION_SHORT = 4 }
 			local mp5 = "Equipar: Restaura 4 p. de maná cada 5 s."
@@ -107,17 +120,27 @@ describe("Tooltip line pre-call", function()
 	end)
 
 	it("lowercases the stat names itself when the client's lowercase returns nothing", function()
-		wow = fakes.NewWoW()
-		wow.env.C_Intl.ToLower = function() end
-		ns = helpers.LoadAddon(
-			"StatsTrimmer",
-			{ "Util.lua", "Config.lua", "Locales.lua", "Rules.lua", "Tooltip.lua" },
-			wow.env
-		)
-		ns.db = ns.LoadSettings(nil)
-		wow.items["item:cosedora"] = COSEDORA_STATS
-		local _, lines = ProcessLine(wow, wow.preCalls[1].handler, COSEDORA_LINE)
+		wow, ns, preCall = Setup(function(world)
+			world.env.C_Intl.ToLower = function() end
+		end)
+		local _, lines = ProcessLine(wow, preCall, COSEDORA_LINE)
 		assert.are.equal("≤10 daño con hechizos", lines[1].text)
+	end)
+
+	it("folds the case itself when the client's case folding returns nothing", function()
+		wow, ns, preCall = Setup(function(world)
+			world.env.C_Intl.FoldCase = function() end
+		end)
+		wow.items["item:nudillos"] = { ITEM_MOD_ATTACK_POWER_SHORT = 6, ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = 6 }
+		local lines = {
+			{ leftText = "Equipar: +6 p. de poder de ataque." },
+			{ leftText = "Equipar: +6 p. de poder de ataque contra Bestias." },
+		}
+		local data = { hyperlink = "item:nudillos", lines = lines }
+		local _, plain = ProcessLine(wow, preCall, lines[1].leftText, data)
+		local _, vsBeasts = ProcessLine(wow, preCall, lines[2].leftText, data)
+		assert.are.equal("+6 poder de ataque", plain[1].text)
+		assert.are.equal("+6 poder de ataque contra bestias", vsBeasts[1].text)
 	end)
 
 	it("keeps the original line color for kinds without a saved color", function()

@@ -50,3 +50,17 @@ end
 function ns.FormatLine(sign, value, percent, name)
 	return ("%s%s%s %s"):format(sign, value, percent and "%" or "", name)
 end
+
+-- A compact line. `text` is the English line; `sign`, `value`, `percent` and the stat keys in `stats` let
+-- ns.LocalizeLines rebuild it with Blizzard's stat names, and without `stats` it is never translated.
+-- `kind` picks its color (ns.COLOR_KINDS); unknown kinds keep the original line color.
+function ns.CompactLine(kind, sign, value, name, stats, percent)
+	return {
+		kind = kind,
+		text = ns.FormatLine(sign, value, percent, name),
+		sign = sign,
+		value = value,
+		percent = percent,
+		stats = stats,
+	}
+end

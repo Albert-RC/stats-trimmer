@@ -8,6 +8,7 @@
 - The settings window uses the game's own texts in the chosen language: key names, headers, Reset buttons, the color rows and the preview.
 - Lines against a creature type are recognized in more languages: capitals like "É" or "Ж" are matched whatever their case, and declined forms through the game's own stat names.
 - Some clients name a few "vs creature" stats wrongly (the Spanish client calls spell damage vs beasts "…contra mecánicos"); those names are neither used to recognize lines nor shown.
+- After updating, restart the game instead of using `/reload`: the new language data is only loaded on a restart.
 
 ## v0.1.0 (2026-10-10)
 

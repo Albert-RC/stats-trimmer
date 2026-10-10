@@ -4,8 +4,12 @@ local _, ns = ...
 -- Localized "Equip:" prefix, provided by the client in every locale
 local EQUIP_PREFIX = ITEM_SPELL_TRIGGER_ONEQUIP
 
--- Unicode-aware lowercase, so type names like "Élémentaire" or "Нежить" are found whatever their case
-local FoldCase = C_Intl and C_Intl.FoldCase or string.lower
+-- Unicode-aware lowercase, so type names like "Élémentaire" or "Нежить" are found whatever their case.
+-- C_Intl.FoldCase may return nothing.
+local IntlFoldCase = C_Intl and C_Intl.FoldCase
+local function FoldCase(text)
+	return IntlFoldCase and IntlFoldCase(text) or text:lower()
+end
 
 local function NonEmpty(value)
 	if type(value) == "string" and value ~= "" then
@@ -19,30 +23,28 @@ function ns.GetClientText(name)
 	return NonEmpty(_G[name])
 end
 
--- The bundled strings of the language chosen in the settings (Locales.lua), or nil when the client's own
--- strings serve: the setting is "CLIENT" or names the client's language
-local function GetChosenStrings()
-	local language = ns.db and ns.db.language
-	if language and language ~= "CLIENT" and language ~= GetLocale() then
-		return ns.LOCALE_STRINGS[language]
+-- The language Blizzard's texts are shown in: "CLIENT" or a bundled language (ns.ResolveLanguage)
+function ns.GetLanguage()
+	return ns.ResolveLanguage(ns.db and ns.db.language, GetLocale())
+end
+
+-- A Blizzard string in a language ("CLIENT" or a bundled one), or nil
+local function GetTextIn(language, name)
+	if language == "CLIENT" then
+		return ns.GetClientText(name)
 	end
+	local strings = ns.LOCALE_STRINGS[language]
+	return strings and NonEmpty(strings[name]) or nil
 end
 
 -- A Blizzard string in the language chosen in the settings, or nil
 function ns.GetText(name)
-	local strings = GetChosenStrings()
-	if strings then
-		return NonEmpty(strings[name])
-	end
-	return ns.GetClientText(name)
+	return GetTextIn(ns.GetLanguage(), name)
 end
 
 -- A Blizzard string in English, the fallback when the chosen language lacks it or names it wrongly
 function ns.GetEnglishText(name)
-	if GetLocale() == "enUS" then
-		return ns.GetClientText(name) or NonEmpty(ns.LOCALE_STRINGS.enUS[name])
-	end
-	return NonEmpty(ns.LOCALE_STRINGS.enUS[name])
+	return GetLocale() == "enUS" and ns.GetClientText(name) or GetTextIn("enUS", name)
 end
 
 -- Lowercase for display, following the client's language rules. C_Intl.ToLower may return nothing.
@@ -51,20 +53,31 @@ function ns.ToLower(text)
 	return IntlToLower and IntlToLower(text) or text:lower()
 end
 
--- A name getter whose names are lowercased like the rest of the compact lines: Blizzard's own
--- capitalization is uneven ("Daño Arcano", "golpe")
-local function Lowercased(GetName)
-	return function(key)
+-- The client's stat names, as the rules recognize equip lines with them
+local clientNames = ns.TrustedNames(ns.GetClientText, FoldCase)
+
+-- Stat name getters for the compact lines: Blizzard's names lowercased like the rest of the line (Blizzard's
+-- own capitalization is uneven: "Daño Arcano", "golpe"). Made once per language, since ns.TrustedNames
+-- reads every creature type's name.
+local namesIn = {} -- language -> getter
+local englishNames
+
+local function LowercasedNames(GetName)
+	return ns.TrustedNames(function(key)
 		local name = GetName(key)
 		return name and ns.ToLower(name)
-	end
+	end, FoldCase)
 end
 
 -- The compact lines with Blizzard's stat names in the chosen language, then in English for any line that
 -- language can't name. MP5 and HP5 have no names and stay as they are.
 function ns.InLanguage(lines)
-	local localized = ns.LocalizeLines(lines, Lowercased(ns.GetText))
-	return ns.LocalizeLines(localized, Lowercased(ns.GetEnglishText))
+	local language = ns.GetLanguage()
+	namesIn[language] = namesIn[language] or LowercasedNames(function(key)
+		return GetTextIn(language, key)
+	end)
+	englishNames = englishNames or LowercasedNames(ns.GetEnglishText)
+	return ns.LocalizeLines(ns.LocalizeLines(lines, namesIn[language]), englishNames)
 end
 
 -- Link and data lines of the item whose tooltip data is being processed. Mirrors TooltipUtil.GetDisplayedItem,
@@ -129,7 +142,7 @@ local function ReplaceEquipLine(tooltip, lineData)
 		lines = GetReadableLines(itemLines),
 		equipPrefix = EQUIP_PREFIX,
 		GetCreatureTypeName = GetCreatureTypeName,
-		GetStatName = ns.GetClientText,
+		GetStatName = clientNames,
 		FoldCase = FoldCase,
 	}
 	local lines = ns.GetReplacement(text, stats, context)

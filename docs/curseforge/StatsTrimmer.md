@@ -43,7 +43,7 @@ In English (the game's own names; other languages use the game's names in that l
 Click the minimap button, or go to **Options > AddOns > Stats Trimmer**.
 
 - **Show original text while holding:** Ctrl (default), Alt or Shift. Keep in mind that Shift also compares items.
-- **Language:** your client's language (default), or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese, without restarting the game. It changes the compact lines (`≤10 spell damage`, `≤10 daño con hechizos`…) and the game's texts in this window. MP5 and HP5 read the same in every language.
+- **Language:** your client's language (default), or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese, without restarting the game. Russian, Korean and Chinese clients offer only English besides their own, since their fonts may lack accented letters. It changes the compact lines (`≤10 spell damage`, `≤10 daño con hechizos`…) and the game's texts in this window. MP5 and HP5 read the same in every language.
 - **Colors:** a color swatch for each kind of line, a Reset button on each row and a "Reset all colors" button. Lines without a color setting yet (weapon skills, crit, dodge and a few others) keep the equip green.
 - **Preview:** a sample tooltip that updates as you pick colors.
 

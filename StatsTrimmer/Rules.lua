@@ -5,6 +5,7 @@
 -- context.equipPrefix            localized "Equip:" prefix
 -- context.GetCreatureTypeName(id) localized creature type name ("Bestia" on esES), or nil
 -- context.GetStatName(key)        the client's name for a stat key ("Poder de ataque contra bestias"), or nil
+--                                 for a missing or untrusted name: a getter made with ns.TrustedNames
 -- context.FoldCase(text)          text folded to lowercase, Unicode-aware ("Élémentaire" -> "élémentaire")
 --
 -- The tooltip wording varies per locale, so lines are matched to the item's stats by their numbers. Each
@@ -16,6 +17,7 @@ local _, ns = ...
 local NumbersMatch = ns.NumbersMatch
 local GetOnlyPercent = ns.GetOnlyPercent
 local FormatLine = ns.FormatLine
+local Line = ns.CompactLine
 
 -- Creature types a stat can be restricted to: stat key suffix -> creature type ID and output label.
 -- All of these ITEM_MOD_<STAT>_VS_<TYPE>_SHORT keys exist in the client; BEAST and ELEMENTAL have been
@@ -78,20 +80,6 @@ local PERCENT_RATINGS = {
 	ITEM_MOD_PARRY_RATING_SHORT = { kind = "parryRating", label = "parry rating" },
 }
 
--- A compact line. `text` is the English line; `sign`, `value`, `percent` and the stat keys in `stats` let
--- ns.LocalizeLines rebuild it with Blizzard's stat names. Without `stats` it is never translated. `kind` picks its color (ns.COLOR_KINDS);
--- unknown kinds keep the original line color.
-local function Line(kind, sign, value, name, stats, percent)
-	return {
-		kind = kind,
-		text = FormatLine(sign, value, percent, name),
-		sign = sign,
-		value = value,
-		percent = percent,
-		stats = stats,
-	}
-end
-
 -- A claim is a stat (or a group of stats) that can own equip lines:
 --   numbers   { a[, b] }: the numbers its line shows, exactly (ns.NumbersMatch)
 --   percent   true instead of numbers: its line shows a lone percentage
@@ -113,32 +101,47 @@ local function LastWord(text)
 	return text and text:match("(%S+)%s*$")
 end
 
--- The last word of the client's name for "<stat> vs <creature type>" ("bestias"), or nil
-local function VsWord(GetStatName, stat, typeKey)
-	return LastWord(GetStatName("ITEM_MOD_" .. stat .. "_VS_" .. typeKey .. "_SHORT"))
+local function VsKey(stat, typeKey)
+	return "ITEM_MOD_" .. stat .. "_VS_" .. typeKey .. "_SHORT"
 end
 
--- The client's name for a stat key, or nil. Names of "<stat> vs <creature type>" stats are checked first:
--- the esES client calls spell damage vs beasts "Daño con hechizos contra mecánicos" and vs mechanicals
--- "…contra humanoides". Attack power, the vs stat seen on items, is the reference: its name is trusted
--- when no other creature type's name ends in the same word, and other stats' names must end in the same
--- word as the attack power name for their type.
-local function GetTrustedStatName(GetStatName, key)
-	local name = GetStatName(key)
-	local typeKey = key:match("_VS_(%u+)_SHORT$")
-	if not (name and VS_CREATURE_TYPES[typeKey]) then
-		return name
+-- A stat name getter like GetStatName that leaves out the names of "<stat> vs <creature type>" stats it
+-- can't trust: the esES client calls spell damage vs beasts "Daño con hechizos contra mecánicos" and vs
+-- mechanicals "…contra humanoides". Attack power, the vs stat seen on items, is the reference: its name is
+-- trusted when no other creature type's name ends in the same word, and other stats' names must end in the
+-- same word as the attack power name for their type. Words are compared folded, so case doesn't matter.
+-- The vs names are checked once, here: make one getter per language and keep it.
+function ns.TrustedNames(GetStatName, FoldCase)
+	local function VsWord(stat, typeKey)
+		local word = LastWord(GetStatName(VsKey(stat, typeKey)))
+		return word and FoldCase(word)
 	end
-	local reference = VsWord(GetStatName, "ATTACK_POWER", typeKey)
-	if not reference or LastWord(name) ~= reference then
-		return nil
-	end
-	for otherKey in pairs(VS_CREATURE_TYPES) do
-		if otherKey ~= typeKey and VsWord(GetStatName, "ATTACK_POWER", otherKey) == reference then
-			return nil
+
+	-- The last word of each type's attack power name, and how many types end in each word
+	local references, uses = {}, {}
+	for typeKey in pairs(VS_CREATURE_TYPES) do
+		local word = VsWord("ATTACK_POWER", typeKey)
+		if word then
+			references[typeKey] = word
+			uses[word] = (uses[word] or 0) + 1
 		end
 	end
-	return name
+
+	local untrusted = {}
+	for typeKey in pairs(VS_CREATURE_TYPES) do
+		local reference = references[typeKey]
+		for stat in pairs(VS_STATS) do
+			if not reference or uses[reference] > 1 or VsWord(stat, typeKey) ~= reference then
+				untrusted[VsKey(stat, typeKey)] = true
+			end
+		end
+	end
+
+	return function(key)
+		if not untrusted[key] then
+			return GetStatName(key)
+		end
+	end
 end
 
 -- Folded words that name a creature type in a tooltip line: the client's type name ("Bestia") and the last
@@ -150,7 +153,7 @@ local function CreatureTerms(context, creatureType, key)
 	if typeName then
 		table.insert(terms, context.FoldCase(typeName))
 	end
-	local lastWord = LastWord(GetTrustedStatName(context.GetStatName, key))
+	local lastWord = LastWord(context.GetStatName(key))
 	if lastWord then
 		table.insert(terms, context.FoldCase(lastWord))
 	end
@@ -500,7 +503,7 @@ local function GetStatNames(line, GetStatName)
 	end
 	local names = {}
 	for i, key in ipairs(line.stats) do
-		local name = GetTrustedStatName(GetStatName, key)
+		local name = GetStatName(key)
 		if not name then
 			return nil
 		end
@@ -509,10 +512,10 @@ local function GetStatNames(line, GetStatName)
 	return names
 end
 
--- The compact lines with Blizzard's stat names from GetStatName instead of English ("≤10 Daño con
--- hechizos"). A line naming several stats (a group of weapon skills, several creature types) becomes one
--- line per stat. A line stays as it is when one of its names is missing or untrusted, so a second pass with
--- other names can still translate it.
+-- The compact lines with Blizzard's stat names from GetStatName (a getter made with ns.TrustedNames)
+-- instead of English ("≤10 Daño con hechizos"). A line naming several stats (a group of weapon skills,
+-- several creature types) becomes one line per stat. A line stays as it is when one of its names is missing
+-- or untrusted, so a second pass with other names can still translate it.
 function ns.LocalizeLines(lines, GetStatName)
 	local localized = {}
 	for _, line in ipairs(lines) do

@@ -33,7 +33,7 @@ The full list of rewritten lines is in [docs/curseforge/StatsTrimmer.md](docs/cu
 Click the minimap button, or go to **Options > AddOns > Stats Trimmer**:
 
 - **Show original text while holding:** Ctrl (default), Alt or Shift. Shift also compares items.
-- **Language:** your client's (default), or English, German, Spanish, French, Italian or Portuguese. It changes at once, with no restart.
+- **Language:** your client's (default), or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese. Russian, Korean and Chinese clients offer only English besides their own, since their fonts may lack accented letters. It changes at once, with no restart.
 - **Colors:** a swatch for each kind of line, with a Reset button per row and "Reset all colors".
 - **Preview:** a sample tooltip that updates as you pick colors.
 

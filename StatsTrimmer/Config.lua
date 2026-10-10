@@ -27,6 +27,32 @@ function ns.IsOriginalTextEventKey(settingKey, eventKey)
 	return false
 end
 
+-- Blizzard's strings in the bundled languages, filled by Locales.lua. /reload doesn't load files new in the
+-- .toc, so right after an update the addon runs without them until the client restarts: with the client's
+-- own strings and the addon's English.
+ns.LOCALES = {}
+ns.LOCALE_STRINGS = {}
+
+-- The bundled languages a client can show, in menu order: all of them on a client with the Latin alphabet,
+-- only English on the others (Cyrillic, Korean and Chinese fonts may lack accented letters)
+function ns.GetOfferedLanguages(clientLocale)
+	return ns.LOCALE_STRINGS[clientLocale] and ns.LOCALES or { "enUS" }
+end
+
+-- The language Blizzard's texts are shown in for the saved setting: a bundled language the client offers,
+-- or "CLIENT" for the client's own. The client's language saved by name, or one its font can't show (saved
+-- on another client), counts as "CLIENT" but stays saved for when the client changes back.
+function ns.ResolveLanguage(saved, clientLocale)
+	if saved ~= clientLocale then
+		for _, locale in ipairs(ns.GetOfferedLanguages(clientLocale)) do
+			if locale == saved then
+				return locale
+			end
+		end
+	end
+	return "CLIENT"
+end
+
 -- Every kind of replacement line, in settings order. `group` separates the rows in the settings window.
 -- `stat` is the key of Blizzard's name for the row label (in the chosen language), with `label` as the
 -- English fallback; a kind without `stat` or `typeStat` always shows `label`. `sample` is the line the
@@ -146,16 +172,8 @@ ns.COLOR_KINDS = {
 -- turn it into the chosen language. A kind without a stat (MP5, HP5) is never translated.
 function ns.GetSampleLine(kind)
 	local sign, value, name = unpack(kind.sample)
-	local percent = kind.sample.percent
 	local stat = kind.sample.stat or kind.stat
-	return {
-		kind = kind.key,
-		text = ns.FormatLine(sign, value, percent, name),
-		sign = sign,
-		value = value,
-		percent = percent,
-		stats = stat and { stat },
-	}
+	return ns.CompactLine(kind.key, sign, value, name, stat and { stat }, kind.sample.percent)
 end
 
 -- Same green as the game's own equip lines, so nothing changes until the user picks a color

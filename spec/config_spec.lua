@@ -89,6 +89,36 @@ describe("sample lines", function()
 	end)
 end)
 
+describe("languages", function()
+	local ns = LoadConfig()
+
+	it("offers every bundled language on a client with the Latin alphabet", function()
+		local all = { "enUS", "deDE", "esES", "esMX", "frFR", "itIT", "ptBR" }
+		assert.are.same(all, ns.GetOfferedLanguages("esES"))
+		assert.are.same(all, ns.GetOfferedLanguages("enUS"))
+	end)
+
+	it("offers only English on a client whose font may lack accented letters", function()
+		assert.are.same({ "enUS" }, ns.GetOfferedLanguages("ruRU"))
+		assert.are.same({ "enUS" }, ns.GetOfferedLanguages("zhCN"))
+	end)
+
+	it("show a saved language the client offers", function()
+		assert.are.equal("deDE", ns.ResolveLanguage("deDE", "esES"))
+		assert.are.equal("enUS", ns.ResolveLanguage("enUS", "koKR"))
+	end)
+
+	it("show the client's own for its language saved by name, or nothing saved", function()
+		assert.are.equal("CLIENT", ns.ResolveLanguage("esES", "esES"))
+		assert.are.equal("CLIENT", ns.ResolveLanguage("CLIENT", "esES"))
+		assert.are.equal("CLIENT", ns.ResolveLanguage(nil, "esES"))
+	end)
+
+	it("show the client's own for a saved language its font can't show", function()
+		assert.are.equal("CLIENT", ns.ResolveLanguage("deDE", "ruRU"))
+	end)
+end)
+
 describe("original text key labels", function()
 	local ns = LoadConfig()
 

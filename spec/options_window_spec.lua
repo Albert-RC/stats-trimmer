@@ -303,6 +303,19 @@ describe("Settings window", function()
 			ns.ShowOptions()
 			assert.are.same({ { "ruRU", "CLIENT" }, { "enUS", "enUS" } }, LanguageMenu().options)
 		end)
+
+		it("marks the client's entry for a saved language the client's font can't show", function()
+			-- Saved on another client; the fake client's own strings stay esES
+			wow = fakes.NewWoW()
+			wow.env.GetLocale = function()
+				return "ruRU"
+			end
+			wow.env.StatsTrimmerDB = { language = "deDE" }
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_true(LanguageMenu().isSelected("CLIENT"))
+			assert.are.equal("≤10 daño con hechizos", PreviewTexts()[4])
+		end)
 	end)
 
 	describe("texts", function()

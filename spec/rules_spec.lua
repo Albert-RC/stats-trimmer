@@ -29,11 +29,24 @@ local CREATURE_TYPES = {
 	},
 	ruRU = { [1] = "Животное", [4] = "Элементаль", [6] = "Нежить" },
 	frFR = { [4] = "Élémentaire" },
+	ptBR = { [6] = "Morto-vivo" },
 }
 
 -- ITEM_SPELL_TRIGGER_ONEQUIP per locale
-local EQUIP_PREFIXES =
-	{ esES = "Equipar:", enUS = "Equip:", ruRU = "Если на персонаже:", frFR = "Équipé :" }
+local EQUIP_PREFIXES = {
+	esES = "Equipar:",
+	enUS = "Equip:",
+	ruRU = "Если на персонаже:",
+	frFR = "Équipé :",
+	ptBR = "Equipado:",
+}
+
+-- A stat name getter over a table of names, with untrusted vs names left out, like Tooltip.lua's
+local function Names(statNames)
+	return ns.TrustedNames(function(key)
+		return (statNames or {})[key]
+	end, fakes.FoldCase)
+end
 
 -- The context GetReplacement gets from Tooltip.lua. statNames stands for the client's ITEM_MOD_*_SHORT
 -- strings (none by default).
@@ -44,9 +57,7 @@ local function Context(locale, itemLines, statNames)
 		GetCreatureTypeName = function(id)
 			return CREATURE_TYPES[locale][id]
 		end,
-		GetStatName = function(key)
-			return (statNames or {})[key]
-		end,
+		GetStatName = Names(statNames),
 		FoldCase = fakes.FoldCase,
 	}
 end
@@ -705,15 +716,11 @@ describe("lines that must keep their text", function()
 end)
 
 describe("compact lines in the client's language", function()
-	local function StatName(key)
-		return ES_STRINGS[key]
-	end
-
 	-- The esES client's compact lines for one equip line, as { kind, text }
 	local function Localized(text, stats, itemLines)
 		local context = Context("esES", itemLines or Lines(text), ES_STRINGS)
 		local shown = {}
-		for _, line in ipairs(ns.LocalizeLines(ns.GetReplacement(text, stats, context), StatName)) do
+		for _, line in ipairs(ns.LocalizeLines(ns.GetReplacement(text, stats, context), Names(ES_STRINGS))) do
 			table.insert(shown, { kind = line.kind, text = line.text })
 		end
 		return shown
@@ -787,11 +794,9 @@ describe("compact lines in the client's language", function()
 		local text = "Equipar: Reduce 10 p. las resistencias mágicas de los objetivos de tus hechizos."
 		local lines =
 			ns.GetReplacement(text, { ITEM_MOD_SPELL_PENETRATION_SHORT = 10 }, Context("esES", Lines(text), ES_STRINGS))
-		local untranslated = ns.LocalizeLines(lines, function() end)
+		local untranslated = ns.LocalizeLines(lines, Names({}))
 		assert.are.equal(lines[1], untranslated[1])
-		local translated = ns.LocalizeLines(untranslated, function(key)
-			return ES_STRINGS[key]
-		end)
+		local translated = ns.LocalizeLines(untranslated, Names(ES_STRINGS))
 		assert.are.same({ { kind = "spellPenetration", text = "+10 Perforación de hechizo" } }, translated)
 	end)
 
@@ -812,9 +817,7 @@ describe("compact lines in the client's language", function()
 		local lines = ns.GetReplacement("Equipar: +6 p. de poder de ataque contra bestias.", {
 			ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = 6,
 		}, Context("esES", Lines("Equipar: +6 p. de poder de ataque contra bestias."), statNames))
-		local localized = ns.LocalizeLines(lines, function(key)
-			return statNames[key]
-		end)
+		local localized = ns.LocalizeLines(lines, Names(statNames))
 		assert.are.equal("+6 attack power vs beasts", localized[1].text)
 	end)
 
@@ -867,5 +870,22 @@ describe("creature types in other locales", function()
 			{ L("spellDamageVs", "≤20 spell damage vs humanoids") },
 			Replace(humanoids, stats, "esES", itemLines, ES_STRINGS)
 		)
+	end)
+
+	it("are checked against attack power's whatever their case (ptBR spell damage vs undead)", function()
+		-- ptBR names attack power vs undead "…contra Mortos-vivos" and spell damage vs undead "…contra
+		-- Mortos-Vivos". The type name, "Morto-vivo", isn't in the line: only the stat's name can locate it.
+		local ptStrings = fakes.LocaleStrings("ptBR")
+		local stats = { ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = 20, ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT = 20 }
+		local plain = "Equipado: Aumenta em até 20 o dano causado por feitiços e efeitos mágicos."
+		local vs = "Equipado: Aumenta em até 20 o dano causado a Mortos-vivos por feitiços e efeitos mágicos."
+		local itemLines = Lines(plain, vs)
+		assert.are.same({ L("spellDamage", "≤20 spell damage") }, Replace(plain, stats, "ptBR", itemLines, ptStrings))
+		assert.are.same(
+			{ L("spellDamageVs", "≤20 spell damage vs undead") },
+			Replace(vs, stats, "ptBR", itemLines, ptStrings)
+		)
+		local lines = ns.GetReplacement(vs, stats, Context("ptBR", itemLines, ptStrings))
+		assert.are.equal("≤20 Dano Mágico contra Mortos-Vivos", ns.LocalizeLines(lines, Names(ptStrings))[1].text)
 	end)
 end)
