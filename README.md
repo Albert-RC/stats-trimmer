@@ -24,8 +24,8 @@ The full list of rewritten lines is in [docs/curseforge/StatsTrimmer.md](docs/cu
 
 ## Installation
 
-1. Download this repository (**Code > Download ZIP**) and extract it.
-2. Copy the `StatsTrimmer` folder into the Forever client's `Interface\AddOns` folder: `World of Warcraft\_classic_beta_\Interface\AddOns\StatsTrimmer`.
+1. Download `StatsTrimmer-<version>.zip` from the [latest release](../../releases/latest).
+2. Extract it into the Forever client's `Interface\AddOns` folder. You should end up with `World of Warcraft\_classic_beta_\Interface\AddOns\StatsTrimmer\StatsTrimmer.toc`.
 3. Restart the game. Stats Trimmer appears in the AddOns list under User Interface.
 
 ## Settings
