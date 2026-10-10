@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- The compact lines use the game's own stat names, in lowercase: `≤10 spell damage`, `+1% hit`; `≤10 daño con hechizos` on a Spanish client. MP5 and HP5 stay as they are.
+- Spell power that adds damage and healing shows as `≤26 spell damage` and `≤26 spell healing`, like items with separate damage and healing.
+- New "Language" setting: your client's language (default) or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese. It changes at once, with no restart.
+- The settings window uses the game's own texts in the chosen language: key names, headers, Reset buttons, the color rows and the preview.
+- Lines against a creature type are recognized in more languages: capitals like "É" or "Ж" are matched whatever their case, and declined forms through the game's own stat names.
+- Some clients name a few "vs creature" stats wrongly (the Spanish client calls spell damage vs beasts "…contra mecánicos"); those names are neither used to recognize lines nor shown.
+
 ## v0.1.0 (2026-10-10)
 
 First release.

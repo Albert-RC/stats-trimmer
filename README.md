@@ -9,13 +9,13 @@ Equip: Increases damage and healing done by magical spells and effects by up to 
 becomes
 
 ```
-≤26 spell power
-≤26 healing power
+≤26 spell damage
+≤26 spell healing
 ```
 
 `≤` means "up to", just like the original wording.
 
-- **Any client language.** Lines are recognized through the game's own item data, not English text. The compact lines are always in English.
+- **Any client language.** Lines are recognized through the game's own item data, not English text. The compact lines use the game's own stat names, in your client's language or another one you pick in the addon.
 - **When in doubt, it leaves the line alone.** A line is only rewritten when exactly one of the item's stats can own it.
 - **Original text on demand.** Hold Ctrl (or Alt, or Shift) over an item to see the original lines.
 - **Your colors.** A color for each kind of line, with a live preview.
@@ -33,6 +33,7 @@ The full list of rewritten lines is in [docs/curseforge/StatsTrimmer.md](docs/cu
 Click the minimap button, or go to **Options > AddOns > Stats Trimmer**:
 
 - **Show original text while holding:** Ctrl (default), Alt or Shift. Shift also compares items.
+- **Language:** your client's (default), or English, German, Spanish, French, Italian or Portuguese. It changes at once, with no restart.
 - **Colors:** a swatch for each kind of line, with a Reset button per row and "Reset all colors".
 - **Preview:** a sample tooltip that updates as you pick colors.
 
@@ -59,4 +60,4 @@ CI runs them on every pull request. Merging a version bump into `main` publishes
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). `StatsTrimmer/Locales.lua` holds Blizzard's own game strings, generated from the client data; they aren't covered by the MIT license.
