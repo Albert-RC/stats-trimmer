@@ -124,4 +124,16 @@ describe("LoadSettings", function()
 		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.hp5)
 		assert.are.equal(200, settings.minimap.angle)
 	end)
+
+	it("replaces numbers that aren't finite with defaults", function()
+		local nan = 0 / 0
+		local settings = ns.LoadSettings({
+			colors = { spellPower = { r = nan, g = 0, b = 0 } },
+			minimap = { angle = nan },
+		})
+		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.spellPower)
+		assert.are.equal(200, settings.minimap.angle)
+		assert.are.equal(200, ns.LoadSettings({ minimap = { angle = math.huge } }).minimap.angle)
+		assert.are.equal(200, ns.LoadSettings({ minimap = { angle = -math.huge } }).minimap.angle)
+	end)
 end)

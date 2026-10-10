@@ -1,49 +1,60 @@
-# wow-addon
+# Stats Trimmer
 
-Addons for World of Warcraft: Forever (`## Interface: 16001`, Lua 5.1).
+An addon for **World of Warcraft: Forever** that trims the verbose green **Equip:** lines in item tooltips down to short stat lines, so you can compare gear at a glance.
 
-## Layout
-
-- `StatsTrimmer/`: rewrites verbose equip lines in item tooltips into compact ones, e.g. `≤10 spell power` / `≤30 healing power`. Works on any client locale. Settings (a color per line kind with a live preview, and the key that shows the original text) open from the minimap button, which MinimapButtonButton also collects, or from Options > AddOns > Stats Trimmer.
-- `HelloForever/`: test addon. Shows a button that prints to chat and stores the click count in `HelloForeverDB`. `/helloforever` shows or hides it.
-
-Each addon folder is linked into the client through a directory junction; the rest of the repository never reaches the game.
-
-## Linking an addon into the client
-
-Forever client: `F:\World of Warcraft\_classic_beta_\`. In `cmd`:
-
-```bat
-mklink /J "F:\World of Warcraft\_classic_beta_\Interface\AddOns\HelloForever" "C:\Users\alber\Documents\Github\wow-addon\HelloForever"
+```
+Equip: Increases damage and healing done by magical spells and effects by up to 26.
 ```
 
-To remove the link without deleting the code: `rmdir "F:\World of Warcraft\_classic_beta_\Interface\AddOns\HelloForever"`.
+becomes
 
-## Tools
+```
+≤26 spell power
+≤26 healing power
+```
 
-- VS Code + `sumneko.lua` (LuaLS) + `ketho.wow-api` + `JohnnyMorganz.stylua`
-- StyLua (`stylua .`) and Luacheck (`luacheck .`)
-- In-game: BugSack + !BugGrabber to capture Lua errors
+`≤` means "up to", just like the original wording.
 
-## Tests
+- **Any client language.** Lines are recognized through the game's own item data, not English text. The compact lines are always in English.
+- **When in doubt, it leaves the line alone.** A line is only rewritten when exactly one of the item's stats can own it.
+- **Original text on demand.** Hold Ctrl (or Alt, or Shift) over an item to see the original lines.
+- **Your colors.** A color for each kind of line, with a live preview.
 
-The pure logic (e.g. `StatsTrimmer/Util.lua`, `StatsTrimmer/Rules.lua`) has unit tests in `spec/`, written in busted syntax. They run with LuaJIT and a small busted-compatible runner:
+The full list of rewritten lines is in [docs/curseforge/StatsTrimmer.md](docs/curseforge/StatsTrimmer.md).
 
-```powershell
-winget install --id DEVCOM.LuaJIT -e   # once
+## Installation
+
+1. Download this repository (**Code > Download ZIP**) and extract it.
+2. Copy the `StatsTrimmer` folder into the Forever client's `Interface\AddOns` folder: `World of Warcraft\_classic_beta_\Interface\AddOns\StatsTrimmer`.
+3. Restart the game. Stats Trimmer appears in the AddOns list under User Interface.
+
+## Settings
+
+Click the minimap button, or go to **Options > AddOns > Stats Trimmer**:
+
+- **Show original text while holding:** Ctrl (default), Alt or Shift. Shift also compares items.
+- **Colors:** a swatch for each kind of line, with a Reset button per row and "Reset all colors".
+- **Preview:** a sample tooltip that updates as you pick colors.
+
+## Reporting a problem
+
+Please [open an issue](../../issues) with:
+
+- your client language;
+- the item name, or a link to it;
+- the exact tooltip line (hold Ctrl to see the original text);
+- for Lua errors, the BugSack stack trace.
+
+## Development
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the architecture, the tooltip mechanism, the rules and the test setup. The checks before a change:
+
+```
+stylua --check .
+luacheck .
 ./scripts/test.ps1
 ```
 
-Game-facing code is tested against a small fake of the WoW API (`spec/fakes.lua`).
+## License
 
-Coverage uses [LuaCov](https://github.com/lunarmodules/luacov) 0.17.0, which is pure Lua. Copy its `src/` folder to `%LOCALAPPDATA%\Programs\luacov` once, then run:
-
-```powershell
-./scripts/coverage.ps1   # fails if StatsTrimmer/ line coverage is below 85%
-```
-
-## Workflow
-
-Edit → `stylua --check .`, `luacheck .` and `./scripts/test.ps1` → `/reload` in game → test.
-Restart the client when adding files to the `.toc` or adding new addons.
-Debugging: `/console scriptErrors 1`, `/etrace`, `/fstack`.
+[MIT](LICENSE)

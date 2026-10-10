@@ -119,6 +119,8 @@ assert = setmetatable({
 })
 
 for _, file in ipairs(arg) do
+	-- A file that fails inside a describe never closes its blocks; they must not wrap the next file's tests
+	blocks = {}
 	local ok, err = pcall(dofile, file)
 	if not ok then
 		table.insert(failures, { path = file, err = "failed to load: " .. tostring(err) })

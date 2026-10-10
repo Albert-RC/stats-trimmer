@@ -21,6 +21,23 @@ local function GetCreatureTypeName(id)
 	return info and info.name
 end
 
+-- Tooltip text can be a secret value, which addon code can't compare or search. The type check comes
+-- first so issecretvalue only ever gets a string.
+local function IsReadable(text)
+	return type(text) == "string" and not issecretvalue(text)
+end
+
+-- The item's data lines whose text the rules can read
+local function GetReadableLines(lines)
+	local readable = {}
+	for _, line in ipairs(lines) do
+		if IsReadable(line.leftText) then
+			table.insert(readable, { leftText = line.leftText })
+		end
+	end
+	return readable
+end
+
 local KEY_DOWN_CHECKS = {
 	CTRL = IsControlKeyDown,
 	ALT = IsAltKeyDown,
@@ -36,14 +53,21 @@ end
 -- Line pre-call: returning true keeps the original line out of the tooltip
 local function ReplaceEquipLine(tooltip, lineData)
 	local text = lineData.leftText
-	if not text or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX or IsShowingOriginal() then
+	if not IsReadable(text) or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX or IsShowingOriginal() then
 		return false
 	end
 
 	local link, itemLines = GetProcessingItem(tooltip)
 	local stats = link and C_Item.GetItemStats(link)
-	local context = { lines = itemLines, equipPrefix = EQUIP_PREFIX, GetCreatureTypeName = GetCreatureTypeName }
-	local lines = stats and ns.GetReplacement(text, stats, context)
+	if not stats then
+		return false
+	end
+	local context = {
+		lines = GetReadableLines(itemLines),
+		equipPrefix = EQUIP_PREFIX,
+		GetCreatureTypeName = GetCreatureTypeName,
+	}
+	local lines = ns.GetReplacement(text, stats, context)
 	if not lines then
 		return false
 	end

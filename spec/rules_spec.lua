@@ -5,7 +5,7 @@ local ns = helpers.LoadAddon("StatsTrimmer", { "Util.lua", "Rules.lua" })
 -- Creature type names as C_CreatureInfo.GetCreatureTypeInfo returns them. ruRU stands for a locale whose
 -- tooltip uses a declined form that doesn't contain the type name.
 local CREATURE_TYPES = {
-	esES = { [1] = "Bestia", [4] = "Elemental", [6] = "No-muerto" },
+	esES = { [1] = "Bestia", [3] = "Demonio", [4] = "Elemental", [6] = "No-muerto" },
 	enUS = {
 		[1] = "Beast",
 		[2] = "Dragonkin",
@@ -47,26 +47,6 @@ local function Lines(...)
 	end
 	return lines
 end
-
-describe("rule order", function()
-	it("is the documented priority", function()
-		local names = {}
-		for _, rule in ipairs(ns.Rules) do
-			table.insert(names, rule.name)
-		end
-		assert.are.same({
-			"combined spell power",
-			"spell damage and healing",
-			"MP5",
-			"HP5",
-			"attack power",
-			"point stats",
-			"weapon skills",
-			"rating percentage",
-			"school damage",
-		}, names)
-	end)
-end)
 
 describe("spell damage and healing", function()
 	-- Cosedora
@@ -232,9 +212,43 @@ describe("attack power", function()
 			)
 		end)
 
-		it("leaves both lines alone when the type name isn't in the tooltip", function()
-			assert.is_nil(Replace(plain, stats, "ruRU", itemLines))
-			assert.is_nil(Replace(vsBeasts, stats, "ruRU", itemLines))
+		describe("in a locale whose line uses a declined form of the type name", function()
+			-- ruRU-style lines, made up: "животных" doesn't contain the type name "Животное"
+			local ruPlain = "Если на персонаже: +6 к силе атаки."
+			local ruBeasts =
+				"Если на персонаже: +6 к силе атаки против животных."
+
+			it("leaves both lines alone", function()
+				local ruLines = Lines("Костяные кастеты", ruPlain, ruBeasts)
+				assert.is_nil(Replace(ruPlain, stats, "ruRU", ruLines))
+				assert.is_nil(Replace(ruBeasts, stats, "ruRU", ruLines))
+			end)
+
+			it("doesn't take the type name from the item name", function()
+				local ruLines = Lines("Кастеты Животное", ruPlain, ruBeasts)
+				assert.is_nil(Replace(ruPlain, stats, "ruRU", ruLines))
+				assert.is_nil(Replace(ruBeasts, stats, "ruRU", ruLines))
+			end)
+		end)
+	end)
+
+	it("replaces a vs line without the type name when no other stat has its number", function()
+		local stats = { ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = 6, ITEM_MOD_STAMINA_SHORT = 4 }
+		local ruBeasts = "Если на персонаже: +6 к силе атаки против животных."
+		assert.are.same({ L("attackPowerVs", "+6 attack power vs beasts") }, Replace(ruBeasts, stats, "ruRU"))
+	end)
+
+	describe("one line naming several creature types", function()
+		local stats = { ITEM_MOD_ATTACK_POWER_VS_UNDEAD_SHORT = 150, ITEM_MOD_ATTACK_POWER_VS_DEMON_SHORT = 150 }
+
+		it("lists every type, in the line's order (enUS)", function()
+			local text = "Equip: +150 Attack Power when fighting Undead and Demons."
+			assert.are.same({ L("attackPowerVs", "+150 attack power vs undead/demons") }, Replace(text, stats, "enUS"))
+		end)
+
+		it("lists every type, in the line's order (esES)", function()
+			local text = "Equipar: +150 p. de poder de ataque contra demonios y no-muertos."
+			assert.are.same({ L("attackPowerVs", "+150 attack power vs demons/undead") }, Replace(text, stats))
 		end)
 	end)
 
@@ -381,13 +395,119 @@ describe("point stats", function()
 	end
 end)
 
-describe("known limits", function()
-	-- Numbers can't tell these lines apart and nothing else in the line is checked: attack power is earlier
-	-- in the rule order, so both lines read as attack power. Rare on real items; documented in CLAUDE.md.
-	it("reads a ranged attack power line as attack power when both share the number", function()
-		local stats = { ITEM_MOD_ATTACK_POWER_SHORT = 24, ITEM_MOD_RANGED_ATTACK_POWER_SHORT = 24 }
-		local ranged = "Equip: +24 ranged Attack Power."
-		assert.are.same({ L("attackPower", "+24 attack power") }, Replace(ranged, stats, "enUS"))
+-- Numbers alone can't tell these lines apart, and guessing would show a wrong line, so they keep their
+-- text. See "Rules" in docs/DEVELOPMENT.md.
+describe("lines with more than one possible owner keep their text", function()
+	-- Every equip line of the item keeps its text
+	local function AssertAllUntouched(stats, ...)
+		local itemLines = Lines(...)
+		for _, line in ipairs(itemLines) do
+			assert.is_nil(Replace(line.leftText, stats, "enUS", itemLines))
+		end
+	end
+
+	it("two schools with the same value", function()
+		AssertAllUntouched(
+			{ ITEM_MOD_FIRE_DAMAGE_DONE_SHORT = 20, ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT = 20 },
+			"Equip: Increases damage done by Fire spells and effects by up to 20.",
+			"Equip: Increases damage done by Shadow spells and effects by up to 20."
+		)
+	end)
+
+	it("MP5 and HP5 with the same value", function()
+		AssertAllUntouched(
+			{ ITEM_MOD_MANA_REGENERATION_SHORT = 4, ITEM_MOD_HEALTH_REGEN_SHORT = 4 },
+			"Equip: Restores 4 mana per 5 sec.",
+			"Equip: Restores 4 health per 5 sec."
+		)
+	end)
+
+	it("MP5 of 5 and attack power of 5, whose lines both show only 5s", function()
+		AssertAllUntouched(
+			{ ITEM_MOD_MANA_REGENERATION_SHORT = 5, ITEM_MOD_ATTACK_POWER_SHORT = 5 },
+			"Equip: Restores 5 mana per 5 sec.",
+			"Equip: +5 Attack Power."
+		)
+	end)
+
+	it("attack power and ranged attack power with the same value", function()
+		AssertAllUntouched(
+			{ ITEM_MOD_ATTACK_POWER_SHORT = 24, ITEM_MOD_RANGED_ATTACK_POWER_SHORT = 24 },
+			"Equip: +24 Attack Power.",
+			"Equip: +24 ranged Attack Power."
+		)
+	end)
+
+	it("two point stats with the same value", function()
+		AssertAllUntouched(
+			{ ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = 7, ITEM_MOD_BLOCK_VALUE_SHORT = 7 },
+			"Equip: Increased Defense +7.",
+			"Equip: Increases the block value of your shield by 7."
+		)
+	end)
+
+	it("a stat whose number is also in an unrelated equip line", function()
+		AssertAllUntouched(
+			{ ITEM_MOD_ATTACK_POWER_SHORT = 1 },
+			"Equip: +1 Attack Power.",
+			"Equip: Increases your effective stealth level by 1."
+		)
+	end)
+
+	it("a percentage rating next to an unrelated percentage line", function()
+		AssertAllUntouched(
+			{ ITEM_MOD_HIT_RATING_SHORT = 10 },
+			"Equip: Improves your chance to hit by 1%.",
+			"Equip: Increases your movement speed by 8%."
+		)
+	end)
+
+	it("a creature type no rule knows, next to attack power with the same value", function()
+		AssertAllUntouched(
+			{ ITEM_MOD_ATTACK_POWER_SHORT = 6, ITEM_MOD_ATTACK_POWER_VS_CRITTER_SHORT = 6 },
+			"Equip: +6 Attack Power.",
+			"Equip: +6 Attack Power when fighting Critters."
+		)
+	end)
+
+	it("a group of weapon skills sharing its number with another stat, without removing any line", function()
+		AssertAllUntouched(
+			{
+				ITEM_MOD_AXES_SHORT = 7,
+				ITEM_MOD_DAGGERS_SHORT = 7,
+				ITEM_MOD_SWORDS_SHORT = 7,
+				ITEM_MOD_ATTACK_POWER_SHORT = 7,
+			},
+			"Equip: Increased Axes +7.",
+			"Equip: Increased Daggers +7.",
+			"Equip: Increased Swords +7.",
+			"Equip: +7 Attack Power."
+		)
+	end)
+end)
+
+describe("percentages", function()
+	it("aren't read as a point stat with the same number", function()
+		local stats = { ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = 10 }
+		local spell = "Equip: Increases damage done by magical spells and effects by up to 10."
+		local silence = "Equip: Increases your chance to resist Silence and Interrupt effects by 10%."
+		local itemLines = Lines(spell, silence)
+		assert.are.same({ L("spellPower", "≤10 spell power") }, Replace(spell, stats, "enUS", itemLines))
+		assert.is_nil(Replace(silence, stats, "enUS", itemLines))
+	end)
+
+	it("give the rating to the only line with a lone percentage", function()
+		local stats = { ITEM_MOD_HIT_RATING_SHORT = 10 }
+		local hit = "Equip: Improves your chance to hit by 1%."
+		local struck = "Equip: When struck in combat has a 5% chance to stun the attacker for 3 sec."
+		local itemLines = Lines(hit, struck)
+		assert.are.same({ L("hitRating", "+1% hit rating") }, Replace(hit, stats, "enUS", itemLines))
+		assert.is_nil(Replace(struck, stats, "enUS", itemLines))
+	end)
+
+	it("stay as they are for a rating no rule knows", function()
+		local text = "Equip: Improves your chance to hit by 1%."
+		assert.is_nil(Replace(text, { ITEM_MOD_EXPERTISE_RATING_SHORT = 10 }, "enUS"))
 	end)
 end)
 
@@ -460,6 +580,17 @@ describe("weapon skills", function()
 			assert.is_nil(Replace(axes, stats, "enUS", fewerLines))
 		end)
 	end)
+
+	it("groups the skills apart from a vs line with the same number", function()
+		local stats = { ITEM_MOD_AXES_SHORT = 7, ITEM_MOD_DAGGERS_SHORT = 7, ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = 7 }
+		local axes = "Equip: Increased Axes +7."
+		local daggers = "Equip: Increased Daggers +7."
+		local beasts = "Equip: +7 Attack Power when fighting Beasts."
+		local itemLines = Lines(axes, daggers, beasts)
+		assert.are.same({ L("weaponSkill", "+7 axes/daggers skill") }, Replace(axes, stats, "enUS", itemLines))
+		assert.are.same({}, Replace(daggers, stats, "enUS", itemLines))
+		assert.are.same({ L("attackPowerVs", "+7 attack power vs beasts") }, Replace(beasts, stats, "enUS", itemLines))
+	end)
 end)
 
 describe("every creature type", function()
@@ -477,24 +608,30 @@ describe("every creature type", function()
 	for _, creature in ipairs(types) do
 		local key, inGame, label = creature[1], creature[2], creature[3]
 
+		-- A plain line with the same number makes the vs line depend on the type's ID and name
 		it(("attack power vs %s"):format(label), function()
-			local stats = { ["ITEM_MOD_ATTACK_POWER_VS_" .. key .. "_SHORT"] = 30 }
-			local text = ("Equip: +30 Attack Power when fighting %s."):format(inGame)
+			local stats = { ITEM_MOD_ATTACK_POWER_SHORT = 30, ["ITEM_MOD_ATTACK_POWER_VS_" .. key .. "_SHORT"] = 30 }
+			local plain = "Equip: +30 Attack Power."
+			local vs = ("Equip: +30 Attack Power when fighting %s."):format(inGame)
+			local itemLines = Lines(plain, vs)
 			assert.are.same(
 				{ L("attackPowerVs", ("+30 attack power vs %s"):format(label)) },
-				Replace(text, stats, "enUS")
+				Replace(vs, stats, "enUS", itemLines)
 			)
+			assert.are.same({ L("attackPower", "+30 attack power") }, Replace(plain, stats, "enUS", itemLines))
 		end)
 
 		it(("spell damage vs %s"):format(label), function()
-			local stats = { ["ITEM_MOD_SPELL_DAMAGE_VS_" .. key .. "_SHORT"] = 15 }
-			local text = ("Equip: Increases damage done to %s by magical spells and effects by up to 15."):format(
-				inGame
-			)
+			local stats =
+				{ ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = 15, ["ITEM_MOD_SPELL_DAMAGE_VS_" .. key .. "_SHORT"] = 15 }
+			local plain = "Equip: Increases damage done by magical spells and effects by up to 15."
+			local vs = ("Equip: Increases damage done to %s by magical spells and effects by up to 15."):format(inGame)
+			local itemLines = Lines(plain, vs)
 			assert.are.same(
 				{ L("spellDamageVs", ("≤15 spell damage vs %s"):format(label)) },
-				Replace(text, stats, "enUS")
+				Replace(vs, stats, "enUS", itemLines)
 			)
+			assert.are.same({ L("spellPower", "≤15 spell power") }, Replace(plain, stats, "enUS", itemLines))
 		end)
 	end
 end)

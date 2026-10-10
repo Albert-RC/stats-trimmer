@@ -4,21 +4,32 @@
 local fakes = {}
 
 local Frame = {}
+local FrameMeta = { __index = Frame }
 
--- Methods specs don't care about (layout, strata, textures...) exist but do nothing. Only names that look
--- like WoW methods (capitalized) get one, so missing data fields still read as nil.
+-- Methods specs don't care about (layout, strata, textures...) exist but do nothing. The list is explicit,
+-- so a misspelled WoW method fails the specs instead of being silently ignored.
 local function NoOp() end
-local FrameMeta = {
-	__index = function(_, key)
-		local method = Frame[key]
-		if method ~= nil then
-			return method
-		end
-		if type(key) == "string" and key:find("^%u") then
-			return NoOp
-		end
-	end,
-}
+for _, name in ipairs({
+	"EnableMouse",
+	"Raise",
+	"RegisterForClicks",
+	"RegisterForDrag",
+	"SetClampedToScreen",
+	"SetFrameLevel",
+	"SetHighlightTexture",
+	"SetMovable",
+	"SetPortraitToAsset",
+	"SetSize",
+	"SetTexCoord",
+	"SetTexture",
+	"SetTitle",
+	"SetToplevel",
+	"SetWidth",
+	"StartMoving",
+	"StopMovingOrSizing",
+}) do
+	Frame[name] = NoOp
+end
 
 -- Runs a frame's script handler, like the client does; returns what the handler returns
 function fakes.Fire(frame, scriptName, ...)
@@ -55,6 +66,17 @@ end
 
 function Frame:GetScript(name)
 	return self.scripts[name]
+end
+
+-- Like the client: the hook runs after the frame's own handler, if it has one
+function Frame:HookScript(name, hook)
+	local handler = self.scripts[name]
+	self.scripts[name] = function(...)
+		if handler then
+			handler(...)
+		end
+		hook(...)
+	end
 end
 
 function Frame:RegisterEvent(event)
@@ -172,8 +194,9 @@ function Frame:GetProcessingTooltipInfo()
 	return self.processingInfo
 end
 
+-- Like TooltipDataHandlerMixin:IsTooltipType, it checks the primary info, not the one being processed
 function Frame:IsTooltipType(tooltipType)
-	local data = self.processingInfo and self.processingInfo.tooltipData
+	local data = self.primaryInfo and self.primaryInfo.tooltipData
 	return data ~= nil and data.type == tooltipType
 end
 
@@ -215,6 +238,7 @@ function fakes.ItemTooltip(wow, data)
 	data.type = data.type or wow.env.Enum.TooltipDataType.Item
 	data.lines = data.lines or {}
 	tooltip.processingInfo = { tooltipData = data }
+	tooltip.primaryInfo = tooltip.processingInfo
 	tooltip.shown = true
 	return tooltip
 end
@@ -245,6 +269,7 @@ function fakes.NewWoW(options)
 		items = {}, -- link -> GetItemStats result
 		guids = {}, -- guid -> link
 		keysDown = {}, -- "CTRL" / "ALT" / "SHIFT" -> true
+		secretTexts = {}, -- text -> true: issecretvalue reports it as a secret
 		cursor = { 0, 0 },
 		preCalls = {}, -- { lineType, handler }
 		categories = {}, -- Options categories
@@ -312,6 +337,9 @@ function fakes.NewWoW(options)
 			return creatureTypes[id] and { id = id, name = creatureTypes[id] }
 		end,
 	}
+	env.issecretvalue = function(value)
+		return wow.secretTexts[value] == true
+	end
 	env.IsControlKeyDown = function()
 		return wow.keysDown.CTRL == true
 	end

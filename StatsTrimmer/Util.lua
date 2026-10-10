@@ -1,9 +1,14 @@
--- Pure text/stat helpers. No WoW API here, so this file can be unit tested outside the game.
+-- Pure text helpers. No WoW API here, so this file can be unit tested outside the game.
 local _, ns = ...
 
 -- The tooltip wording varies per locale and per item, so a line is identified by its numbers:
--- they must be exactly the expected values (a and/or b), nothing more and nothing less.
+-- they must be exactly the expected values (a and/or b), nothing more and nothing less. A line with a
+-- percentage never matches: these values are points, and a "10%" next to a 10-point stat is something else.
 function ns.NumbersMatch(text, a, b)
+	if text:find("%", 1, true) then
+		return false
+	end
+
 	local expected = {}
 	if a then
 		expected[a] = true
@@ -39,25 +44,4 @@ function ns.GetOnlyPercent(text)
 	end
 	local value = tonumber((percent:match("[%d%.,]+"):gsub(",", ".")))
 	return value and tostring(value)
-end
-
--- True when the item has a rating stat other than the given one. Skill ratings (e.g. defense) are
--- shown as plain points, not percentages, so they don't count.
-function ns.HasOtherRating(stats, ratingKey)
-	for key in pairs(stats) do
-		if key ~= ratingKey and key:find("_RATING_SHORT$") and not key:find("_SKILL_RATING_SHORT$") then
-			return true
-		end
-	end
-	return false
-end
-
--- True when any tooltip data line contains lowerName (plain, case-insensitive search)
-function ns.AnyLineMentions(lines, lowerName)
-	for _, line in ipairs(lines) do
-		if line.leftText and line.leftText:lower():find(lowerName, 1, true) then
-			return true
-		end
-	end
-	return false
 end

@@ -46,9 +46,9 @@ Click the minimap button, or go to **Options > AddOns > Stats Trimmer**.
 
 ## When in doubt, it leaves the line alone
 
-Stats Trimmer only rewrites a line when its numbers match the item's real stat values. When two stats could own the same line, it usually keeps the original text instead of guessing. For example, an item with two percentage bonuses (say, hit and crit) keeps both lines as they are.
+Stats Trimmer only rewrites a line when its numbers match one of the item's real stat values and no other stat could own that line. When two stats could, it keeps the original text instead of guessing. For example, an item with the same amount of attack power and ranged attack power, or with two percentage bonuses (say, hit and crit), keeps those lines as they are. So does a line whose number also shows up in another equip effect of the item.
 
-Rare mismatches are still possible, such as an item with the same amount of attack power and ranged attack power showing both as attack power. Hold Ctrl to check the original text at any time.
+Hold Ctrl to check the original text at any time.
 
 ## Languages
 

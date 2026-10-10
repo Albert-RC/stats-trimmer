@@ -26,6 +26,10 @@ describe("NumbersMatch", function()
 	it("rejects a line without numbers", function()
 		assert.is_false(ns.NumbersMatch("Equip: Allows underwater breathing.", 1))
 	end)
+
+	it("rejects a percentage, which isn't a point value", function()
+		assert.is_false(ns.NumbersMatch("Equip: Increases your chance to resist Silence effects by 10%.", 10))
+	end)
 end)
 
 describe("GetOnlyPercent", function()
@@ -48,38 +52,5 @@ describe("GetOnlyPercent", function()
 
 	it("returns nil when the line has another number", function()
 		assert.is_nil(ns.GetOnlyPercent("Equip: Increases your chance to block by 1% for 10 sec."))
-	end)
-end)
-
-describe("HasOtherRating", function()
-	it("ignores the given rating and non-rating stats", function()
-		local stats = { ITEM_MOD_BLOCK_RATING_SHORT = 5, ITEM_MOD_STRENGTH_SHORT = 5 }
-		assert.is_false(ns.HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT"))
-	end)
-
-	it("ignores skill ratings, which are plain points", function()
-		local stats = { ITEM_MOD_BLOCK_RATING_SHORT = 5, ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = 3 }
-		assert.is_false(ns.HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT"))
-	end)
-
-	it("finds another rating stat", function()
-		local stats = { ITEM_MOD_BLOCK_RATING_SHORT = 5, ITEM_MOD_CRIT_RATING_SHORT = 14 }
-		assert.is_true(ns.HasOtherRating(stats, "ITEM_MOD_BLOCK_RATING_SHORT"))
-	end)
-end)
-
-describe("AnyLineMentions", function()
-	local lines = {
-		{ leftText = "Nudillos de hueso" },
-		{},
-		{ leftText = "Equipar: +6 p. de poder de ataque contra bestias." },
-	}
-
-	it("finds a lowercase name inside a line, skipping lines without text", function()
-		assert.is_true(ns.AnyLineMentions(lines, "bestia"))
-	end)
-
-	it("returns false when no line mentions the name", function()
-		assert.is_false(ns.AnyLineMentions(lines, "demonio"))
 	end)
 end)
