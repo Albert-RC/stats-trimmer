@@ -125,6 +125,16 @@ describe("Tooltip line pre-call", function()
 		it("when no rule recognizes it", function()
 			AssertUntouched(ProcessLine(wow, preCall, "Equipar: Permite respirar bajo el agua."))
 		end)
+
+		it("when more than one stat could own it", function()
+			wow.items["item:regen"] = { ITEM_MOD_MANA_REGENERATION_SHORT = 4, ITEM_MOD_HEALTH_REGEN_SHORT = 4 }
+			local lines = {
+				{ leftText = "Equipar: Restaura 4 p. de maná cada 5 s." },
+				{ leftText = "Equipar: Restaura 4 p. de salud cada 5 s." },
+			}
+			local data = { hyperlink = "item:regen", lines = lines }
+			AssertUntouched(ProcessLine(wow, preCall, lines[1].leftText, data))
+		end)
 	end)
 
 	describe("original text key", function()
