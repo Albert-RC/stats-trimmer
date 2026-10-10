@@ -27,11 +27,11 @@ function helpers.TocFiles(addonName)
 	return files
 end
 
--- Loads the whole Easy Stats addon in .toc order into a fake world (fakes.NewWoW) and sends its
--- ADDON_LOADED, the way the client starts it. Settings saved before can be put in wow.env.EasyStatsDB first.
-function helpers.StartEasyStats(wow)
-	local ns = helpers.LoadAddon("EasyStats", helpers.TocFiles("EasyStats"), wow.env)
-	require("spec.fakes").FireEvent(wow, "ADDON_LOADED", "EasyStats")
+-- Loads the whole Stats Trimmer addon in .toc order into a fake world (fakes.NewWoW) and sends its
+-- ADDON_LOADED, the way the client starts it. Settings saved before can be put in wow.env.StatsTrimmerDB first.
+function helpers.StartStatsTrimmer(wow)
+	local ns = helpers.LoadAddon("StatsTrimmer", helpers.TocFiles("StatsTrimmer"), wow.env)
+	require("spec.fakes").FireEvent(wow, "ADDON_LOADED", "StatsTrimmer")
 	return ns
 end
 

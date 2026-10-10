@@ -25,7 +25,7 @@ describe("Settings window", function()
 	end
 
 	local function PreviewLine(text)
-		for _, line in ipairs(wow.env.EasyStatsPreviewTooltip.lines) do
+		for _, line in ipairs(wow.env.StatsTrimmerPreviewTooltip.lines) do
 			if line.text == text then
 				return line
 			end
@@ -39,8 +39,8 @@ describe("Settings window", function()
 
 	before_each(function()
 		wow = fakes.NewWoW()
-		wow.env.EasyStatsDB = { colors = { frostDamage = { r = 0.2, g = 0.6, b = 1 } } }
-		ns = helpers.StartEasyStats(wow)
+		wow.env.StatsTrimmerDB = { colors = { frostDamage = { r = 0.2, g = 0.6, b = 1 } } }
+		ns = helpers.StartStatsTrimmer(wow)
 	end)
 
 	describe("opening and closing", function()
@@ -48,26 +48,26 @@ describe("Settings window", function()
 			ns.ShowOptions()
 			ns.ShowOptions()
 			assert.are.equal(1, #fakes.FindFrames(wow, { template = "PortraitFrameTemplate" }))
-			assert.is_true(wow.env.EasyStatsOptionsFrame:IsShown())
+			assert.is_true(wow.env.StatsTrimmerOptionsFrame:IsShown())
 		end)
 
 		it("closes with Escape", function()
 			ns.ShowOptions()
-			assert.are.same({ "EasyStatsOptionsFrame" }, wow.env.UISpecialFrames)
+			assert.are.same({ "StatsTrimmerOptionsFrame" }, wow.env.UISpecialFrames)
 		end)
 
 		it("toggles", function()
 			ns.ToggleOptions()
-			assert.is_true(wow.env.EasyStatsOptionsFrame:IsShown())
+			assert.is_true(wow.env.StatsTrimmerOptionsFrame:IsShown())
 			ns.ToggleOptions()
-			assert.is_false(wow.env.EasyStatsOptionsFrame:IsShown())
+			assert.is_false(wow.env.StatsTrimmerOptionsFrame:IsShown())
 		end)
 
 		it("closes with its close button, hiding the preview, with the open and close sounds", function()
 			ns.ShowOptions()
-			fakes.Fire(wow.env.EasyStatsOptionsFrame.CloseButton, "OnClick")
-			assert.is_false(wow.env.EasyStatsOptionsFrame:IsShown())
-			assert.is_false(wow.env.EasyStatsPreviewTooltip:IsShown())
+			fakes.Fire(wow.env.StatsTrimmerOptionsFrame.CloseButton, "OnClick")
+			assert.is_false(wow.env.StatsTrimmerOptionsFrame:IsShown())
+			assert.is_false(wow.env.StatsTrimmerPreviewTooltip:IsShown())
 			assert.are.same(
 				{ wow.env.SOUNDKIT.IG_CHARACTER_INFO_OPEN, wow.env.SOUNDKIT.IG_CHARACTER_INFO_CLOSE },
 				wow.sounds
@@ -86,11 +86,11 @@ describe("Settings window", function()
 		end)
 
 		it("previews a sample item with every line kind in its color", function()
-			assert.are.equal("Sample Item", wow.env.EasyStatsPreviewTooltip.lines[1].text)
+			assert.are.equal("Sample Item", wow.env.StatsTrimmerPreviewTooltip.lines[1].text)
 			for _, kind in ipairs(ns.COLOR_KINDS) do
 				assert.are.same(ns.db.colors[kind.key], PreviewColor(kind.key))
 			end
-			assert.is_true(wow.env.EasyStatsPreviewTooltip:IsShown())
+			assert.is_true(wow.env.StatsTrimmerPreviewTooltip:IsShown())
 		end)
 	end)
 
@@ -119,10 +119,10 @@ describe("Settings window", function()
 			function()
 				wow.colorPicker.rgb = { 1, 0, 0 }
 				wow.colorPicker.info.swatchFunc()
-				wow.env.EasyStatsOptionsFrame:Hide()
+				wow.env.StatsTrimmerOptionsFrame:Hide()
 				wow.colorPicker.info.cancelFunc({ r = 0.2, g = 0.6, b = 1 })
 				assert.are.same({ r = 0.2, g = 0.6, b = 1 }, ns.db.colors.frostDamage)
-				assert.is_false(wow.env.EasyStatsPreviewTooltip:IsShown())
+				assert.is_false(wow.env.StatsTrimmerPreviewTooltip:IsShown())
 			end
 		)
 

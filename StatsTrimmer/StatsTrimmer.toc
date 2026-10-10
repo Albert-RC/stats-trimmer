@@ -1,10 +1,10 @@
 ## Interface: 16001
-## Title: Easy Stats
+## Title: Stats Trimmer
 ## Notes: Rewrites verbose stat lines in item tooltips into compact ones.
 ## Author: Albert-RC
 ## Version: 0.1.0
 ## IconTexture: Interface\Icons\INV_Misc_Note_01
-## SavedVariables: EasyStatsDB
+## SavedVariables: StatsTrimmerDB
 ## Category: User Interface
 ## Category-deDE: Benutzerinterface
 ## Category-esES: Interfaz de usuario

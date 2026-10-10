@@ -1,5 +1,5 @@
 local helpers = require("spec.helpers")
-local ns = helpers.LoadAddon("EasyStats", { "Util.lua" })
+local ns = helpers.LoadAddon("StatsTrimmer", { "Util.lua" })
 
 describe("NumbersMatch", function()
 	it("accepts a line with exactly the expected number", function()

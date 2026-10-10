@@ -3,7 +3,7 @@ max_line_length = false
 
 -- Globals the addon defines or modifies
 globals = {
-	"EasyStatsDB",
+	"StatsTrimmerDB",
 	"HelloForeverDB",
 	"SLASH_HELLOFOREVER1",
 	"SlashCmdList",

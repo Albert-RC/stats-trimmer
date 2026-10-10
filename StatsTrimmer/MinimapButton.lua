@@ -3,7 +3,7 @@
 -- created at load time so it already exists when that addon scans on PLAYER_LOGIN.
 local _, ns = ...
 
-local button = CreateFrame("Button", "EasyStatsMinimapButton", Minimap)
+local button = CreateFrame("Button", "StatsTrimmerMinimapButton", Minimap)
 button:SetSize(31, 31)
 button:SetFrameStrata("MEDIUM")
 button:SetFrameLevel(8)
@@ -59,7 +59,7 @@ end)
 
 button:SetScript("OnEnter", function(self)
 	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-	GameTooltip:SetText("Easy Stats")
+	GameTooltip:SetText("Stats Trimmer")
 	GameTooltip:AddLine("Click to open settings.", 1, 1, 1)
 	GameTooltip:Show()
 end)
