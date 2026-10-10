@@ -4,21 +4,32 @@
 local fakes = {}
 
 local Frame = {}
+local FrameMeta = { __index = Frame }
 
--- Methods specs don't care about (layout, strata, textures...) exist but do nothing. Only names that look
--- like WoW methods (capitalized) get one, so missing data fields still read as nil.
+-- Methods specs don't care about (layout, strata, textures...) exist but do nothing. The list is explicit,
+-- so a misspelled WoW method fails the specs instead of being silently ignored.
 local function NoOp() end
-local FrameMeta = {
-	__index = function(_, key)
-		local method = Frame[key]
-		if method ~= nil then
-			return method
-		end
-		if type(key) == "string" and key:find("^%u") then
-			return NoOp
-		end
-	end,
-}
+for _, name in ipairs({
+	"EnableMouse",
+	"Raise",
+	"RegisterForClicks",
+	"RegisterForDrag",
+	"SetClampedToScreen",
+	"SetFrameLevel",
+	"SetHighlightTexture",
+	"SetMovable",
+	"SetPortraitToAsset",
+	"SetSize",
+	"SetTexCoord",
+	"SetTexture",
+	"SetTitle",
+	"SetToplevel",
+	"SetWidth",
+	"StartMoving",
+	"StopMovingOrSizing",
+}) do
+	Frame[name] = NoOp
+end
 
 -- Runs a frame's script handler, like the client does; returns what the handler returns
 function fakes.Fire(frame, scriptName, ...)
@@ -183,8 +194,9 @@ function Frame:GetProcessingTooltipInfo()
 	return self.processingInfo
 end
 
+-- Like TooltipDataHandlerMixin:IsTooltipType, it checks the primary info, not the one being processed
 function Frame:IsTooltipType(tooltipType)
-	local data = self.processingInfo and self.processingInfo.tooltipData
+	local data = self.primaryInfo and self.primaryInfo.tooltipData
 	return data ~= nil and data.type == tooltipType
 end
 
@@ -226,6 +238,7 @@ function fakes.ItemTooltip(wow, data)
 	data.type = data.type or wow.env.Enum.TooltipDataType.Item
 	data.lines = data.lines or {}
 	tooltip.processingInfo = { tooltipData = data }
+	tooltip.primaryInfo = tooltip.processingInfo
 	tooltip.shown = true
 	return tooltip
 end

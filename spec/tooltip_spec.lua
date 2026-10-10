@@ -182,7 +182,7 @@ describe("Tooltip refresh on modifier changes", function()
 
 	-- Makes a fake tooltip look like a shown tooltip of the given data type
 	local function ShowTooltip(tooltip, dataType)
-		tooltip.processingInfo = { tooltipData = { type = dataType } }
+		tooltip.primaryInfo = { tooltipData = { type = dataType } }
 		tooltip.shown = true
 	end
 
