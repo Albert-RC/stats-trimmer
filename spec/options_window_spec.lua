@@ -1,5 +1,5 @@
--- OptionsWindow.lua: opening and closing, live color editing with preview, resets, the dropdowns and the
--- client's own texts. The fake client is esES unless a test says otherwise.
+-- OptionsWindow.lua: opening and closing, live color editing with preview, resets, the dropdowns, the spell
+-- power checkbox and the client's own texts. The fake client is esES unless a test says otherwise.
 local helpers = require("spec.helpers")
 local fakes = require("spec.fakes")
 
@@ -229,14 +229,15 @@ describe("Settings window", function()
 			local texts = PreviewTexts()
 			assert.are.same({ "Sample Item", "Se liga al equiparlo", "+5 aguante" }, { texts[1], texts[2], texts[3] })
 			assert.are.same({
-				"≤10 daño con hechizos",
-				"≤30 sanación con hechizos",
-				"≤12 daño arcano",
-				"≤12 daño de fuego",
-				"≤32 daño de escarcha",
-				"≤12 daño sagrado",
-				"≤12 daño de naturaleza",
-				"≤12 daño de las sombras",
+				"+26 poder con hechizos",
+				"+10 daño con hechizos",
+				"+30 sanación con hechizos",
+				"+12 daño arcano",
+				"+12 daño de fuego",
+				"+32 daño de escarcha",
+				"+12 daño sagrado",
+				"+12 daño de naturaleza",
+				"+12 daño de las sombras",
 				"+4 MP5",
 				"+5 HP5",
 				"+4 poder de ataque",
@@ -259,20 +260,28 @@ describe("Settings window", function()
 				{ { "CTRL key", "CTRL" }, { "ALT key", "ALT" }, { "SHIFT key", "SHIFT" } },
 				KeyMenu().options
 			)
-			for _, label in ipairs({ "spell damage", "spell healing", "MP5", "attack power vs …", "hit" }) do
+			for _, label in ipairs({
+				"spell power",
+				"spell damage",
+				"spell healing",
+				"MP5",
+				"attack power vs …",
+				"hit",
+			}) do
 				assert.is_true(HasText(label))
 			end
 			local texts = PreviewTexts()
 			assert.are.same({ "Sample Item", "Binds when equipped", "+5 Stamina" }, { texts[1], texts[2], texts[3] })
 			assert.are.same({
-				"≤10 spell damage",
-				"≤30 spell healing",
-				"≤12 arcane damage",
-				"≤12 fire damage",
-				"≤32 frost damage",
-				"≤12 holy damage",
-				"≤12 nature damage",
-				"≤12 shadow damage",
+				"+26 spell power",
+				"+10 spell damage",
+				"+30 spell healing",
+				"+12 arcane damage",
+				"+12 fire damage",
+				"+32 frost damage",
+				"+12 holy damage",
+				"+12 nature damage",
+				"+12 shadow damage",
 				"+4 MP5",
 				"+5 HP5",
 				"+4 attack power",
@@ -314,7 +323,58 @@ describe("Settings window", function()
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
 			assert.is_true(LanguageMenu().isSelected("CLIENT"))
-			assert.are.equal("≤10 daño con hechizos", PreviewTexts()[4])
+			assert.are.equal("+26 poder con hechizos", PreviewTexts()[4])
+		end)
+	end)
+
+	describe("spell power checkbox", function()
+		local function Checkbox()
+			return fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]
+		end
+
+		local function PreviewHas(text)
+			for _, shown in ipairs(PreviewTexts()) do
+				if shown == text then
+					return true
+				end
+			end
+			return false
+		end
+
+		it("starts unchecked, with spell power as its own line in the preview", function()
+			ns.ShowOptions()
+			assert.are.equal("Split spell power into spell damage and spell healing", Checkbox().Text.text)
+			assert.is_false(Checkbox():GetChecked())
+			assert.is_true(PreviewHas("+26 poder con hechizos"))
+		end)
+
+		it("splits spell power when checked, rebuilding the preview and a shown item tooltip", function()
+			local tooltip = wow.env.GameTooltip
+			tooltip.primaryInfo = { tooltipData = { type = wow.env.Enum.TooltipDataType.Item } }
+			tooltip.shown = true
+			ns.ShowOptions()
+			fakes.ClickCheckButton(Checkbox())
+			assert.is_true(ns.db.splitSpellPower)
+			assert.is_false(PreviewHas("+26 poder con hechizos"))
+			assert.are.equal("+10 daño con hechizos", PreviewTexts()[4])
+			assert.are.equal(1, tooltip.refreshCount)
+		end)
+
+		it("shows spell power as its own line again when unchecked", function()
+			ns.ShowOptions()
+			fakes.ClickCheckButton(Checkbox())
+			fakes.ClickCheckButton(Checkbox())
+			assert.is_false(ns.db.splitSpellPower)
+			assert.is_true(PreviewHas("+26 poder con hechizos"))
+		end)
+
+		it("shows the saved setting when opened", function()
+			wow = fakes.NewWoW()
+			wow.env.StatsTrimmerDB = { splitSpellPower = true }
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_true(Checkbox():GetChecked())
+			assert.is_false(PreviewHas("+26 poder con hechizos"))
 		end)
 	end)
 
@@ -332,6 +392,7 @@ describe("Settings window", function()
 		it("label the color rows with Blizzard's names in lowercase, MP5 and HP5 as they are", function()
 			ns.ShowOptions()
 			for _, label in ipairs({
+				"poder con hechizos",
 				"daño con hechizos",
 				"sanación con hechizos",
 				"daño de escarcha",

@@ -49,8 +49,8 @@ local function Names(statNames)
 end
 
 -- The context GetReplacement gets from Tooltip.lua. statNames stands for the client's ITEM_MOD_*_SHORT
--- strings (none by default).
-local function Context(locale, itemLines, statNames)
+-- strings (none by default); splitSpellPower for the setting.
+local function Context(locale, itemLines, statNames, splitSpellPower)
 	return {
 		lines = itemLines,
 		equipPrefix = EQUIP_PREFIXES[locale],
@@ -59,13 +59,14 @@ local function Context(locale, itemLines, statNames)
 		end,
 		GetStatName = Names(statNames),
 		FoldCase = fakes.FoldCase,
+		splitSpellPower = splitSpellPower,
 	}
 end
 
 -- GetReplacement for one equip line, as { kind, text } lines; itemLines are the item's other tooltip lines
 -- (defaults to just this one)
-local function Replace(text, stats, locale, itemLines, statNames)
-	local context = Context(locale or "esES", itemLines or { { leftText = text } }, statNames)
+local function Replace(text, stats, locale, itemLines, statNames, splitSpellPower)
+	local context = Context(locale or "esES", itemLines or { { leftText = text } }, statNames, splitSpellPower)
 	local lines = ns.GetReplacement(text, stats, context)
 	if not lines then
 		return nil
@@ -98,7 +99,7 @@ describe("spell damage and healing", function()
 		ITEM_MOD_SPELL_HEALING_DONE_SHORT = 30,
 		ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = 10,
 	}
-	local expected = { L("spellDamage", "≤10 spell damage"), L("spellHealing", "≤30 spell healing") }
+	local expected = { L("spellDamage", "+10 spell damage"), L("spellHealing", "+30 spell healing") }
 
 	it("splits different values (esES)", function()
 		local text = "Equipar: Aumenta hasta 30 p. la sanación realizada y hasta 10 p. el daño infligido "
@@ -111,6 +112,19 @@ describe("spell damage and healing", function()
 			.. "for all magical spells and effects."
 		assert.are.same(expected, Replace(text, stats, "enUS"))
 	end)
+
+	it("splits different values whether spell power is split or not", function()
+		local text = "Equip: Increases healing done by up to 30 and damage done by up to 10 "
+			.. "for all magical spells and effects."
+		assert.are.same(expected, Replace(text, stats, "enUS", nil, nil, true))
+	end)
+
+	it("shows only healing for an item without spell damage", function()
+		-- Classic's wording for a healing-only item; not seen in Forever yet
+		local text = "Equip: Increases healing done by spells and effects by up to 5."
+		local healingOnly = { ITEM_MOD_STAMINA_SHORT = 3, ITEM_MOD_SPELL_HEALING_DONE_SHORT = 5 }
+		assert.are.same({ L("spellHealing", "+5 spell healing") }, Replace(text, healingOnly, "enUS"))
+	end)
 end)
 
 describe("combined spell power", function()
@@ -120,17 +134,34 @@ describe("combined spell power", function()
 		ITEM_MOD_SPELL_POWER_SHORT = 26,
 		ITEM_MOD_SPIRIT_SHORT = 10,
 	}
-	local expected = { L("spellDamage", "≤26 spell damage"), L("spellHealing", "≤26 spell healing") }
+	local esText = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada "
+		.. "con hechizos y efectos mágicos."
+	local enText = "Equip: Increases damage and healing done by magical spells and effects by up to 26."
+	local one = { L("spellPower", "+26 spell power") }
+	local split = { L("spellDamage", "+26 spell damage"), L("spellHealing", "+26 spell healing") }
 
-	it("shows as spell damage and spell healing (esES)", function()
-		local text = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada "
-			.. "con hechizos y efectos mágicos."
-		assert.are.same(expected, Replace(text, stats))
+	it("shows as one spell power line, like Blizzard's item comparison (esES)", function()
+		assert.are.same(one, Replace(esText, stats))
 	end)
 
-	it("shows as spell damage and spell healing (enUS)", function()
-		local text = "Equip: Increases damage and healing done by magical spells and effects by up to 26."
-		assert.are.same(expected, Replace(text, stats, "enUS"))
+	it("shows as one spell power line, like Blizzard's item comparison (enUS)", function()
+		assert.are.same(one, Replace(enText, stats, "enUS"))
+	end)
+
+	it("shows as spell damage and spell healing when split (esES)", function()
+		assert.are.same(split, Replace(esText, stats, "esES", nil, nil, true))
+	end)
+
+	it("shows as spell damage and spell healing when split (enUS)", function()
+		assert.are.same(split, Replace(enText, stats, "enUS", nil, nil, true))
+	end)
+
+	it("leaves the line alone when another stat has the same number, split or not", function()
+		local withMp5 = { ITEM_MOD_SPELL_POWER_SHORT = 5, ITEM_MOD_MANA_REGENERATION_SHORT = 5 }
+		local text = "Equip: Increases damage and healing done by magical spells and effects by up to 5."
+		local mp5 = "Equip: Restores 5 mana per 5 sec."
+		assert.is_nil(Replace(text, withMp5, "enUS", Lines(text, mp5)))
+		assert.is_nil(Replace(text, withMp5, "enUS", Lines(text, mp5), nil, true))
 	end)
 end)
 
@@ -144,12 +175,12 @@ describe("school damage", function()
 
 	it("names the school (esES)", function()
 		local text = "Equipar: Aumenta hasta 32 p. el daño infligido con hechizos y efectos de escarcha."
-		assert.are.same({ L("frostDamage", "≤32 frost damage") }, Replace(text, stats))
+		assert.are.same({ L("frostDamage", "+32 frost damage") }, Replace(text, stats))
 	end)
 
 	it("names the school (enUS)", function()
 		local text = "Equip: Increases damage done by Frost spells and effects by up to 32."
-		assert.are.same({ L("frostDamage", "≤32 frost damage") }, Replace(text, stats, "enUS"))
+		assert.are.same({ L("frostDamage", "+32 frost damage") }, Replace(text, stats, "enUS"))
 	end)
 end)
 
@@ -534,7 +565,7 @@ describe("percentages", function()
 		local spell = "Equip: Increases damage done by magical spells and effects by up to 10."
 		local silence = "Equip: Increases your chance to resist Silence and Interrupt effects by 10%."
 		local itemLines = Lines(spell, silence)
-		assert.are.same({ L("spellDamage", "≤10 spell damage") }, Replace(spell, stats, "enUS", itemLines))
+		assert.are.same({ L("spellDamage", "+10 spell damage") }, Replace(spell, stats, "enUS", itemLines))
 		assert.is_nil(Replace(silence, stats, "enUS", itemLines))
 	end)
 
@@ -670,10 +701,10 @@ describe("every creature type", function()
 			local vs = ("Equip: Increases damage done to %s by magical spells and effects by up to 15."):format(inGame)
 			local itemLines = Lines(plain, vs)
 			assert.are.same(
-				{ L("spellDamageVs", ("≤15 spell damage vs %s"):format(label)) },
+				{ L("spellDamageVs", ("+15 spell damage vs %s"):format(label)) },
 				Replace(vs, stats, "enUS", itemLines)
 			)
-			assert.are.same({ L("spellDamage", "≤15 spell damage") }, Replace(plain, stats, "enUS", itemLines))
+			assert.are.same({ L("spellDamage", "+15 spell damage") }, Replace(plain, stats, "enUS", itemLines))
 		end)
 	end
 end)
@@ -683,12 +714,12 @@ describe("spell damage vs creature type", function()
 
 	it("names the creature type (enUS)", function()
 		local text = "Equip: Increases damage done to Undead by magical spells and effects by up to 20."
-		assert.are.same({ L("spellDamageVs", "≤20 spell damage vs undead") }, Replace(text, stats, "enUS"))
+		assert.are.same({ L("spellDamageVs", "+20 spell damage vs undead") }, Replace(text, stats, "enUS"))
 	end)
 
 	it("names the creature type (esES)", function()
 		local text = "Equipar: Aumenta hasta 20 p. el daño infligido a no-muertos con hechizos y efectos mágicos."
-		assert.are.same({ L("spellDamageVs", "≤20 spell damage vs undead") }, Replace(text, stats))
+		assert.are.same({ L("spellDamageVs", "+20 spell damage vs undead") }, Replace(text, stats))
 	end)
 
 	it("tells a plain spell damage line with the same number apart", function()
@@ -696,9 +727,9 @@ describe("spell damage vs creature type", function()
 		local plain = "Equip: Increases damage done by magical spells and effects by up to 20."
 		local vsUndead = "Equip: Increases damage done to Undead by magical spells and effects by up to 20."
 		local itemLines = Lines(plain, vsUndead)
-		assert.are.same({ L("spellDamage", "≤20 spell damage") }, Replace(plain, both, "enUS", itemLines))
+		assert.are.same({ L("spellDamage", "+20 spell damage") }, Replace(plain, both, "enUS", itemLines))
 		assert.are.same(
-			{ L("spellDamageVs", "≤20 spell damage vs undead") },
+			{ L("spellDamageVs", "+20 spell damage vs undead") },
 			Replace(vsUndead, both, "enUS", itemLines)
 		)
 	end)
@@ -717,8 +748,8 @@ end)
 
 describe("compact lines in the client's language", function()
 	-- The esES client's compact lines for one equip line, as { kind, text }
-	local function Localized(text, stats, itemLines)
-		local context = Context("esES", itemLines or Lines(text), ES_STRINGS)
+	local function Localized(text, stats, itemLines, splitSpellPower)
+		local context = Context("esES", itemLines or Lines(text), ES_STRINGS, splitSpellPower)
 		local shown = {}
 		for _, line in ipairs(ns.LocalizeLines(ns.GetReplacement(text, stats, context), Names(ES_STRINGS))) do
 			table.insert(shown, { kind = line.kind, text = line.text })
@@ -731,17 +762,19 @@ describe("compact lines in the client's language", function()
 		local text = "Equipar: Aumenta hasta 30 p. la sanación realizada y hasta 10 p. el daño infligido "
 			.. "con todos los hechizos y efectos mágicos."
 		assert.are.same(
-			{ L("spellDamage", "≤10 Daño con hechizos"), L("spellHealing", "≤30 Sanación con hechizos") },
+			{ L("spellDamage", "+10 Daño con hechizos"), L("spellHealing", "+30 Sanación con hechizos") },
 			Localized(text, stats)
 		)
 	end)
 
-	it("shows combined spell power as spell damage and healing (Bastón nudoso de nigromancia)", function()
+	it("names combined spell power (Bastón nudoso de nigromancia)", function()
 		local text = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada "
 			.. "con hechizos y efectos mágicos."
+		local stats = { ITEM_MOD_SPELL_POWER_SHORT = 26 }
+		assert.are.same({ L("spellPower", "+26 poder con hechizos") }, Localized(text, stats))
 		assert.are.same(
-			{ L("spellDamage", "≤26 Daño con hechizos"), L("spellHealing", "≤26 Sanación con hechizos") },
-			Localized(text, { ITEM_MOD_SPELL_POWER_SHORT = 26 })
+			{ L("spellDamage", "+26 Daño con hechizos"), L("spellHealing", "+26 Sanación con hechizos") },
+			Localized(text, stats, nil, true)
 		)
 	end)
 
@@ -804,7 +837,7 @@ describe("compact lines in the client's language", function()
 	it("keeps the English line for spell damage vs beasts, whose esES name says mechanicals", function()
 		local text = "Equipar: Aumenta hasta 15 p. el daño infligido a bestias con hechizos y efectos mágicos."
 		assert.are.same(
-			{ L("spellDamageVs", "≤15 spell damage vs beasts") },
+			{ L("spellDamageVs", "+15 spell damage vs beasts") },
 			Localized(text, { ITEM_MOD_SPELL_DAMAGE_VS_BEAST_SHORT = 15 })
 		)
 	end)
@@ -824,7 +857,7 @@ describe("compact lines in the client's language", function()
 	it("uses the spell damage vs name when it agrees with attack power's", function()
 		local text = "Equipar: Aumenta hasta 20 p. el daño infligido a no-muertos con hechizos y efectos mágicos."
 		assert.are.same(
-			{ L("spellDamageVs", "≤20 Daño con hechizos contra no-muertos") },
+			{ L("spellDamageVs", "+20 Daño con hechizos contra no-muertos") },
 			Localized(text, { ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT = 20 })
 		)
 	end)
@@ -863,11 +896,11 @@ describe("creature types in other locales", function()
 			"Equipar: Aumenta hasta 20 p. el daño infligido a humanoides con hechizos y efectos mágicos."
 		local itemLines = Lines(mechanicals, humanoids)
 		assert.are.same(
-			{ L("spellDamageVs", "≤20 spell damage vs mechanicals") },
+			{ L("spellDamageVs", "+20 spell damage vs mechanicals") },
 			Replace(mechanicals, stats, "esES", itemLines, ES_STRINGS)
 		)
 		assert.are.same(
-			{ L("spellDamageVs", "≤20 spell damage vs humanoids") },
+			{ L("spellDamageVs", "+20 spell damage vs humanoids") },
 			Replace(humanoids, stats, "esES", itemLines, ES_STRINGS)
 		)
 	end)
@@ -880,12 +913,12 @@ describe("creature types in other locales", function()
 		local plain = "Equipado: Aumenta em até 20 o dano causado por feitiços e efeitos mágicos."
 		local vs = "Equipado: Aumenta em até 20 o dano causado a Mortos-vivos por feitiços e efeitos mágicos."
 		local itemLines = Lines(plain, vs)
-		assert.are.same({ L("spellDamage", "≤20 spell damage") }, Replace(plain, stats, "ptBR", itemLines, ptStrings))
+		assert.are.same({ L("spellDamage", "+20 spell damage") }, Replace(plain, stats, "ptBR", itemLines, ptStrings))
 		assert.are.same(
-			{ L("spellDamageVs", "≤20 spell damage vs undead") },
+			{ L("spellDamageVs", "+20 spell damage vs undead") },
 			Replace(vs, stats, "ptBR", itemLines, ptStrings)
 		)
 		local lines = ns.GetReplacement(vs, stats, Context("ptBR", itemLines, ptStrings))
-		assert.are.equal("≤20 Dano Mágico contra Mortos-Vivos", ns.LocalizeLines(lines, Names(ptStrings))[1].text)
+		assert.are.equal("+20 Dano Mágico contra Mortos-Vivos", ns.LocalizeLines(lines, Names(ptStrings))[1].text)
 	end)
 end)

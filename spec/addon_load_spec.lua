@@ -41,7 +41,7 @@ describe("Stats Trimmer load order", function()
 		local tooltip = fakes.ItemTooltip(wow, { hyperlink = "item:vsbeasts" })
 		local text = "Equipar: Aumenta hasta 15 p. el daño infligido a bestias con hechizos y efectos mágicos."
 		wow.preCalls[1].handler(tooltip, { leftText = text, leftColor = fakes.Color(0, 1, 0) })
-		assert.are.equal("≤15 spell damage vs beasts", tooltip.lines[1].text)
+		assert.are.equal("+15 spell damage vs beasts", tooltip.lines[1].text)
 
 		ns.ShowOptions()
 		assert.is_true(wow.env.StatsTrimmerOptionsFrame:IsShown())

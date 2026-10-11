@@ -144,6 +144,7 @@ local function ReplaceEquipLine(tooltip, lineData)
 		GetCreatureTypeName = GetCreatureTypeName,
 		GetStatName = clientNames,
 		FoldCase = FoldCase,
+		splitSpellPower = ns.db and ns.db.splitSpellPower,
 	}
 	local lines = ns.GetReplacement(text, stats, context)
 	if not lines then

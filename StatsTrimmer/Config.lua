@@ -56,85 +56,92 @@ end
 -- Every kind of replacement line, in settings order. `group` separates the rows in the settings window.
 -- `stat` is the key of Blizzard's name for the row label (in the chosen language), with `label` as the
 -- English fallback; a kind without `stat` or `typeStat` always shows `label`. `sample` is the line the
--- preview tooltip shows: { sign, value, English name, percent = ..., stat = ... }, where its own `stat`
+-- preview tooltip shows: { value, English name, percent = ..., stat = ... }, where its own `stat`
 -- overrides the kind's.
 ns.COLOR_KINDS = {
 	{
-		-- Spell damage, also from spell power, which adds damage and healing (see Rules.lua)
+		-- A single stat that adds damage and healing; split into the next two when splitSpellPower is set
+		key = "spellPower",
+		group = "spell",
+		label = "Spell power",
+		stat = "ITEM_MOD_SPELL_POWER_SHORT",
+		sample = { 26, "spell power" },
+	},
+	{
 		key = "spellDamage",
 		group = "spell",
 		label = "Spell damage",
 		stat = "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT",
-		sample = { "≤", 10, "spell damage" },
+		sample = { 10, "spell damage" },
 	},
 	{
 		key = "spellHealing",
 		group = "spell",
 		label = "Spell healing",
 		stat = "ITEM_MOD_SPELL_HEALING_DONE_SHORT",
-		sample = { "≤", 30, "spell healing" },
+		sample = { 30, "spell healing" },
 	},
 	{
 		key = "arcaneDamage",
 		group = "school",
 		label = "Arcane damage",
 		stat = "ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT",
-		sample = { "≤", 12, "arcane damage" },
+		sample = { 12, "arcane damage" },
 	},
 	{
 		key = "fireDamage",
 		group = "school",
 		label = "Fire damage",
 		stat = "ITEM_MOD_FIRE_DAMAGE_DONE_SHORT",
-		sample = { "≤", 12, "fire damage" },
+		sample = { 12, "fire damage" },
 	},
 	{
 		key = "frostDamage",
 		group = "school",
 		label = "Frost damage",
 		stat = "ITEM_MOD_FROST_DAMAGE_DONE_SHORT",
-		sample = { "≤", 32, "frost damage" },
+		sample = { 32, "frost damage" },
 	},
 	{
 		key = "holyDamage",
 		group = "school",
 		label = "Holy damage",
 		stat = "ITEM_MOD_HOLY_DAMAGE_DONE_SHORT",
-		sample = { "≤", 12, "holy damage" },
+		sample = { 12, "holy damage" },
 	},
 	{
 		key = "natureDamage",
 		group = "school",
 		label = "Nature damage",
 		stat = "ITEM_MOD_NATURE_DAMAGE_DONE_SHORT",
-		sample = { "≤", 12, "nature damage" },
+		sample = { 12, "nature damage" },
 	},
 	{
 		key = "shadowDamage",
 		group = "school",
 		label = "Shadow damage",
 		stat = "ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT",
-		sample = { "≤", 12, "shadow damage" },
+		sample = { 12, "shadow damage" },
 	},
 	{
 		-- MP5 and HP5 read the same in every language
 		key = "mp5",
 		group = "regen",
 		label = "MP5",
-		sample = { "+", 4, "MP5" },
+		sample = { 4, "MP5" },
 	},
 	{
 		key = "hp5",
 		group = "regen",
 		label = "HP5",
-		sample = { "+", 5, "HP5" },
+		sample = { 5, "HP5" },
 	},
 	{
 		key = "attackPower",
 		group = "physical",
 		label = "Attack power",
 		stat = "ITEM_MOD_ATTACK_POWER_SHORT",
-		sample = { "+", 4, "attack power" },
+		sample = { 4, "attack power" },
 	},
 	{
 		-- Blizzard only names this per creature type: the label is typeStat's name without its last word,
@@ -143,37 +150,37 @@ ns.COLOR_KINDS = {
 		group = "physical",
 		label = "Attack power vs type",
 		typeStat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT",
-		sample = { "+", 6, "attack power vs beasts", stat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT" },
+		sample = { 6, "attack power vs beasts", stat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT" },
 	},
 	{
 		key = "defense",
 		group = "physical",
 		label = "Defense",
 		stat = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT",
-		sample = { "+", 3, "defense" },
+		sample = { 3, "defense" },
 	},
 	{
 		key = "blockRating",
 		group = "physical",
 		label = "Block rating",
 		stat = "ITEM_MOD_BLOCK_RATING_SHORT",
-		sample = { "+", 1, "block rating", percent = true },
+		sample = { 1, "block rating", percent = true },
 	},
 	{
 		key = "hitRating",
 		group = "physical",
 		label = "Hit rating",
 		stat = "ITEM_MOD_HIT_RATING_SHORT",
-		sample = { "+", 1, "hit rating", percent = true },
+		sample = { 1, "hit rating", percent = true },
 	},
 }
 
 -- The preview's compact line for a kind, in the same shape the rules produce, so ns.LocalizeLines can
 -- turn it into the chosen language. A kind without a stat (MP5, HP5) is never translated.
 function ns.GetSampleLine(kind)
-	local sign, value, name = unpack(kind.sample)
+	local value, name = unpack(kind.sample)
 	local stat = kind.sample.stat or kind.stat
-	return ns.CompactLine(kind.key, sign, value, name, stat and { stat }, kind.sample.percent)
+	return ns.CompactLine(kind.key, value, name, stat and { stat }, kind.sample.percent)
 end
 
 -- Same green as the game's own equip lines, so nothing changes until the user picks a color
@@ -183,6 +190,8 @@ ns.DEFAULTS = {
 	originalTextKey = "CTRL",
 	-- "CLIENT" follows the client's language; otherwise a key of ns.LOCALE_STRINGS (Locales.lua)
 	language = "CLIENT",
+	-- Show spell power as spell damage and spell healing lines instead of its own line
+	splitSpellPower = false,
 	colors = {},
 	minimap = { angle = 200 },
 }
@@ -238,6 +247,9 @@ function ns.LoadSettings(saved)
 	end
 	if not IsLanguage(settings.language) then
 		settings.language = ns.DEFAULTS.language
+	end
+	if type(settings.splitSpellPower) ~= "boolean" then
+		settings.splitSpellPower = ns.DEFAULTS.splitSpellPower
 	end
 
 	if type(settings.colors) ~= "table" then

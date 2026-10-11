@@ -56,9 +56,35 @@ describe("Tooltip line pre-call", function()
 		local consumed, lines = ProcessLine(wow, preCall, COSEDORA_LINE)
 		assert.is_true(consumed)
 		assert.are.same({
-			{ text = "≤10 daño con hechizos", r = 1, g = 0.5, b = 0 },
-			{ text = "≤30 sanación con hechizos", r = 0, g = 0.5, b = 1 },
+			{ text = "+10 daño con hechizos", r = 1, g = 0.5, b = 0 },
+			{ text = "+30 sanación con hechizos", r = 0, g = 0.5, b = 1 },
 		}, lines)
+	end)
+
+	describe("combined spell power (Bastón nudoso de nigromancia)", function()
+		local text = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada "
+			.. "con hechizos y efectos mágicos."
+
+		before_each(function()
+			wow.items["item:baston"] = { ITEM_MOD_SPELL_POWER_SHORT = 26, ITEM_MOD_SPIRIT_SHORT = 10 }
+			ns.db.colors.spellPower = { r = 1, g = 0, b = 1 }
+			ns.db.colors.spellDamage = { r = 1, g = 0.5, b = 0 }
+			ns.db.colors.spellHealing = { r = 0, g = 0.5, b = 1 }
+		end)
+
+		it("shows as one line in its own color by default", function()
+			local _, lines = ProcessLine(wow, preCall, text, { hyperlink = "item:baston" })
+			assert.are.same({ { text = "+26 poder con hechizos", r = 1, g = 0, b = 1 } }, lines)
+		end)
+
+		it("shows as spell damage and healing lines in their colors when the setting splits it", function()
+			ns.db.splitSpellPower = true
+			local _, lines = ProcessLine(wow, preCall, text, { hyperlink = "item:baston" })
+			assert.are.same({
+				{ text = "+26 daño con hechizos", r = 1, g = 0.5, b = 0 },
+				{ text = "+26 sanación con hechizos", r = 0, g = 0.5, b = 1 },
+			}, lines)
+		end)
 	end)
 
 	describe("language", function()
@@ -73,19 +99,19 @@ describe("Tooltip line pre-call", function()
 
 		it("is the client's by default, with Blizzard's names in lowercase", function()
 			assert.are.equal("CLIENT", ns.db.language)
-			assert.are.same({ "≤10 daño con hechizos", "≤30 sanación con hechizos" }, Texts(COSEDORA_LINE))
+			assert.are.same({ "+10 daño con hechizos", "+30 sanación con hechizos" }, Texts(COSEDORA_LINE))
 		end)
 
 		it("can be another one, without the client's", function()
 			ns.db.language = "enUS"
-			assert.are.same({ "≤10 spell damage", "≤30 spell healing" }, Texts(COSEDORA_LINE))
+			assert.are.same({ "+10 spell damage", "+30 spell healing" }, Texts(COSEDORA_LINE))
 			ns.db.language = "deDE"
-			assert.are.same({ "≤10 zauberschaden", "≤30 zauberheilung" }, Texts(COSEDORA_LINE))
+			assert.are.same({ "+10 zauberschaden", "+30 zauberheilung" }, Texts(COSEDORA_LINE))
 		end)
 
 		it("uses the client's strings when it is saved as the client's own language", function()
 			ns.db.language = "esES"
-			assert.are.same({ "≤10 daño con hechizos", "≤30 sanación con hechizos" }, Texts(COSEDORA_LINE))
+			assert.are.same({ "+10 daño con hechizos", "+30 sanación con hechizos" }, Texts(COSEDORA_LINE))
 		end)
 
 		it("uses the client's strings for a saved language the client's font can't show", function()
@@ -94,7 +120,7 @@ describe("Tooltip line pre-call", function()
 				return "ruRU"
 			end
 			ns.db.language = "deDE"
-			assert.are.same({ "≤10 daño con hechizos", "≤30 sanación con hechizos" }, Texts(COSEDORA_LINE))
+			assert.are.same({ "+10 daño con hechizos", "+30 sanación con hechizos" }, Texts(COSEDORA_LINE))
 			assert.are.equal("deDE", ns.db.language)
 		end)
 
@@ -108,14 +134,14 @@ describe("Tooltip line pre-call", function()
 
 		it("falls back to Blizzard's English, not the addon's, for a name the client lacks", function()
 			wow.env.ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = nil
-			assert.are.same({ "≤10 spell damage", "≤30 sanación con hechizos" }, Texts(COSEDORA_LINE))
+			assert.are.same({ "+10 spell damage", "+30 sanación con hechizos" }, Texts(COSEDORA_LINE))
 		end)
 
 		it("falls back to Blizzard's English for a name the language gets wrong", function()
 			-- The esES client calls spell damage vs beasts "Daño con hechizos contra mecánicos"
 			wow.items["item:vsbeasts"] = { ITEM_MOD_SPELL_DAMAGE_VS_BEAST_SHORT = 15 }
 			local text = "Equipar: Aumenta hasta 15 p. el daño infligido a bestias con hechizos y efectos mágicos."
-			assert.are.same({ "≤15 spell damage vs beasts" }, Texts(text, { hyperlink = "item:vsbeasts" }))
+			assert.are.same({ "+15 spell damage vs beasts" }, Texts(text, { hyperlink = "item:vsbeasts" }))
 		end)
 	end)
 
@@ -124,7 +150,7 @@ describe("Tooltip line pre-call", function()
 			world.env.C_Intl.ToLower = function() end
 		end)
 		local _, lines = ProcessLine(wow, preCall, COSEDORA_LINE)
-		assert.are.equal("≤10 daño con hechizos", lines[1].text)
+		assert.are.equal("+10 daño con hechizos", lines[1].text)
 	end)
 
 	it("folds the case itself when the client's case folding returns nothing", function()
@@ -202,7 +228,7 @@ describe("Tooltip line pre-call", function()
 	it("already works before the saved settings are loaded, in the line's own color", function()
 		ns.db = nil
 		local _, lines = ProcessLine(wow, preCall, COSEDORA_LINE, nil, fakes.Color(0, 1, 0))
-		assert.are.same({ text = "≤10 daño con hechizos", r = 0, g = 1, b = 0 }, lines[1])
+		assert.are.same({ text = "+10 daño con hechizos", r = 0, g = 1, b = 0 }, lines[1])
 	end)
 
 	describe("leaves the line alone", function()
