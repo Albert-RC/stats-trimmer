@@ -1,11 +1,22 @@
 -- Real cases seen in-game on an esES client (text and GetItemStats output), plus enUS variants
 local helpers = require("spec.helpers")
+local fakes = require("spec.fakes")
 local ns = helpers.LoadAddon("StatsTrimmer", { "Util.lua", "Rules.lua" })
+
+-- Blizzard's strings of the esES client, as Locales.lua bundles them
+local ES_STRINGS = fakes.LocaleStrings("esES")
 
 -- Creature type names as C_CreatureInfo.GetCreatureTypeInfo returns them. ruRU stands for a locale whose
 -- tooltip uses a declined form that doesn't contain the type name.
 local CREATURE_TYPES = {
-	esES = { [1] = "Bestia", [3] = "Demonio", [4] = "Elemental", [6] = "No-muerto" },
+	esES = {
+		[1] = "Bestia",
+		[3] = "Demonio",
+		[4] = "Elemental",
+		[6] = "No-muerto",
+		[7] = "Humanoide",
+		[9] = "Mecánico",
+	},
 	enUS = {
 		[1] = "Beast",
 		[2] = "Dragonkin",
@@ -17,22 +28,53 @@ local CREATURE_TYPES = {
 		[9] = "Mechanical",
 	},
 	ruRU = { [1] = "Животное", [4] = "Элементаль", [6] = "Нежить" },
+	frFR = { [4] = "Élémentaire" },
+	ptBR = { [6] = "Morto-vivo" },
 }
 
 -- ITEM_SPELL_TRIGGER_ONEQUIP per locale
-local EQUIP_PREFIXES = { esES = "Equipar:", enUS = "Equip:", ruRU = "Если на персонаже:" }
+local EQUIP_PREFIXES = {
+	esES = "Equipar:",
+	enUS = "Equip:",
+	ruRU = "Если на персонаже:",
+	frFR = "Équipé :",
+	ptBR = "Equipado:",
+}
 
--- GetReplacement for one equip line; itemLines are the item's other tooltip lines (defaults to just this one)
-local function Replace(text, stats, locale, itemLines)
-	locale = locale or "esES"
-	local context = {
-		lines = itemLines or { { leftText = text } },
+-- A stat name getter over a table of names, with untrusted vs names left out, like Tooltip.lua's
+local function Names(statNames)
+	return ns.TrustedNames(function(key)
+		return (statNames or {})[key]
+	end, fakes.FoldCase)
+end
+
+-- The context GetReplacement gets from Tooltip.lua. statNames stands for the client's ITEM_MOD_*_SHORT
+-- strings (none by default).
+local function Context(locale, itemLines, statNames)
+	return {
+		lines = itemLines,
 		equipPrefix = EQUIP_PREFIXES[locale],
 		GetCreatureTypeName = function(id)
 			return CREATURE_TYPES[locale][id]
 		end,
+		GetStatName = Names(statNames),
+		FoldCase = fakes.FoldCase,
 	}
-	return ns.GetReplacement(text, stats, context)
+end
+
+-- GetReplacement for one equip line, as { kind, text } lines; itemLines are the item's other tooltip lines
+-- (defaults to just this one)
+local function Replace(text, stats, locale, itemLines, statNames)
+	local context = Context(locale or "esES", itemLines or { { leftText = text } }, statNames)
+	local lines = ns.GetReplacement(text, stats, context)
+	if not lines then
+		return nil
+	end
+	local shown = {}
+	for _, line in ipairs(lines) do
+		table.insert(shown, { kind = line.kind, text = line.text })
+	end
+	return shown
 end
 
 -- An expected compact line
@@ -56,7 +98,7 @@ describe("spell damage and healing", function()
 		ITEM_MOD_SPELL_HEALING_DONE_SHORT = 30,
 		ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = 10,
 	}
-	local expected = { L("spellPower", "≤10 spell power"), L("healingPower", "≤30 healing power") }
+	local expected = { L("spellDamage", "≤10 spell damage"), L("spellHealing", "≤30 spell healing") }
 
 	it("splits different values (esES)", function()
 		local text = "Equipar: Aumenta hasta 30 p. la sanación realizada y hasta 10 p. el daño infligido "
@@ -78,15 +120,15 @@ describe("combined spell power", function()
 		ITEM_MOD_SPELL_POWER_SHORT = 26,
 		ITEM_MOD_SPIRIT_SHORT = 10,
 	}
-	local expected = { L("spellPower", "≤26 spell power"), L("healingPower", "≤26 healing power") }
+	local expected = { L("spellDamage", "≤26 spell damage"), L("spellHealing", "≤26 spell healing") }
 
-	it("counts as both spell and healing power (esES)", function()
+	it("shows as spell damage and spell healing (esES)", function()
 		local text = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada "
 			.. "con hechizos y efectos mágicos."
 		assert.are.same(expected, Replace(text, stats))
 	end)
 
-	it("counts as both spell and healing power (enUS)", function()
+	it("shows as spell damage and spell healing (enUS)", function()
 		local text = "Equip: Increases damage and healing done by magical spells and effects by up to 26."
 		assert.are.same(expected, Replace(text, stats, "enUS"))
 	end)
@@ -492,7 +534,7 @@ describe("percentages", function()
 		local spell = "Equip: Increases damage done by magical spells and effects by up to 10."
 		local silence = "Equip: Increases your chance to resist Silence and Interrupt effects by 10%."
 		local itemLines = Lines(spell, silence)
-		assert.are.same({ L("spellPower", "≤10 spell power") }, Replace(spell, stats, "enUS", itemLines))
+		assert.are.same({ L("spellDamage", "≤10 spell damage") }, Replace(spell, stats, "enUS", itemLines))
 		assert.is_nil(Replace(silence, stats, "enUS", itemLines))
 	end)
 
@@ -631,7 +673,7 @@ describe("every creature type", function()
 				{ L("spellDamageVs", ("≤15 spell damage vs %s"):format(label)) },
 				Replace(vs, stats, "enUS", itemLines)
 			)
-			assert.are.same({ L("spellPower", "≤15 spell power") }, Replace(plain, stats, "enUS", itemLines))
+			assert.are.same({ L("spellDamage", "≤15 spell damage") }, Replace(plain, stats, "enUS", itemLines))
 		end)
 	end
 end)
@@ -654,7 +696,7 @@ describe("spell damage vs creature type", function()
 		local plain = "Equip: Increases damage done by magical spells and effects by up to 20."
 		local vsUndead = "Equip: Increases damage done to Undead by magical spells and effects by up to 20."
 		local itemLines = Lines(plain, vsUndead)
-		assert.are.same({ L("spellPower", "≤20 spell power") }, Replace(plain, both, "enUS", itemLines))
+		assert.are.same({ L("spellDamage", "≤20 spell damage") }, Replace(plain, both, "enUS", itemLines))
 		assert.are.same(
 			{ L("spellDamageVs", "≤20 spell damage vs undead") },
 			Replace(vsUndead, both, "enUS", itemLines)
@@ -670,5 +712,180 @@ describe("lines that must keep their text", function()
 
 	it("ignores an equip line without numbers", function()
 		assert.is_nil(Replace("Equip: Allows underwater breathing.", { ITEM_MOD_STAMINA_SHORT = 5 }, "enUS"))
+	end)
+end)
+
+describe("compact lines in the client's language", function()
+	-- The esES client's compact lines for one equip line, as { kind, text }
+	local function Localized(text, stats, itemLines)
+		local context = Context("esES", itemLines or Lines(text), ES_STRINGS)
+		local shown = {}
+		for _, line in ipairs(ns.LocalizeLines(ns.GetReplacement(text, stats, context), Names(ES_STRINGS))) do
+			table.insert(shown, { kind = line.kind, text = line.text })
+		end
+		return shown
+	end
+
+	it("uses the client's stat names (Cosedora)", function()
+		local stats = { ITEM_MOD_SPELL_HEALING_DONE_SHORT = 30, ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = 10 }
+		local text = "Equipar: Aumenta hasta 30 p. la sanación realizada y hasta 10 p. el daño infligido "
+			.. "con todos los hechizos y efectos mágicos."
+		assert.are.same(
+			{ L("spellDamage", "≤10 Daño con hechizos"), L("spellHealing", "≤30 Sanación con hechizos") },
+			Localized(text, stats)
+		)
+	end)
+
+	it("shows combined spell power as spell damage and healing (Bastón nudoso de nigromancia)", function()
+		local text = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada "
+			.. "con hechizos y efectos mágicos."
+		assert.are.same(
+			{ L("spellDamage", "≤26 Daño con hechizos"), L("spellHealing", "≤26 Sanación con hechizos") },
+			Localized(text, { ITEM_MOD_SPELL_POWER_SHORT = 26 })
+		)
+	end)
+
+	it("leaves MP5 and HP5 as they are and writes percentages", function()
+		local mp5 = "Equipar: Restaura 4 p. de maná cada 5 s."
+		assert.are.same({ L("mp5", "+4 MP5") }, Localized(mp5, { ITEM_MOD_MANA_REGENERATION_SHORT = 4 }))
+		local hp5 = "Equipar: Restaura 5 p. de salud cada 5 s."
+		assert.are.same({ L("hp5", "+5 HP5") }, Localized(hp5, { ITEM_MOD_HEALTH_REGEN_SHORT = 5 }))
+		local hit = "Equipar: Mejora tu probabilidad de golpear un 1%."
+		assert.are.same({ L("hitRating", "+1% golpe") }, Localized(hit, { ITEM_MOD_HIT_RATING_SHORT = 4 }))
+	end)
+
+	it("names the creature type through the vs stat (Nudillos de hueso)", function()
+		local stats = { ITEM_MOD_ATTACK_POWER_SHORT = 6, ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = 6 }
+		local plain = "Equipar: +6 p. de poder de ataque."
+		local vsBeasts = "Equipar: +6 p. de poder de ataque contra bestias."
+		local itemLines = Lines(plain, vsBeasts)
+		assert.are.same({ L("attackPower", "+6 Poder de ataque") }, Localized(plain, stats, itemLines))
+		assert.are.same(
+			{ L("attackPowerVs", "+6 Poder de ataque contra bestias") },
+			Localized(vsBeasts, stats, itemLines)
+		)
+	end)
+
+	it("gives each weapon skill of a group its own line", function()
+		local stats = { ITEM_MOD_AXES_SHORT = 7, ITEM_MOD_DAGGERS_SHORT = 7, ITEM_MOD_SWORDS_SHORT = 7 }
+		local itemLines = Lines(
+			"Equipar: Habilidad con hachas aumentada +7.",
+			"Equipar: Habilidad con dagas aumentada +7.",
+			"Equipar: Habilidad con espadas aumentada +7."
+		)
+		assert.are.same({
+			L("weaponSkill", "+7 Habilidad con hachas"),
+			L("weaponSkill", "+7 Habilidad con dagas"),
+			L("weaponSkill", "+7 Habilidad con espadas"),
+		}, Localized(itemLines[1].leftText, stats, itemLines))
+		assert.are.same({}, Localized(itemLines[2].leftText, stats, itemLines))
+	end)
+
+	it("gives each creature type of a combined line its own line", function()
+		local stats = { ITEM_MOD_ATTACK_POWER_VS_UNDEAD_SHORT = 150, ITEM_MOD_ATTACK_POWER_VS_DEMON_SHORT = 150 }
+		local text = "Equipar: +150 p. de poder de ataque contra demonios y no-muertos."
+		assert.are.same({
+			L("attackPowerVs", "+150 Poder de ataque contra demonios"),
+			L("attackPowerVs", "+150 Poder de ataque contra no-muertos"),
+		}, Localized(text, stats))
+	end)
+
+	it("leaves a line as it is when a name is missing, for a second pass with other names", function()
+		local text = "Equipar: Reduce 10 p. las resistencias mágicas de los objetivos de tus hechizos."
+		local lines =
+			ns.GetReplacement(text, { ITEM_MOD_SPELL_PENETRATION_SHORT = 10 }, Context("esES", Lines(text), ES_STRINGS))
+		local untranslated = ns.LocalizeLines(lines, Names({}))
+		assert.are.equal(lines[1], untranslated[1])
+		local translated = ns.LocalizeLines(untranslated, Names(ES_STRINGS))
+		assert.are.same({ { kind = "spellPenetration", text = "+10 Perforación de hechizo" } }, translated)
+	end)
+
+	-- Line texts made up in the usual esES wording
+	it("keeps the English line for spell damage vs beasts, whose esES name says mechanicals", function()
+		local text = "Equipar: Aumenta hasta 15 p. el daño infligido a bestias con hechizos y efectos mágicos."
+		assert.are.same(
+			{ L("spellDamageVs", "≤15 spell damage vs beasts") },
+			Localized(text, { ITEM_MOD_SPELL_DAMAGE_VS_BEAST_SHORT = 15 })
+		)
+	end)
+
+	it("keeps the English line when two creature types share the attack power vs name's last word", function()
+		local statNames = {
+			ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = "Poder de ataque contra bichos",
+			ITEM_MOD_ATTACK_POWER_VS_DEMON_SHORT = "Poder de ataque contra bichos",
+		}
+		local lines = ns.GetReplacement("Equipar: +6 p. de poder de ataque contra bestias.", {
+			ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = 6,
+		}, Context("esES", Lines("Equipar: +6 p. de poder de ataque contra bestias."), statNames))
+		local localized = ns.LocalizeLines(lines, Names(statNames))
+		assert.are.equal("+6 attack power vs beasts", localized[1].text)
+	end)
+
+	it("uses the spell damage vs name when it agrees with attack power's", function()
+		local text = "Equipar: Aumenta hasta 20 p. el daño infligido a no-muertos con hechizos y efectos mágicos."
+		assert.are.same(
+			{ L("spellDamageVs", "≤20 Daño con hechizos contra no-muertos") },
+			Localized(text, { ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT = 20 })
+		)
+	end)
+end)
+
+-- Line texts made up in each locale's style; what matters is how the type is written
+describe("creature types in other locales", function()
+	it("are found whatever the case of accented capitals (frFR)", function()
+		local stats = { ITEM_MOD_ATTACK_POWER_SHORT = 6, ITEM_MOD_ATTACK_POWER_VS_ELEMENTAL_SHORT = 6 }
+		local plain = "Équipé : +6 à la puissance d'attaque."
+		-- The name is "Élémentaire" and the line says "Élémentaires": both need folding, not just ASCII lower
+		local vs = "Équipé : +6 à la puissance d'attaque contre les Élémentaires."
+		local itemLines = Lines(plain, vs)
+		assert.are.same({ L("attackPower", "+6 attack power") }, Replace(plain, stats, "frFR", itemLines))
+		assert.are.same({ L("attackPowerVs", "+6 attack power vs elementals") }, Replace(vs, stats, "frFR", itemLines))
+	end)
+
+	it("are found in a declined form through the vs stat's own name (ruRU)", function()
+		local stats = { ITEM_MOD_ATTACK_POWER_SHORT = 6, ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = 6 }
+		local statNames = { ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = "Сила атаки против животных" }
+		local plain = "Если на персонаже: +6 к силе атаки."
+		local vs = "Если на персонаже: +6 к силе атаки против животных."
+		local itemLines = Lines(plain, vs)
+		assert.are.same({ L("attackPower", "+6 attack power") }, Replace(plain, stats, "ruRU", itemLines, statNames))
+		assert.are.same(
+			{ L("attackPowerVs", "+6 attack power vs beasts") },
+			Replace(vs, stats, "ruRU", itemLines, statNames)
+		)
+	end)
+
+	it("aren't taken from a vs name that ends like another type's (esES spell damage vs mechanicals)", function()
+		local stats = { ITEM_MOD_SPELL_DAMAGE_VS_MECHANICAL_SHORT = 20, ITEM_MOD_SPELL_DAMAGE_VS_HUMANOID_SHORT = 20 }
+		local mechanicals =
+			"Equipar: Aumenta hasta 20 p. el daño infligido a mecánicos con hechizos y efectos mágicos."
+		local humanoids =
+			"Equipar: Aumenta hasta 20 p. el daño infligido a humanoides con hechizos y efectos mágicos."
+		local itemLines = Lines(mechanicals, humanoids)
+		assert.are.same(
+			{ L("spellDamageVs", "≤20 spell damage vs mechanicals") },
+			Replace(mechanicals, stats, "esES", itemLines, ES_STRINGS)
+		)
+		assert.are.same(
+			{ L("spellDamageVs", "≤20 spell damage vs humanoids") },
+			Replace(humanoids, stats, "esES", itemLines, ES_STRINGS)
+		)
+	end)
+
+	it("are checked against attack power's whatever their case (ptBR spell damage vs undead)", function()
+		-- ptBR names attack power vs undead "…contra Mortos-vivos" and spell damage vs undead "…contra
+		-- Mortos-Vivos". The type name, "Morto-vivo", isn't in the line: only the stat's name can locate it.
+		local ptStrings = fakes.LocaleStrings("ptBR")
+		local stats = { ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = 20, ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT = 20 }
+		local plain = "Equipado: Aumenta em até 20 o dano causado por feitiços e efeitos mágicos."
+		local vs = "Equipado: Aumenta em até 20 o dano causado a Mortos-vivos por feitiços e efeitos mágicos."
+		local itemLines = Lines(plain, vs)
+		assert.are.same({ L("spellDamage", "≤20 spell damage") }, Replace(plain, stats, "ptBR", itemLines, ptStrings))
+		assert.are.same(
+			{ L("spellDamageVs", "≤20 spell damage vs undead") },
+			Replace(vs, stats, "ptBR", itemLines, ptStrings)
+		)
+		local lines = ns.GetReplacement(vs, stats, Context("ptBR", itemLines, ptStrings))
+		assert.are.equal("≤20 Dano Mágico contra Mortos-Vivos", ns.LocalizeLines(lines, Names(ptStrings))[1].text)
 	end)
 end)

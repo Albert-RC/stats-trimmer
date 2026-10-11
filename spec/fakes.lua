@@ -17,6 +17,7 @@ for _, name in ipairs({
 	"SetClampedToScreen",
 	"SetFrameLevel",
 	"SetHighlightTexture",
+	"SetJustifyH",
 	"SetMovable",
 	"SetPortraitToAsset",
 	"SetSize",
@@ -25,6 +26,7 @@ for _, name in ipairs({
 	"SetTitle",
 	"SetToplevel",
 	"SetWidth",
+	"SetWordWrap",
 	"StartMoving",
 	"StopMovingOrSizing",
 }) do
@@ -46,6 +48,26 @@ function fakes.FireEvent(wow, event, ...)
 			fakes.Fire(frame, "OnEvent", event, ...)
 		end
 	end
+end
+
+-- Blizzard's strings for a language, as the generated Locales.lua bundles them. For esES they match the
+-- client exactly (checked against an in-game dump), so the fake esES client uses them as its globals.
+function fakes.LocaleStrings(locale)
+	local ns = {}
+	assert(loadfile("StatsTrimmer/Locales.lua"))("StatsTrimmer", ns)
+	return ns.LOCALE_STRINGS[locale]
+end
+
+-- Folded capitals besides ASCII that the specs use; string.lower leaves them as they are
+local FOLDED_CAPITALS = { ["É"] = "é", ["Ж"] = "ж", ["Н"] = "н", ["С"] = "с" }
+
+-- Like C_Intl.FoldCase for the letters the specs use
+function fakes.FoldCase(text)
+	local folded = text:lower()
+	for capital, small in pairs(FOLDED_CAPITALS) do
+		folded = folded:gsub(capital, small)
+	end
+	return folded
 end
 
 -- A color object with the ColorMixin method the addon uses
@@ -126,6 +148,12 @@ end
 
 function Frame:GetText()
 	return self.text
+end
+
+-- UIButtonFitToTextBehaviorMixin: the width isn't modeled, only that the text was fitted
+function Frame:SetTextToFit(text)
+	self:SetText(text)
+	self.fitsText = true
 end
 
 function Frame:SetColorRGB(r, g, b)
@@ -259,7 +287,9 @@ function fakes.FindFrames(wow, filter)
 end
 
 -- A fresh fake world.
--- options.locale: "esES" (default) or "enUS", for the "Equip:" prefix and creature type names.
+-- options.locale: "esES" (default) or "enUS", for the "Equip:" prefix and creature type names. Only the esES
+-- client has Blizzard's strings as globals (fakes.LocaleStrings); the enUS one has none, which exercises the
+-- fallbacks.
 function fakes.NewWoW(options)
 	options = options or {}
 	local env = setmetatable({}, { __index = _G })
@@ -275,9 +305,47 @@ function fakes.NewWoW(options)
 		categories = {}, -- Options categories
 		sounds = {},
 		colorPicker = { rgb = { 1, 1, 1 } },
+		radioMenus = {}, -- MenuUtil.CreateRadioMenu calls, in creation order
 	}
 
 	local english = options.locale == "enUS"
+	-- Addon code reads client strings through _G, which must be this world
+	env._G = env
+	if not english then
+		for name, value in pairs(fakes.LocaleStrings("esES")) do
+			env[name] = value
+		end
+	end
+	env.GetLocale = function()
+		return english and "enUS" or "esES"
+	end
+	-- The esES client's names are its real LFG_LIST_LANGUAGE_* strings; the enUS ones are made up
+	local localeNames = english
+			and {
+				enUS = "English",
+				deDE = "German",
+				esES = "Spanish",
+				esMX = "Spanish (Mexico)",
+				frFR = "French",
+				itIT = "Italian",
+				ptBR = "Portuguese",
+			}
+		or {
+			enUS = "Inglés",
+			deDE = "Alemán",
+			esES = "Español",
+			esMX = "Español (México)",
+			frFR = "Francés",
+			itIT = "Italiano",
+			ptBR = "Portugués",
+		}
+	env.LocaleUtil = {
+		GetLocaleDisplayName = function(locale)
+			return localeNames[locale]
+		end,
+	}
+	-- The specs only use letters for which lowercase and case folding agree
+	env.C_Intl = { FoldCase = fakes.FoldCase, ToLower = fakes.FoldCase }
 	env.ITEM_SPELL_TRIGGER_ONEQUIP = english and "Equip:" or "Equipar:"
 	local creatureTypes = english
 			and {
@@ -366,8 +434,10 @@ function fakes.NewWoW(options)
 	}
 	env.MenuUtil = {
 		CreateRadioMenu = function(dropdown, isSelected, setSelected, ...)
-			wow.radioMenu =
+			table.insert(
+				wow.radioMenus,
 				{ dropdown = dropdown, isSelected = isSelected, setSelected = setSelected, options = { ... } }
+			)
 		end,
 	}
 	env.Settings = {
