@@ -27,7 +27,7 @@ becomes two lines:
 
 - `StatsTrimmer/`: the addon. Only this folder reaches the game. Its name, the `.toc` base name and the folder name in `Interface\AddOns` must match exactly.
 - `spec/`: unit tests (`*_spec.lua`), the test runner, helpers and the fake WoW API.
-- `scripts/`: `test.ps1`, `coverage.ps1` and `package.ps1`.
+- `scripts/`: `test.ps1`, `coverage.ps1`, `package.ps1` and `update-locales.ps1`.
 - `docs/`: this guide and the CurseForge description (`docs/curseforge/StatsTrimmer.md`).
 - `.github/workflows/`: CI and releases (see [CI and releases](#ci-and-releases)).
 - Root tooling: `.luacheckrc`, `.luacov`, `stylua.toml`, `.vscode/`.
