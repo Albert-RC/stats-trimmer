@@ -55,6 +55,8 @@ luacheck .
 ./scripts/test.ps1
 ```
 
+CI runs them on every pull request. Merging a version bump into `main` publishes the release.
+
 ## License
 
 [MIT](LICENSE)

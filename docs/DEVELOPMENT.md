@@ -26,8 +26,9 @@ becomes two lines:
 
 - `StatsTrimmer/`: the addon. Only this folder reaches the game. Its name, the `.toc` base name and the folder name in `Interface\AddOns` must match exactly.
 - `spec/`: unit tests (`*_spec.lua`), the test runner, helpers and the fake WoW API.
-- `scripts/`: `test.ps1` and `coverage.ps1`.
+- `scripts/`: `test.ps1`, `coverage.ps1` and `package.ps1`.
 - `docs/`: this guide and the CurseForge description (`docs/curseforge/StatsTrimmer.md`).
+- `.github/workflows/`: CI and releases (see [CI and releases](#ci-and-releases)).
 - Root tooling: `.luacheckrc`, `.luacov`, `stylua.toml`, `.vscode/`.
 
 ## Setup
@@ -43,7 +44,7 @@ becomes two lines:
    - [StyLua](https://github.com/JohnnyMorganz/StyLua), for formatting.
    - [Luacheck](https://github.com/lunarmodules/luacheck), for static analysis.
    - LuaJIT 2.1 (`winget install --id DEVCOM.LuaJIT -e`), to run the tests.
-   - [LuaCov](https://github.com/lunarmodules/luacov) 0.17.0 (pure Lua) for coverage. Copy its `src/` folder to `%LOCALAPPDATA%\Programs\luacov`.
+   - [LuaCov](https://github.com/lunarmodules/luacov) 0.17.0 (pure Lua) for coverage. Copy its `src/` folder to `%LOCALAPPDATA%\Programs\luacov`, or pass another one with `coverage.ps1 -LuaCov <folder>`.
 3. VS Code extensions: `sumneko.lua`, `ketho.wow-api`, `JohnnyMorganz.stylua` (see `.vscode/extensions.json`).
 4. In game: [BugSack](https://github.com/funkydude/BugSack) and !BugGrabber capture Lua errors.
 
@@ -54,6 +55,7 @@ stylua --check .        # format check (stylua . to fix)
 luacheck .              # static analysis; luacheck <file> for one file
 ./scripts/test.ps1      # unit tests (spec/*_spec.lua)
 ./scripts/coverage.ps1  # tests under LuaCov; fails if StatsTrimmer/ line coverage < 85%
+./scripts/package.ps1   # release zip and notes for the .toc version, in .release/
 luajit spec/runner.lua spec/rules_spec.lua   # a single spec file
 ```
 
@@ -223,6 +225,31 @@ Unit tests run on LuaJIT 2.1 (Lua 5.1 compatible) through `spec/runner.lua`, a m
 Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. On 2026-10-10 it was 100% of 559 lines with 176 tests.
 
 The tests cover the logic. Game-facing behavior still has to be checked in game.
+
+## CI and releases
+
+GitHub Actions, in `.github/workflows/`:
+
+- `ci.yml` runs on every pull request, and by hand from the Actions tab:
+  - `stylua --check .` (StyLua 2.5.2) and `luacheck .` (Luacheck 1.2.0);
+  - `test.ps1` and `coverage.ps1` on Ubuntu's LuaJIT 2.1 with LuaCov 0.17.0;
+  - `package.ps1`. The zip it builds is attached to the run as an artifact, to try a pull request in game.
+- `release.yml` runs on every push to `main`, i.e. every merged pull request. It runs the same checks, then publishes a GitHub release if the `.toc` version has no tag yet:
+  - the tag `v<version>`, on the merged commit;
+  - `StatsTrimmer-v<version>.zip`: the `StatsTrimmer` folder, with `LICENSE` inside it;
+  - as notes, that version's CHANGELOG section plus the installation steps.
+
+  A push that doesn't change `## Version` publishes nothing.
+
+To release a version, in its pull request:
+
+1. Set `## Version: X.Y.Z` in `StatsTrimmer/StatsTrimmer.toc`.
+2. Rename `## Unreleased` in `CHANGELOG.md` to `## vX.Y.Z (<date>)`.
+3. Merge it.
+
+The `.toc` version must always have a CHANGELOG section: `package.ps1` fails without one, so the pull request's CI catches it before the merge.
+
+`package.ps1` builds the same files locally, in `.release/` (gitignored), from the committed files: commit first. When StyLua or Luacheck are updated locally, update their versions in `ci.yml` too.
 
 ## WoW API rules
 
