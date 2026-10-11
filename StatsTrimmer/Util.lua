@@ -46,19 +46,20 @@ function ns.GetOnlyPercent(text)
 	return value and tostring(value)
 end
 
--- A compact line's text, in English or with the client's stat name: "≤10 spell damage", "+1% golpe"
-function ns.FormatLine(sign, value, percent, name)
-	return ("%s%s%s %s"):format(sign, value, percent and "%" or "", name)
+-- A compact line's text, in English or with the client's stat name: "+10 spell damage", "+1% golpe".
+-- Always "+": the line shows what the item adds to the stat, like Blizzard's item comparison. The "up to"
+-- of the original wording is how much of it each spell gets, not the stat itself.
+function ns.FormatLine(value, percent, name)
+	return ("+%s%s %s"):format(value, percent and "%" or "", name)
 end
 
--- A compact line. `text` is the English line; `sign`, `value`, `percent` and the stat keys in `stats` let
+-- A compact line. `text` is the English line; `value`, `percent` and the stat keys in `stats` let
 -- ns.LocalizeLines rebuild it with Blizzard's stat names, and without `stats` it is never translated.
 -- `kind` picks its color (ns.COLOR_KINDS); unknown kinds keep the original line color.
-function ns.CompactLine(kind, sign, value, name, stats, percent)
+function ns.CompactLine(kind, value, name, stats, percent)
 	return {
 		kind = kind,
-		text = ns.FormatLine(sign, value, percent, name),
-		sign = sign,
+		text = ns.FormatLine(value, percent, name),
 		value = value,
 		percent = percent,
 		stats = stats,

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Every compact line starts with `+`, like the game's own item comparison: `+10 spell damage` instead of `≤10 spell damage`. The original "up to" is about how much of the bonus each spell gets, not the bonus itself.
+
 ## v0.2.0 (2026-10-11)
 
 - The compact lines use the game's own stat names, in lowercase: `≤10 spell damage`, `+1% hit`; `≤10 daño con hechizos` on a Spanish client. MP5 and HP5 stay as they are.

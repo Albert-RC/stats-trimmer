@@ -9,11 +9,11 @@ Equip: Increases damage and healing done by magical spells and effects by up to 
 becomes
 
 ```
-≤26 spell damage
-≤26 spell healing
++26 spell damage
++26 spell healing
 ```
 
-`≤` means "up to", just like the original wording.
+Each line shows what the item adds, as in the game's own item comparison. The original "up to" is about how much of that bonus each spell gets, not the bonus itself.
 
 - **Any client language.** Lines are recognized through the game's own item data, not English text. The compact lines use the game's own stat names, in your client's language or another one you pick in the addon.
 - **When in doubt, it leaves the line alone.** A line is only rewritten when exactly one of the item's stats can own it.

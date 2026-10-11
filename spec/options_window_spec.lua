@@ -229,14 +229,14 @@ describe("Settings window", function()
 			local texts = PreviewTexts()
 			assert.are.same({ "Sample Item", "Se liga al equiparlo", "+5 aguante" }, { texts[1], texts[2], texts[3] })
 			assert.are.same({
-				"≤10 daño con hechizos",
-				"≤30 sanación con hechizos",
-				"≤12 daño arcano",
-				"≤12 daño de fuego",
-				"≤32 daño de escarcha",
-				"≤12 daño sagrado",
-				"≤12 daño de naturaleza",
-				"≤12 daño de las sombras",
+				"+10 daño con hechizos",
+				"+30 sanación con hechizos",
+				"+12 daño arcano",
+				"+12 daño de fuego",
+				"+32 daño de escarcha",
+				"+12 daño sagrado",
+				"+12 daño de naturaleza",
+				"+12 daño de las sombras",
 				"+4 MP5",
 				"+5 HP5",
 				"+4 poder de ataque",
@@ -265,14 +265,14 @@ describe("Settings window", function()
 			local texts = PreviewTexts()
 			assert.are.same({ "Sample Item", "Binds when equipped", "+5 Stamina" }, { texts[1], texts[2], texts[3] })
 			assert.are.same({
-				"≤10 spell damage",
-				"≤30 spell healing",
-				"≤12 arcane damage",
-				"≤12 fire damage",
-				"≤32 frost damage",
-				"≤12 holy damage",
-				"≤12 nature damage",
-				"≤12 shadow damage",
+				"+10 spell damage",
+				"+30 spell healing",
+				"+12 arcane damage",
+				"+12 fire damage",
+				"+32 frost damage",
+				"+12 holy damage",
+				"+12 nature damage",
+				"+12 shadow damage",
 				"+4 MP5",
 				"+5 HP5",
 				"+4 attack power",
@@ -314,7 +314,7 @@ describe("Settings window", function()
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
 			assert.is_true(LanguageMenu().isSelected("CLIENT"))
-			assert.are.equal("≤10 daño con hechizos", PreviewTexts()[4])
+			assert.are.equal("+10 daño con hechizos", PreviewTexts()[4])
 		end)
 	end)
 

@@ -33,11 +33,11 @@ local VS_CREATURE_TYPES = {
 	MECHANICAL = { id = 9, label = "mechanicals" },
 }
 
--- Stats that can be restricted to a creature type: ITEM_MOD_<stat>_VS_<TYPE>_SHORT -> line kind, sign and
+-- Stats that can be restricted to a creature type: ITEM_MOD_<stat>_VS_<TYPE>_SHORT -> line kind and
 -- English name
 local VS_STATS = {
-	ATTACK_POWER = { kind = "attackPowerVs", sign = "+", name = "attack power" },
-	SPELL_DAMAGE = { kind = "spellDamageVs", sign = "≤", name = "spell damage" },
+	ATTACK_POWER = { kind = "attackPowerVs", name = "attack power" },
+	SPELL_DAMAGE = { kind = "spellDamageVs", name = "spell damage" },
 }
 
 -- Stats whose equip line shows exactly the stat value
@@ -171,8 +171,8 @@ ns.Rules = {
 			local power = stats.ITEM_MOD_SPELL_POWER_SHORT
 			if power then
 				Add(Claim({ power }, {
-					Line("spellDamage", "≤", power, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" }),
-					Line("spellHealing", "≤", power, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" }),
+					Line("spellDamage", power, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" }),
+					Line("spellHealing", power, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" }),
 				}))
 			end
 		end,
@@ -188,15 +188,12 @@ ns.Rules = {
 			end
 			local lines = {}
 			if damage then
-				table.insert(
-					lines,
-					Line("spellDamage", "≤", damage, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" })
-				)
+				table.insert(lines, Line("spellDamage", damage, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" }))
 			end
 			if healing then
 				table.insert(
 					lines,
-					Line("spellHealing", "≤", healing, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" })
+					Line("spellHealing", healing, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" })
 				)
 			end
 			Add(Claim({ damage, healing }, lines))
@@ -209,7 +206,7 @@ ns.Rules = {
 		claims = function(stats, _, Add)
 			local mp5 = stats.ITEM_MOD_MANA_REGENERATION_SHORT
 			if mp5 then
-				Add(Claim({ mp5, 5 }, { Line("mp5", "+", mp5, "MP5") }))
+				Add(Claim({ mp5, 5 }, { Line("mp5", mp5, "MP5") }))
 			end
 		end,
 	},
@@ -219,7 +216,7 @@ ns.Rules = {
 		claims = function(stats, _, Add)
 			local hp5 = stats.ITEM_MOD_HEALTH_REGEN_SHORT
 			if hp5 then
-				Add(Claim({ hp5, 5 }, { Line("hp5", "+", hp5, "HP5") }))
+				Add(Claim({ hp5, 5 }, { Line("hp5", hp5, "HP5") }))
 			end
 		end,
 	},
@@ -228,7 +225,7 @@ ns.Rules = {
 		claims = function(stats, _, Add)
 			local attackPower = stats.ITEM_MOD_ATTACK_POWER_SHORT
 			if attackPower then
-				local line = Line("attackPower", "+", attackPower, "attack power", { "ITEM_MOD_ATTACK_POWER_SHORT" })
+				local line = Line("attackPower", attackPower, "attack power", { "ITEM_MOD_ATTACK_POWER_SHORT" })
 				Add(Claim({ attackPower }, { line }))
 			end
 		end,
@@ -246,7 +243,7 @@ ns.Rules = {
 					local creatureType = VS_CREATURE_TYPES[typeKey]
 					if creatureType then
 						local name = vs.name .. " vs " .. creatureType.label
-						local claim = Claim({ value }, { Line(vs.kind, vs.sign, value, name, { key }) })
+						local claim = Claim({ value }, { Line(vs.kind, value, name, { key }) })
 						local terms = CreatureTerms(context, creatureType, key)
 						if #terms > 0 then
 							claim.creature =
@@ -266,7 +263,7 @@ ns.Rules = {
 			for _, stat in ipairs(POINT_STATS) do
 				local value = stats[stat.key]
 				if value then
-					Add(Claim({ value }, { Line(stat.kind, "+", value, stat.name, { stat.key }) }))
+					Add(Claim({ value }, { Line(stat.kind, value, stat.name, { stat.key }) }))
 				end
 			end
 		end,
@@ -289,7 +286,7 @@ ns.Rules = {
 			end
 			for value, group in pairs(groups) do
 				local name = table.concat(group.labels, "/") .. " skill"
-				local claim = Claim({ value }, { Line("weaponSkill", "+", value, name, group.keys) })
+				local claim = Claim({ value }, { Line("weaponSkill", value, name, group.keys) })
 				claim.size = #group.keys
 				Add(claim)
 			end
@@ -309,7 +306,7 @@ ns.Rules = {
 					local claim = { percent = true, size = 1 }
 					if rating then
 						claim.Render = function(text)
-							return { Line(rating.kind, "+", GetOnlyPercent(text), rating.label, { key }, true) }
+							return { Line(rating.kind, GetOnlyPercent(text), rating.label, { key }, true) }
 						end
 					end
 					Add(claim)
@@ -318,14 +315,14 @@ ns.Rules = {
 		end,
 	},
 	{
-		-- Single school damage, e.g. ITEM_MOD_FROST_DAMAGE_DONE_SHORT -> "≤32 frost damage"
+		-- Single school damage, e.g. ITEM_MOD_FROST_DAMAGE_DONE_SHORT -> "+32 frost damage"
 		name = "school damage",
 		claims = function(stats, _, Add)
 			for key, value in pairs(stats) do
 				local school = key:match("^ITEM_MOD_(%u+)_DAMAGE_DONE_SHORT$")
 				if school and school ~= "SPELL" then
 					local name = school:lower()
-					Add(Claim({ value }, { Line(name .. "Damage", "≤", value, name .. " damage", { key }) }))
+					Add(Claim({ value }, { Line(name .. "Damage", value, name .. " damage", { key }) }))
 				end
 			end
 		end,
@@ -449,7 +446,7 @@ local function CombineCreatures(claims, text, FoldCase)
 	end
 	local vs = VS_STATS[stat]
 	local name = vs.name .. " vs " .. table.concat(labels, "/")
-	return { Line(vs.kind, vs.sign, claims[1].creature.value, name, keys) }
+	return { Line(vs.kind, claims[1].creature.value, name, keys) }
 end
 
 -- Compact lines for an equip line (possibly empty, meaning "remove it"), or nil to keep its text: it isn't
@@ -513,7 +510,7 @@ local function GetStatNames(line, GetStatName)
 end
 
 -- The compact lines with Blizzard's stat names from GetStatName (a getter made with ns.TrustedNames)
--- instead of English ("≤10 Daño con hechizos"). A line naming several stats (a group of weapon skills,
+-- instead of English ("+10 Daño con hechizos"). A line naming several stats (a group of weapon skills,
 -- several creature types) becomes one line per stat. A line stays as it is when one of its names is missing
 -- or untrusted, so a second pass with other names can still translate it.
 function ns.LocalizeLines(lines, GetStatName)
@@ -522,10 +519,7 @@ function ns.LocalizeLines(lines, GetStatName)
 		local names = GetStatNames(line, GetStatName)
 		if names then
 			for _, name in ipairs(names) do
-				table.insert(
-					localized,
-					{ kind = line.kind, text = FormatLine(line.sign, line.value, line.percent, name) }
-				)
+				table.insert(localized, { kind = line.kind, text = FormatLine(line.value, line.percent, name) })
 			end
 		else
 			table.insert(localized, line)

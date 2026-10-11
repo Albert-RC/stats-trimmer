@@ -79,7 +79,7 @@ local function RefreshPreview()
 	previewTooltip:SetPoint("TOP", panel, "TOP", 0, -34)
 	previewTooltip:AddLine("Sample Item", 0.12, 1, 0)
 	previewTooltip:AddLine(Text("ITEM_BIND_ON_EQUIP", "Binds when equipped"), 1, 1, 1)
-	previewTooltip:AddLine(ns.FormatLine("+", 5, false, Text("ITEM_MOD_STAMINA_SHORT", "Stamina")), 1, 1, 1)
+	previewTooltip:AddLine(ns.FormatLine(5, false, Text("ITEM_MOD_STAMINA_SHORT", "Stamina")), 1, 1, 1)
 	for _, line in ipairs(GetSampleLines()) do
 		local color = ns.db.colors[line.kind]
 		previewTooltip:AddLine(line.text, color.r, color.g, color.b)

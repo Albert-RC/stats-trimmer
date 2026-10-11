@@ -69,7 +69,6 @@ describe("sample lines", function()
 		assert.are.same({
 			kind = "hitRating",
 			text = "+1% hit rating",
-			sign = "+",
 			value = 1,
 			percent = true,
 			stats = { "ITEM_MOD_HIT_RATING_SHORT" },
