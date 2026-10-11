@@ -1,0 +1,63 @@
+# Checks every pull request. Release runs these same jobs on each push to main before publishing.
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    name: StyLua
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: JohnnyMorganz/stylua-action@v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: 2.5.2
+          args: --check .
+
+  lint:
+    name: Luacheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: lunarmodules/luacheck@v1.2.0
+
+  test:
+    name: Tests and coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install LuaJIT and LuaCov
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luajit
+          git clone --depth 1 --branch v0.17.0 https://github.com/lunarmodules/luacov.git "$RUNNER_TEMP/luacov"
+      - name: Tests
+        shell: pwsh
+        run: ./scripts/test.ps1
+      - name: Coverage
+        shell: pwsh
+        run: ./scripts/coverage.ps1 -LuaCov "$env:RUNNER_TEMP/luacov/src"
+
+  package:
+    name: Package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the zip and the release notes
+        id: package
+        shell: pwsh
+        run: ./scripts/package.ps1
+      # The zip as it would be released, to try it in game before merging
+      - uses: actions/upload-artifact@v7
+        with:
+          path: .release/StatsTrimmer-v${{ steps.package.outputs.version }}.zip
+          archive: false
+          include-hidden-files: true
+          if-no-files-found: error

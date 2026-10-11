@@ -1,0 +1,51 @@
+# On each push to main (a merged pull request): runs the CI checks, then publishes a GitHub release for the .toc
+# version if it has no tag yet. Pushes that don't change ## Version publish nothing.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Publish
+    needs: checks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the zip and the release notes
+        id: package
+        shell: pwsh
+        run: ./scripts/package.ps1
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          # --exit-code: 0 if the tag exists, 2 if it doesn't, anything else is a real error
+          status=0
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null || status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "$tag is already released. Bump ## Version in StatsTrimmer.toc to publish a new release." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          elif [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+          gh release create "$tag" ".release/StatsTrimmer-$tag.zip" \
+            --target "$GITHUB_SHA" \
+            --title "Stats Trimmer $tag" \
+            --notes-file .release/notes.md
+          echo "Published [$tag]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag)." >> "$GITHUB_STEP_SUMMARY"

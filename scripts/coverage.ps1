@@ -1,10 +1,11 @@
 # Runs the unit tests under LuaCov and checks the line coverage of StatsTrimmer/.
-# Needs LuaJIT and LuaCov 0.17.0 in %LOCALAPPDATA%\Programs\luacov (see README).
-# Usage: ./scripts/coverage.ps1 [-Minimum 85]
-param([double]$Minimum = 85)
+# Needs LuaJIT and LuaCov 0.17.0: its src folder in %LOCALAPPDATA%\Programs\luacov, or the one given with -LuaCov
+# (see docs/DEVELOPMENT.md).
+# Usage: ./scripts/coverage.ps1 [-Minimum 85] [-LuaCov <path to LuaCov's src folder>]
+param([double]$Minimum = 85, [string]$LuaCov = (Join-Path $env:LOCALAPPDATA "Programs\luacov"))
 
 $root = Split-Path -Parent $PSScriptRoot
-$luacov = (Join-Path $env:LOCALAPPDATA "Programs\luacov") -replace '\\', '/'
+$luacov = $LuaCov -replace '\\', '/'
 $setPath = "package.path='$luacov/?.lua;'..package.path"
 
 Push-Location $root
