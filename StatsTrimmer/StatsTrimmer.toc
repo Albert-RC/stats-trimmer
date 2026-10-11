@@ -2,7 +2,7 @@
 ## Title: Stats Trimmer
 ## Notes: Rewrites verbose stat lines in item tooltips into compact ones.
 ## Author: Albert-RC
-## Version: 0.1.0
+## Version: 0.2.0
 ## X-License: MIT
 ## IconTexture: Interface\Icons\inv_magicalfishpet
 ## SavedVariables: StatsTrimmerDB

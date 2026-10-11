@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 (2026-10-11)
 
 - The compact lines use the game's own stat names, in lowercase: `≤10 spell damage`, `+1% hit`; `≤10 daño con hechizos` on a Spanish client. MP5 and HP5 stay as they are.
 - Spell power that adds damage and healing shows as `≤26 spell damage` and `≤26 spell healing`, like items with separate damage and healing.
