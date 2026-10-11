@@ -164,16 +164,22 @@ end
 -- doesn't matter: a line with more than one possible owner is left alone.
 ns.Rules = {
 	{
-		-- "Damage and healing by up to X" is a single spell power stat that counts as both: it shows as the
-		-- same two lines as an item with separate spell damage and healing
+		-- "Damage and healing by up to X" is a single spell power stat that counts as both. It shows as one
+		-- line, like Blizzard's item comparison, or with context.splitSpellPower as the same two lines as an
+		-- item with separate spell damage and healing.
 		name = "combined spell power",
-		claims = function(stats, _, Add)
+		claims = function(stats, context, Add)
 			local power = stats.ITEM_MOD_SPELL_POWER_SHORT
-			if power then
+			if not power then
+				return
+			end
+			if context.splitSpellPower then
 				Add(Claim({ power }, {
 					Line("spellDamage", power, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" }),
 					Line("spellHealing", power, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" }),
 				}))
+			else
+				Add(Claim({ power }, { Line("spellPower", power, "spell power", { "ITEM_MOD_SPELL_POWER_SHORT" }) }))
 			end
 		end,
 	},

@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Every compact line starts with `+`, like the game's own item comparison: `+10 spell damage` instead of `≤10 spell damage`. The original "up to" is about how much of the bonus each spell gets, not the bonus itself.
+- Spell power that adds damage and healing shows as one line, `+26 spell power`, like the game's item comparison, with its own color row. Items with separate damage and healing still get both lines.
+- New "Split spell power into spell damage and spell healing" setting, off by default: with it on, spell power shows as `+26 spell damage` and `+26 spell healing`, as in v0.2.0.
 
 ## v0.2.0 (2026-10-11)
 

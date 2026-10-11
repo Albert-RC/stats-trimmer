@@ -1,14 +1,14 @@
--- Settings window, built from Blizzard templates: original-text key, language, a color per line kind and a
--- live preview that is a real GameTooltip. Blizzard's own texts (key names, RESET, COLORS, stat names...)
+-- Settings window, built from Blizzard templates: original-text key, language, spell power split, a color per
+-- line kind and a live preview that is a real GameTooltip. Blizzard's own texts (key names, RESET, COLORS, stat names...)
 -- follow the language setting and switch on the spot; the addon's own phrases are in English.
 local _, ns = ...
 
-local WIDTH, HEIGHT = 600, 580
+local WIDTH, HEIGHT = 600, 630
 local ROW_HEIGHT, GROUP_GAP = 22, 8
 -- Room around a button's text when it is sized to fit a translated label
 local BUTTON_TEXT_PADDING = 24
 
-local frame, previewTooltip, keyDropdown
+local frame, previewTooltip, keyDropdown, splitCheckbox
 local swatches = {} -- kind key -> ColorSwatchTemplate button
 local translated = {} -- { widget, GetValue, isButton, width }: texts set again when the language changes
 
@@ -81,8 +81,11 @@ local function RefreshPreview()
 	previewTooltip:AddLine(Text("ITEM_BIND_ON_EQUIP", "Binds when equipped"), 1, 1, 1)
 	previewTooltip:AddLine(ns.FormatLine(5, false, Text("ITEM_MOD_STAMINA_SHORT", "Stamina")), 1, 1, 1)
 	for _, line in ipairs(GetSampleLines()) do
-		local color = ns.db.colors[line.kind]
-		previewTooltip:AddLine(line.text, color.r, color.g, color.b)
+		-- Split spell power looks like the spell damage and healing samples, which are already there
+		if not (ns.db.splitSpellPower and line.kind == "spellPower") then
+			local color = ns.db.colors[line.kind]
+			previewTooltip:AddLine(line.text, color.r, color.g, color.b)
+		end
 	end
 	previewTooltip:Show()
 end
@@ -223,11 +226,27 @@ local function CreateLanguageRow(above)
 	MenuUtil.CreateRadioMenu(dropdown, function(language)
 		return ns.GetLanguage() == language
 	end, SetLanguage, unpack(LanguageOptions()))
+	return label
+end
+
+-- Spell power that adds damage and healing: its own line (the default) or spell damage and healing lines
+local function CreateSplitSpellPowerRow(above)
+	splitCheckbox = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+	splitCheckbox:SetSize(26, 26)
+	splitCheckbox:SetPoint("TOPLEFT", above, "BOTTOMLEFT", -6, -10)
+	splitCheckbox.Text:SetFontObject("GameFontNormal")
+	splitCheckbox.Text:SetText("Split spell power into spell damage and spell healing")
+	-- The click has already toggled the box
+	splitCheckbox:SetScript("OnClick", function(checkbox)
+		ns.db.splitSpellPower = checkbox:GetChecked()
+		RefreshPreview()
+		ns.RefreshItemTooltips()
+	end)
 end
 
 local function CreateColorsPanel()
 	local panel = CreateFrame("Frame", nil, frame, "InsetFrameTemplate")
-	panel:SetPoint("TOPLEFT", 12, -126)
+	panel:SetPoint("TOPLEFT", 12, -156)
 	panel:SetPoint("BOTTOMLEFT", 12, 44)
 	panel:SetWidth(300)
 	CreateHeader(panel, "COLORS", "Colors")
@@ -289,7 +308,7 @@ local function CreateWindow()
 	end)
 	tinsert(UISpecialFrames, frame:GetName())
 
-	CreateLanguageRow(CreateOriginalTextRow())
+	CreateSplitSpellPowerRow(CreateLanguageRow(CreateOriginalTextRow()))
 	CreatePreviewPanel(CreateColorsPanel())
 	for _, entry in ipairs(translated) do
 		ApplyText(entry)
@@ -298,6 +317,7 @@ local function CreateWindow()
 
 	frame:SetScript("OnShow", function()
 		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
+		splitCheckbox:SetChecked(ns.db.splitSpellPower)
 		RefreshSwatches()
 		RefreshPreview()
 	end)

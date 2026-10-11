@@ -33,6 +33,7 @@ describe("DEFAULTS", function()
 			keys[kind.key] = true
 		end
 		for _, key in ipairs({
+			"spellPower",
 			"spellDamage",
 			"spellHealing",
 			"arcaneDamage",
@@ -165,7 +166,9 @@ describe("LoadSettings", function()
 		local settings = ns.LoadSettings(nil)
 		assert.are.equal("CTRL", settings.originalTextKey)
 		assert.are.equal("CLIENT", settings.language)
+		assert.is_false(settings.splitSpellPower)
 		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.frostDamage)
+		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.spellPower)
 		assert.are.equal(200, settings.minimap.angle)
 	end)
 
@@ -173,6 +176,7 @@ describe("LoadSettings", function()
 		local saved = {
 			originalTextKey = "ALT",
 			language = "deDE",
+			splitSpellPower = true,
 			colors = { frostDamage = { r = 0.2, g = 0.6, b = 1 } },
 			minimap = { angle = 45 },
 		}
@@ -180,6 +184,7 @@ describe("LoadSettings", function()
 		assert.are.equal(saved, settings)
 		assert.are.equal("ALT", settings.originalTextKey)
 		assert.are.equal("deDE", settings.language)
+		assert.is_true(settings.splitSpellPower)
 		assert.are.same({ r = 0.2, g = 0.6, b = 1 }, settings.colors.frostDamage)
 		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.spellDamage)
 		assert.are.equal(45, settings.minimap.angle)
@@ -196,11 +201,13 @@ describe("LoadSettings", function()
 		local settings = ns.LoadSettings({
 			originalTextKey = "F13",
 			language = "KLINGON",
+			splitSpellPower = "yes",
 			colors = { spellDamage = { r = 2, g = 0, b = 0 }, hp5 = "red" },
 			minimap = "left",
 		})
 		assert.are.equal("CTRL", settings.originalTextKey)
 		assert.are.equal("CLIENT", settings.language)
+		assert.is_false(settings.splitSpellPower)
 		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.spellDamage)
 		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.hp5)
 		assert.are.equal(200, settings.minimap.angle)

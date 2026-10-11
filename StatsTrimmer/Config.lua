@@ -60,7 +60,14 @@ end
 -- overrides the kind's.
 ns.COLOR_KINDS = {
 	{
-		-- Spell damage, also from spell power, which adds damage and healing (see Rules.lua)
+		-- A single stat that adds damage and healing; split into the next two when splitSpellPower is set
+		key = "spellPower",
+		group = "spell",
+		label = "Spell power",
+		stat = "ITEM_MOD_SPELL_POWER_SHORT",
+		sample = { 26, "spell power" },
+	},
+	{
 		key = "spellDamage",
 		group = "spell",
 		label = "Spell damage",
@@ -183,6 +190,8 @@ ns.DEFAULTS = {
 	originalTextKey = "CTRL",
 	-- "CLIENT" follows the client's language; otherwise a key of ns.LOCALE_STRINGS (Locales.lua)
 	language = "CLIENT",
+	-- Show spell power as spell damage and spell healing lines instead of its own line
+	splitSpellPower = false,
 	colors = {},
 	minimap = { angle = 200 },
 }
@@ -238,6 +247,9 @@ function ns.LoadSettings(saved)
 	end
 	if not IsLanguage(settings.language) then
 		settings.language = ns.DEFAULTS.language
+	end
+	if type(settings.splitSpellPower) ~= "boolean" then
+		settings.splitSpellPower = ns.DEFAULTS.splitSpellPower
 	end
 
 	if type(settings.colors) ~= "table" then

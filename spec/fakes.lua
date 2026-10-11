@@ -15,6 +15,7 @@ for _, name in ipairs({
 	"RegisterForClicks",
 	"RegisterForDrag",
 	"SetClampedToScreen",
+	"SetFontObject",
 	"SetFrameLevel",
 	"SetHighlightTexture",
 	"SetJustifyH",
@@ -39,6 +40,12 @@ function fakes.Fire(frame, scriptName, ...)
 	if handler then
 		return handler(frame, ...)
 	end
+end
+
+-- Clicks a check button like the user does: the client toggles it before running OnClick
+function fakes.ClickCheckButton(button)
+	button:SetChecked(not button:GetChecked())
+	return fakes.Fire(button, "OnClick", "LeftButton", true)
 end
 
 -- Sends an event to every frame registered for it
@@ -150,6 +157,15 @@ function Frame:GetText()
 	return self.text
 end
 
+-- CheckButton methods
+function Frame:SetChecked(checked)
+	self.checked = checked == true
+end
+
+function Frame:GetChecked()
+	return self.checked == true
+end
+
 -- UIButtonFitToTextBehaviorMixin: the width isn't modeled, only that the text was fitted
 function Frame:SetTextToFit(text)
 	self:SetText(text)
@@ -251,6 +267,8 @@ function fakes.NewFrame(wow, frameType, name, parent, template)
 	end
 	if template == "PortraitFrameTemplate" then
 		frame.CloseButton = fakes.NewFrame(wow, "Button", nil, frame, "UIPanelCloseButton")
+	elseif template == "UICheckButtonTemplate" then
+		frame.Text = fakes.NewFrame(wow, "FontString", nil, frame)
 	end
 	table.insert(wow.frames, frame)
 	if name then

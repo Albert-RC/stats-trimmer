@@ -61,6 +61,32 @@ describe("Tooltip line pre-call", function()
 		}, lines)
 	end)
 
+	describe("combined spell power (Bastón nudoso de nigromancia)", function()
+		local text = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada "
+			.. "con hechizos y efectos mágicos."
+
+		before_each(function()
+			wow.items["item:baston"] = { ITEM_MOD_SPELL_POWER_SHORT = 26, ITEM_MOD_SPIRIT_SHORT = 10 }
+			ns.db.colors.spellPower = { r = 1, g = 0, b = 1 }
+			ns.db.colors.spellDamage = { r = 1, g = 0.5, b = 0 }
+			ns.db.colors.spellHealing = { r = 0, g = 0.5, b = 1 }
+		end)
+
+		it("shows as one line in its own color by default", function()
+			local _, lines = ProcessLine(wow, preCall, text, { hyperlink = "item:baston" })
+			assert.are.same({ { text = "+26 poder con hechizos", r = 1, g = 0, b = 1 } }, lines)
+		end)
+
+		it("shows as spell damage and healing lines in their colors when the setting splits it", function()
+			ns.db.splitSpellPower = true
+			local _, lines = ProcessLine(wow, preCall, text, { hyperlink = "item:baston" })
+			assert.are.same({
+				{ text = "+26 daño con hechizos", r = 1, g = 0.5, b = 0 },
+				{ text = "+26 sanación con hechizos", r = 0, g = 0.5, b = 1 },
+			}, lines)
+		end)
+	end)
+
 	describe("language", function()
 		local function Texts(text, data)
 			local _, lines = ProcessLine(wow, preCall, text, data)
