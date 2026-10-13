@@ -72,3 +72,8 @@ Please include:
 ## Compatibility
 
 Made for **WoW: Forever**. Other game versions are not supported.
+
+- Item tooltips that other addons show, such as AtlasLoot's or DungeonJournal's, get the compact lines too.
+- Holding Ctrl keeps the lines other addons add to a tooltip, such as AtlasLoot's drop rate.
+- Addons that read an item's text through a hidden tooltip get the original text, which is what they expect.
+- Text that another addon writes on its own isn't rewritten, only the game's item tooltips are. For example, GearQuest's window shows item texts it stores itself.

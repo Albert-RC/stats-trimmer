@@ -292,13 +292,73 @@ describe("Tooltip line pre-call", function()
 	end)
 end)
 
+describe("Tooltips other addons fill", function()
+	local COMPACT = { "+10 daño con hechizos", "+30 sanación con hechizos" }
+	local wow
+
+	-- Fills a tooltip with Cosedora the way addons do (SetOwner, then SetHyperlink); returns the texts shown
+	local function ShowCosedora(tooltip, owner, anchorType)
+		fakes.ShowItem(wow, tooltip, owner, anchorType, {
+			hyperlink = "item:cosedora",
+			lines = { { leftText = COSEDORA_LINE } },
+		})
+		local texts = {}
+		for _, line in ipairs(tooltip.lines) do
+			table.insert(texts, line.text)
+		end
+		return texts
+	end
+
+	local function NewTooltip(name)
+		return wow.env.CreateFrame("GameTooltip", name, wow.env.UIParent, "GameTooltipTemplate")
+	end
+
+	before_each(function()
+		wow = Setup()
+	end)
+
+	it("get compact lines when shown next to the hovered button (AtlasLoot)", function()
+		local button = wow.env.CreateFrame("Button")
+		assert.are.same(COMPACT, ShowCosedora(NewTooltip("AtlasLootTooltip"), button, "ANCHOR_RIGHT"))
+	end)
+
+	it("get compact lines when the addon places them itself (the Dungeon Journal's comparisons)", function()
+		local row = wow.env.CreateFrame("Button")
+		local tooltip = NewTooltip("ForeverDungeonJournalCompareTooltip1")
+		assert.are.same(COMPACT, ShowCosedora(tooltip, row, "ANCHOR_NONE"))
+	end)
+
+	it("get compact lines when they follow the cursor", function()
+		assert.are.same(COMPACT, ShowCosedora(NewTooltip(), wow.env.UIParent, "ANCHOR_CURSOR"))
+	end)
+
+	it("keep the original text when they are only filled to read the item", function()
+		assert.are.same({ COSEDORA_LINE }, ShowCosedora(NewTooltip(), wow.env.UIParent, "ANCHOR_NONE"))
+		assert.are.same({ COSEDORA_LINE }, ShowCosedora(NewTooltip(), wow.env.WorldFrame, "ANCHOR_NONE"))
+		assert.are.same({ COSEDORA_LINE }, ShowCosedora(NewTooltip(), nil, nil))
+	end)
+
+	it("get compact lines in Blizzard's item tooltips, whatever their owner and anchor", function()
+		-- The Dungeon Journal shows items in GameTooltip; default-anchored tooltips are owned by UIParent
+		for _, name in ipairs({
+			"GameTooltip",
+			"ItemRefTooltip",
+			"ShoppingTooltip1",
+			"ShoppingTooltip2",
+			"ItemRefShoppingTooltip1",
+			"ItemRefShoppingTooltip2",
+		}) do
+			assert.are.same(COMPACT, ShowCosedora(wow.env[name], wow.env.UIParent, "ANCHOR_NONE"))
+		end
+	end)
+end)
+
 describe("Tooltip refresh on modifier changes", function()
 	local wow, ns
 
-	-- Makes a fake tooltip look like a shown tooltip of the given data type
+	-- Shows a tooltip of the given data type, built from its data like the client does
 	local function ShowTooltip(tooltip, dataType)
-		tooltip.primaryInfo = { tooltipData = { type = dataType } }
-		tooltip.shown = true
+		fakes.ShowItem(wow, tooltip, wow.env.UIParent, "ANCHOR_NONE", { type = dataType })
 	end
 
 	before_each(function()
@@ -320,6 +380,82 @@ describe("Tooltip refresh on modifier changes", function()
 		fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
 		assert.are.equal(0, wow.env.GameTooltip.refreshCount)
 		assert.are.equal(0, wow.env.ItemRefTooltip.refreshCount)
+	end)
+
+	describe("with lines another addon added after the item's data", function()
+		local button
+
+		local function Texts()
+			local texts = {}
+			for _, line in ipairs(wow.env.GameTooltip.lines) do
+				table.insert(texts, line.text)
+			end
+			return texts
+		end
+
+		-- Like AtlasLoot's item buttons: OnEnter fills GameTooltip, then adds a line of its own
+		before_each(function()
+			button = wow.env.CreateFrame("Button")
+			button.enterCount = 0
+			button:SetScript("OnEnter", function(self)
+				self.enterCount = self.enterCount + 1
+				fakes.ShowItem(wow, wow.env.GameTooltip, self, "ANCHOR_RIGHT", {
+					hyperlink = "item:cosedora",
+					lines = { { leftText = COSEDORA_LINE } },
+				})
+				wow.env.GameTooltip:AddLine("Probabilidad de botín: 5%")
+			end)
+			button.mouseOver = true
+			fakes.Fire(button, "OnEnter")
+		end)
+
+		it("rebuilds it through its owner, as when the mouse enters it again, keeping those lines", function()
+			wow.keysDown.CTRL = true
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.same({ COSEDORA_LINE, "Probabilidad de botín: 5%" }, Texts())
+
+			wow.keysDown.CTRL = nil
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 0)
+			assert.are.same(
+				{ "+10 daño con hechizos", "+30 sanación con hechizos", "Probabilidad de botín: 5%" },
+				Texts()
+			)
+			assert.are.equal(3, button.enterCount)
+			assert.are.equal(0, wow.env.GameTooltip.refreshCount)
+		end)
+
+		it("leaves it alone when the mouse has left its owner", function()
+			button.mouseOver = false
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.equal(1, button.enterCount)
+			assert.are.equal(0, wow.env.GameTooltip.refreshCount)
+		end)
+
+		it("leaves it alone when its owner rebuilds it by itself, like Blizzard's item buttons", function()
+			button.UpdateTooltip = function() end
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.equal(1, button.enterCount)
+		end)
+
+		it("leaves it alone when its owner is protected", function()
+			button.protected = true
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.equal(1, button.enterCount)
+		end)
+
+		it("leaves it alone when its owner doesn't show it from OnEnter", function()
+			button:SetScript("OnEnter", nil)
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.same({}, wow.executedScripts)
+			assert.are.equal(0, wow.env.GameTooltip.refreshCount)
+		end)
+
+		it("rebuilds it from its data again once nothing is added after it", function()
+			ShowTooltip(wow.env.GameTooltip, wow.env.Enum.TooltipDataType.Item)
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.equal(1, button.enterCount)
+			assert.are.equal(1, wow.env.GameTooltip.refreshCount)
+		end)
 	end)
 
 	it("ignores other modifiers", function()

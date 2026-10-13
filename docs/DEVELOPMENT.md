@@ -92,7 +92,7 @@ The `.toc` loads these files in order:
   - A compact line is `{ kind, text, value, percent, stats }`. `text` is the English line, `kind` is a `COLOR_KINDS` key (school damage is `<school>Damage`) and `stats` lists the `ITEM_MOD_*_SHORT` keys it shows.
   - `ns.TrustedNames(GetStatName, FoldCase)` makes a stat name getter that leaves out untrusted vs names (see [Creature types](#creature-types)). `context.GetStatName` is one of these, over the client's names.
   - `ns.LocalizeLines(lines, GetStatName)` rebuilds the lines with the names of a `TrustedNames` getter.
-- `Tooltip.lua`: the WoW API side. It registers the line pre-call and checks the equip prefix. It reads the item and its stats, builds `context`, applies the language setting and colors each line with `ns.db.colors[kind]`, falling back to the original line color. It also handles the "show original text" key.
+- `Tooltip.lua`: the WoW API side. It registers the line pre-call and checks the equip prefix. It reads the item and its stats, builds `context`, applies the language setting and colors each line with `ns.db.colors[kind]`, falling back to the original line color. It skips tooltips other addons only fill to read an item (see [Other addons' tooltips](#other-addons-tooltips)) and handles the "show original text" key.
   - `ns.GetClientText(name)` reads the client's own strings (for recognition), `ns.GetText(name)` a string in the chosen language and `ns.GetEnglishText(name)` one in English.
   - `ns.GetLanguage()` is the language the texts are shown in (`ns.ResolveLanguage` for this client).
   - `ns.InLanguage(lines)` gives the compact lines Blizzard's names in the chosen language, lowercased. Its name getters are made once per language.
@@ -118,17 +118,44 @@ Verified against the `forever` branch of [wow-ui-source](https://github.com/Geth
 
 - Item tooltips are data-driven. `Blizzard_GameTooltip` only ships the Mainline variant, where `GameTooltipTemplate` uses `GameTooltipDataMixin` and `ShoppingTooltipTemplate` uses `TooltipDataHandlerMixin`.
 - `TooltipDataProcessor.AddLinePreCall(lineType, func(tooltip, lineData))`: if `func` returns `true`, the original line is not added (`TooltipDataHandlerMixin:ProcessLineData` in `Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua`). Addon callbacks run insecurely through an attribute delegate, but they can still consume the line.
-- Pre-calls run for **every** tooltip that processes data, including hidden tooltips other addons use to scan item text. Those also get the compact lines.
+- Pre-calls run for **every** tooltip that processes data, shown or not (see [Other addons' tooltips](#other-addons-tooltips)).
+- Blizzard runs the insecure pre-calls in registration order, each through `securecallfunction`:
+  - the first one that returns `true` consumes the line, and the later ones don't see it;
+  - an error goes to the error handler (BugSack), and the line keeps its original text;
+  - a consumed line gets no line post-calls and no `lineData.lineIndex`.
 - Inside a line pre-call, `tooltip:GetProcessingTooltipInfo()` is the info being processed (appended infos included). `TooltipUtil.GetDisplayedItem` reads the primary one instead.
 - Tooltip line text can be a **secret value** in this framework (Blizzard's comment in `GameTooltip.lua` mentions world cursor tooltips with secret line text). Addon code can't compare or search secrets, so the pre-call skips any line whose text fails `type(text) == "string" and not issecretvalue(text)`, and never passes secret item lines to the rules.
 
 The equip `lineData` only has `type`, `leftText`, `leftColor` (green) and `wrapText`: there is no spell ID or other args (confirmed in game). That is why lines are matched by their numbers.
 
+### Other addons' tooltips
+
+Checked on 2026-10-13 with the addons installed in the Forever client: AtlasLoot Forever 1.60.1, DungeonJournal (`ForeverDungeonJournal`) 1.6.3 and GearQuest Forever 0.5.5-beta.
+
+- Addons show items through the same data path (`SetHyperlink`, `SetItemByID`, `SetInventoryItem`), so their tooltips get the compact lines with no special handling:
+  - AtlasLoot uses `GameTooltip` by default (its `useGameTooltip` setting), or its own `AtlasLootTooltip` owned by the hovered button, and Blizzard's comparison tooltips;
+  - DungeonJournal uses `GameTooltip`, and its own comparison tooltips owned by the hovered row with `ANCHOR_NONE`.
+- Addons also fill hidden tooltips only to read an item's text (all three do): `SetOwner(UIParent, "ANCHOR_NONE")`, then `SetHyperlink`.
+  - `IsScanningTooltip` leaves the original text in those, which is what such addons expect to read: a tooltip with no owner, or owned by `UIParent` or `WorldFrame` with `ANCHOR_NONE`.
+  - Blizzard's item tooltips (`GameTooltip`, `ItemRefTooltip`, `ShoppingTooltip1/2`, `ItemRefShoppingTooltip1/2`) are never skipped: default-anchored ones are owned by `UIParent` with `ANCHOR_NONE` too.
+  - Addons that read items through `C_TooltipInfo` (DungeonJournal does too) get the data without the pre-calls, so they always see the original text.
+- Addons add lines in two ways, and only one survives a rebuild (`RefreshData` → `RebuildFromTooltipInfo` processes the tooltip's infos again):
+  - tooltip post-calls (`TooltipDataProcessor.AddTooltipPostCall`) run again: GearQuest's score line on bag items stays;
+  - lines added with `AddLine` after `SetX` are lost: AtlasLoot's drop rate and item ID, and DungeonJournal's source, disappeared when the original-text key rebuilt `GameTooltip` (seen in game). GearQuest does the same in its own window: its score line comes after the data there.
+- All three fill `GameTooltip` from the `OnEnter` script of the hovered button or row, and none defines `UpdateTooltip`, so Blizzard doesn't rebuild their tooltips by itself.
+- GearQuest's own window shows the game's tooltip only for items it has no stored text for. For the rest (about 2,400 to 3,700 items per class, in `GearQuestForever_<CLASS>\AuditTips.lua`) it writes text copied from Wowhead Forever, in English, with `AddLine`. No item data is behind those lines, so the pre-call never sees them and the original-text key has nothing to switch. Left as it is on purpose (user decision, 2026-10-13): it is GearQuest's text, not the game's.
+
 ### "Show original text" key
 
 - While the chosen modifier is down (`IsControlKeyDown` / `IsAltKeyDown` / `IsShiftKeyDown`), the pre-call doesn't replace anything. It never mutates `lineData`, so no original text needs to be stored.
-- On `MODIFIER_STATE_CHANGED` for that key, `GameTooltip` and `ItemRefTooltip` are rebuilt with `RefreshData()` if they are shown item tooltips. `ns.IsOriginalTextEventKey` maps `LCTRL`/`RCTRL` to `CTRL`, and so on. Comparison tooltips follow their main tooltip, and bag tooltips rebuild by themselves every 0.2 s.
-- Taint risk to watch: `RefreshData` runs from addon code, and Blizzard notes that tainted tooltip state can show no lines for secret data. If unit or NPC tooltips ever come up empty, stop calling `RefreshData` and rely on the bags' automatic refresh.
+- On `MODIFIER_STATE_CHANGED` for that key, shown item tooltips in `GameTooltip` and `ItemRefTooltip` are rebuilt so they switch at once. `ns.IsOriginalTextEventKey` maps `LCTRL`/`RCTRL` to `CTRL`, and so on.
+  - `hooksecurefunc` on their `ProcessInfo` (which every `SetX` calls) records `NumLines()` after each build, other addons' post-calls included.
+  - A tooltip with only those lines is rebuilt from its data with `RefreshData()`. Comparison tooltips follow their main tooltip.
+  - A tooltip with more lines has some another addon added with `AddLine`, which `RefreshData()` would lose (see [Other addons' tooltips](#other-addons-tooltips)). Its owner rebuilds it instead, with `ExecuteFrameScript(owner, "OnEnter")`, as when the mouse enters it again. That needs an owner under the mouse with an `OnEnter` script, not protected and without `UpdateTooltip`.
+  - Anything else switches the next time it is built. Owners with `UpdateTooltip` (Blizzard's bag and character buttons) get it called by `GameTooltip_OnUpdate` every 0.2 s.
+- Taint risks to watch, since both run from addon code:
+  - `RefreshData`: Blizzard notes that tainted tooltip state can show no lines for secret data. If unit or NPC tooltips ever come up empty, stop calling `RefreshData` and rely on the bags' automatic refresh.
+  - `ExecuteFrameScript` runs the owner's `OnEnter` as addon code. That is harmless for another addon's frame, but would taint a Blizzard frame's handler. Blizzard's item buttons have `UpdateTooltip` or don't add lines after the data, so they shouldn't get there; if one does and errors or blocked actions follow hovering it, narrow `CanEnterAgain`.
 
 ## Rules
 
@@ -233,7 +260,10 @@ Retail-only keys (haste, mastery, versatility, `CR_*`, crafting stats, PvP, resi
 
 - Lines are matched by numbers only, so a line that more than one stat could own keeps its original text (see above).
 - Creature type recognition outside esES has only been checked with made-up lines in the specs.
-- Hidden tooltips that other addons use to scan item text also get the compact lines.
+- A tooltip another addon shows with no owner, or owned by `UIParent` or `WorldFrame` with `ANCHOR_NONE`, keeps the original text, like a scanning tooltip. An addon that builds its shown tooltip by copying lines from a scanning tooltip gets the original text too (GearQuest has such code for random-suffix items, unused in 0.5.5-beta).
+- The original-text key only rebuilds `GameTooltip` and `ItemRefTooltip`. Other addons' own tooltips (AtlasLoot's `AtlasLootTooltip`, with its `useGameTooltip` setting off) switch the next time the item is hovered.
+- Replaced lines get no line post-calls or `lineIndex`, and if another addon also consumes equip lines with a line pre-call, the one registered first wins. None of the addons checked on 2026-10-13 uses line callbacks.
+- Text another addon writes itself with `AddLine` isn't rewritten: only lines that come from the game's item data are. GearQuest's window is the case seen so far (see [Other addons' tooltips](#other-addons-tooltips)).
 
 ## Localization
 
@@ -313,13 +343,14 @@ Unit tests run on LuaJIT 2.1 (Lua 5.1 compatible) through `spec/runner.lua`, a m
   - `fakes.FoldCase` stands in for `C_Intl.FoldCase` for the letters the specs use.
   - Load into it with `helpers.LoadAddon(name, files, wow.env)` or `helpers.StartStatsTrimmer(wow)`, which loads the full `.toc` and fires `ADDON_LOADED`.
   - Drive it with `fakes.Fire(frame, script)`, `fakes.ClickCheckButton(button)` (which toggles the button before `OnClick`, like the client) and `fakes.FireEvent(wow, event, ...)`.
+  - Tooltips: `fakes.ItemTooltip(wow, data)` is another addon's tooltip in the middle of processing, for calling the pre-call directly. `fakes.ShowItem(wow, tooltip, owner, anchorType, data)` fills one like the client: `SetOwner`, then `ProcessInfo`, which runs the registered line pre-calls and shows it.
   - Frame methods the specs don't care about are listed explicitly as no-ops. Any other missing method fails, so a misspelled WoW method is caught.
 - Every `.toc` file must be loaded by some spec, otherwise LuaCov silently leaves it out. `spec/addon_load_spec.lua` loads the whole `.toc`.
 - Test observable behavior: the lines and colors shown, saved settings, positions, what opens or closes. Don't test calls like `SetSize`; layout isn't asserted.
 - Expected values (labels, names) are written in the spec, not copied from the code's tables, so typos are caught.
 - When adding tests, check that they catch a real bug: change the code on purpose, see the right test fail, restore.
 
-Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. On 2026-10-11 it was 100% of 793 lines with 231 tests.
+Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. On 2026-10-13 it was 100% of 818 lines with 242 tests.
 
 The tests cover the logic. Game-facing behavior still has to be checked in game.
 

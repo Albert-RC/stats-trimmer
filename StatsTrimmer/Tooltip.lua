@@ -126,10 +126,40 @@ local function IsShowingOriginal()
 	return isKeyDown and isKeyDown() or false
 end
 
+-- Blizzard's item tooltips: hovered items, chat links and their comparisons. The player always sees them,
+-- even the default-anchored ones, which are owned by UIParent with no anchor like a scanning tooltip.
+local PLAYER_TOOLTIPS = {}
+for _, name in ipairs({
+	"GameTooltip",
+	"ItemRefTooltip",
+	"ShoppingTooltip1",
+	"ShoppingTooltip2",
+	"ItemRefShoppingTooltip1",
+	"ItemRefShoppingTooltip2",
+}) do
+	if _G[name] then
+		PLAYER_TOOLTIPS[_G[name]] = true
+	end
+end
+
+-- True for a tooltip another addon fills only to read the item's text: it has no owner, or UIParent or
+-- WorldFrame with no anchor. It keeps the original text, which is what that addon expects to read. The
+-- tooltips other addons show are owned by the hovered button or row (AtlasLoot, the Dungeon Journal).
+local function IsScanningTooltip(tooltip)
+	if PLAYER_TOOLTIPS[tooltip] then
+		return false
+	end
+	local owner = tooltip:GetOwner()
+	return not owner or ((owner == UIParent or owner == WorldFrame) and tooltip:GetAnchorType() == "ANCHOR_NONE")
+end
+
 -- Line pre-call: returning true keeps the original line out of the tooltip
 local function ReplaceEquipLine(tooltip, lineData)
 	local text = lineData.leftText
-	if not IsReadable(text) or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX or IsShowingOriginal() then
+	if not IsReadable(text) or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX then
+		return false
+	end
+	if IsShowingOriginal() or IsScanningTooltip(tooltip) then
 		return false
 	end
 
@@ -169,11 +199,42 @@ end
 -- In Forever, equip lines arrive with type None, not ItemSpellTriggerOnEquip
 TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.None, ReplaceEquipLine)
 
--- Rebuilding re-runs the line pre-calls on the tooltip's original data (they never change it), so the
--- tooltip switches between original and compact text. Comparison tooltips follow their main tooltip.
+-- How many lines each tooltip had right after its data was processed, other addons' tooltip post-calls
+-- included. Rebuilding from the data only runs those again: lines added later with AddLine would be lost.
+local processedLineCounts = {}
+
+local function RecordProcessedLines(tooltip)
+	processedLineCounts[tooltip] = tooltip:NumLines()
+end
+
+-- True for another addon's frame under the mouse that shows its tooltip from OnEnter, so running it again
+-- rebuilds the whole tooltip. Blizzard's item buttons with UpdateTooltip rebuild theirs by themselves every
+-- 0.2 s, and protected frames aren't run from addon code.
+local function CanEnterAgain(owner)
+	return owner ~= nil
+		and not owner.UpdateTooltip
+		and not owner:IsProtected()
+		and owner:IsMouseOver()
+		and owner:GetScript("OnEnter") ~= nil
+end
+
+-- Rebuilds a shown item tooltip so it switches between original and compact text at once:
+-- - from its data, when nothing was added after it. That re-runs the line pre-calls on the original data
+--   (they never change it); comparison tooltips follow their main tooltip.
+-- - by its owner, as when the mouse enters it again, when another addon added lines after the data
+--   (AtlasLoot's drop rate, DungeonJournal's source): only that addon can add them again.
+-- Otherwise it is left as it is, and switches the next time it is built.
 local function RefreshItemTooltip(tooltip)
-	if tooltip:IsShown() and tooltip:IsTooltipType(Enum.TooltipDataType.Item) then
+	if not (tooltip:IsShown() and tooltip:IsTooltipType(Enum.TooltipDataType.Item)) then
+		return
+	end
+	if tooltip:NumLines() == processedLineCounts[tooltip] then
 		tooltip:RefreshData()
+	else
+		local owner = tooltip:GetOwner()
+		if CanEnterAgain(owner) then
+			ExecuteFrameScript(owner, "OnEnter")
+		end
 	end
 end
 
@@ -182,6 +243,9 @@ function ns.RefreshItemTooltips()
 	RefreshItemTooltip(GameTooltip)
 	RefreshItemTooltip(ItemRefTooltip)
 end
+
+hooksecurefunc(GameTooltip, "ProcessInfo", RecordProcessedLines)
+hooksecurefunc(ItemRefTooltip, "ProcessInfo", RecordProcessedLines)
 
 local modifierWatcher = CreateFrame("Frame")
 modifierWatcher:RegisterEvent("MODIFIER_STATE_CHANGED")
