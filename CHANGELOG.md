@@ -2,7 +2,7 @@
 
 ## v0.3.1 (2026-10-13)
 
-- Holding Ctrl no longer removes the lines other addons add to an item tooltip, such as AtlasLoot's drop rate, DungeonJournal's source or GearQuest's score.
+- Holding Ctrl no longer removes the lines other addons add to an item tooltip, such as AtlasLoot's drop rate or DungeonJournal's source.
 - Hidden tooltips that other addons use to read an item's text keep the original text, which is what those addons expect.
 
 ## v0.3.0 (2026-10-11)

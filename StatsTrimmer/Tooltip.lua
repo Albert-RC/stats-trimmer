@@ -222,8 +222,7 @@ end
 -- - from its data, when nothing was added after it. That re-runs the line pre-calls on the original data
 --   (they never change it); comparison tooltips follow their main tooltip.
 -- - by its owner, as when the mouse enters it again, when another addon added lines after the data
---   (AtlasLoot's drop rate, DungeonJournal's source, GearQuest's score in its own window): only that addon
---   can add them again.
+--   (AtlasLoot's drop rate, DungeonJournal's source): only that addon can add them again.
 -- Otherwise it is left as it is, and switches the next time it is built.
 local function RefreshItemTooltip(tooltip)
 	if not (tooltip:IsShown() and tooltip:IsTooltipType(Enum.TooltipDataType.Item)) then
