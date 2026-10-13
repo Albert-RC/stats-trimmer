@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Holding Ctrl no longer removes the lines other addons add to an item tooltip, such as AtlasLoot's drop rate, DungeonJournal's source or GearQuest's score.
+- Hidden tooltips that other addons use to read an item's text keep the original text, which is what those addons expect.
+
 ## v0.3.0 (2026-10-11)
 
 - Every compact line starts with `+`, like the game's own item comparison: `+10 spell damage` instead of `≤10 spell damage`. The original "up to" is about how much of the bonus each spell gets, not the bonus itself.

@@ -294,8 +294,7 @@ describe("Settings window", function()
 
 		it("rebuilds a shown item tooltip so it switches language right away", function()
 			local tooltip = wow.env.GameTooltip
-			tooltip.primaryInfo = { tooltipData = { type = wow.env.Enum.TooltipDataType.Item } }
-			tooltip.shown = true
+			fakes.ShowItem(wow, tooltip, wow.env.UIParent, "ANCHOR_NONE")
 			LanguageMenu().setSelected("deDE")
 			assert.are.equal(1, tooltip.refreshCount)
 		end)
@@ -350,8 +349,7 @@ describe("Settings window", function()
 
 		it("splits spell power when checked, rebuilding the preview and a shown item tooltip", function()
 			local tooltip = wow.env.GameTooltip
-			tooltip.primaryInfo = { tooltipData = { type = wow.env.Enum.TooltipDataType.Item } }
-			tooltip.shown = true
+			fakes.ShowItem(wow, tooltip, wow.env.UIParent, "ANCHOR_NONE")
 			ns.ShowOptions()
 			fakes.ClickCheckButton(Checkbox())
 			assert.is_true(ns.db.splitSpellPower)

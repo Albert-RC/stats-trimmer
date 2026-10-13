@@ -14,9 +14,11 @@ read_globals = {
 	"ColorPickerFrame",
 	"CreateFrame",
 	"Enum",
+	"ExecuteFrameScript",
 	"GameTooltip",
 	"GetCursorPosition",
 	"GetLocale",
+	"hooksecurefunc",
 	"issecretvalue",
 	"IsAltKeyDown",
 	"IsControlKeyDown",
@@ -34,6 +36,7 @@ read_globals = {
 	"TooltipDataProcessor",
 	"UIParent",
 	"UISpecialFrames",
+	"WorldFrame",
 }
 
 -- Specs use busted's globals; the runner is what defines them when busted isn't available

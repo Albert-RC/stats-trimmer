@@ -134,6 +134,15 @@ function Frame:IsShown()
 	return self.shown
 end
 
+-- Set frame.protected or frame.mouseOver to change these
+function Frame:IsProtected()
+	return self.protected == true, false
+end
+
+function Frame:IsMouseOver()
+	return self.mouseOver == true
+end
+
 function Frame:GetName()
 	return self.name
 end
@@ -217,13 +226,18 @@ function Frame:CreateTexture()
 end
 
 -- GameTooltip methods: lines are recorded as { text, r, g, b }
-function Frame:SetOwner(owner)
+function Frame:SetOwner(owner, anchorType)
 	self.owner = owner
+	self.anchorType = anchorType
 	self.lines = {}
 end
 
 function Frame:GetOwner()
 	return self.owner
+end
+
+function Frame:GetAnchorType()
+	return self.anchorType
 end
 
 function Frame:ClearLines()
@@ -232,6 +246,34 @@ end
 
 function Frame:AddLine(text, r, g, b)
 	table.insert(self.lines, { text = text, r = r, g = g, b = b })
+end
+
+function Frame:NumLines()
+	return #self.lines
+end
+
+-- Like TooltipDataHandlerMixin:ProcessInfo, which every SetX method (SetHyperlink, SetBagItem...) calls:
+-- builds the tooltip from the info's data, where the line pre-calls can consume each line, and shows it.
+-- The specs' lines are all None lines.
+function Frame:ProcessInfo(info)
+	self.lines = {}
+	self.primaryInfo = info
+	self.processingInfo = info
+	for _, lineData in ipairs(info.tooltipData.lines or {}) do
+		local consumed = false
+		for _, preCall in ipairs(self.wow.preCalls) do
+			consumed = preCall.handler(self, lineData)
+			if consumed then
+				break
+			end
+		end
+		if not consumed then
+			local color = lineData.leftColor or self.wow.env.NORMAL_FONT_COLOR
+			self:AddLine(lineData.leftText, color:GetRGB())
+		end
+	end
+	self:Show()
+	return true
 end
 
 function Frame:GetProcessingTooltipInfo()
@@ -277,16 +319,27 @@ function fakes.NewFrame(wow, frameType, name, parent, template)
 	return frame
 end
 
--- A shown tooltip whose data is being processed, as the line pre-calls see it. `data` is the tooltip
--- data: { type, hyperlink, guid, lines }; type defaults to an item.
+-- A shown tooltip whose data is being processed, as the line pre-calls see it: another addon's tooltip
+-- next to the hovered button. `data` is the tooltip data: { type, hyperlink, guid, lines }; type defaults
+-- to an item.
 function fakes.ItemTooltip(wow, data)
 	local tooltip = fakes.NewFrame(wow, "GameTooltip")
+	tooltip:SetOwner(fakes.NewFrame(wow, "Button"), "ANCHOR_RIGHT")
 	data.type = data.type or wow.env.Enum.TooltipDataType.Item
 	data.lines = data.lines or {}
 	tooltip.processingInfo = { tooltipData = data }
 	tooltip.primaryInfo = tooltip.processingInfo
 	tooltip.shown = true
 	return tooltip
+end
+
+-- Fills a tooltip from item data the way the client does: an owner and anchor first, then SetHyperlink
+-- (ProcessInfo). `data` defaults to an item without lines.
+function fakes.ShowItem(wow, tooltip, owner, anchorType, data)
+	data = data or {}
+	data.type = data.type or wow.env.Enum.TooltipDataType.Item
+	tooltip:SetOwner(owner, anchorType)
+	tooltip:ProcessInfo({ tooltipData = data })
 end
 
 -- Frames created by the addon with a given template or text, in creation order
@@ -320,6 +373,7 @@ function fakes.NewWoW(options)
 		secretTexts = {}, -- text -> true: issecretvalue reports it as a secret
 		cursor = { 0, 0 },
 		preCalls = {}, -- { lineType, handler }
+		executedScripts = {}, -- ExecuteFrameScript calls: { frame, scriptName }
 		categories = {}, -- Options categories
 		sounds = {},
 		colorPicker = { rgb = { 1, 1, 1 } },
@@ -400,10 +454,32 @@ function fakes.NewWoW(options)
 		return fakes.NewFrame(wow, frameType, name, parent, template)
 	end
 	env.UIParent = fakes.NewFrame(wow, "Frame", "UIParent")
+	env.WorldFrame = fakes.NewFrame(wow, "Frame", "WorldFrame")
 	env.Minimap = fakes.NewFrame(wow, "Frame", "Minimap", env.UIParent)
 	env.Minimap.width, env.Minimap.centerX, env.Minimap.centerY, env.Minimap.scale = 140, 500, 400, 1
-	env.GameTooltip = fakes.NewFrame(wow, "GameTooltip", "GameTooltip", env.UIParent)
-	env.ItemRefTooltip = fakes.NewFrame(wow, "GameTooltip", "ItemRefTooltip", env.UIParent)
+	for _, name in ipairs({
+		"GameTooltip",
+		"ItemRefTooltip",
+		"ShoppingTooltip1",
+		"ShoppingTooltip2",
+		"ItemRefShoppingTooltip1",
+		"ItemRefShoppingTooltip2",
+	}) do
+		fakes.NewFrame(wow, "GameTooltip", name, env.UIParent)
+	end
+	env.ExecuteFrameScript = function(frame, scriptName, ...)
+		table.insert(wow.executedScripts, { frame = frame, scriptName = scriptName })
+		fakes.Fire(frame, scriptName, ...)
+	end
+	-- Like the client: the hook runs after the method, which returns what it returned
+	env.hooksecurefunc = function(object, method, hook)
+		local original = object[method]
+		object[method] = function(...)
+			local results = { original(...) }
+			hook(...)
+			return unpack(results)
+		end
+	end
 
 	env.TooltipDataProcessor = {
 		AddLinePreCall = function(lineType, handler)
