@@ -169,12 +169,14 @@ describe("Tooltip line pre-call", function()
 		assert.are.equal("+6 poder de ataque contra bestias", vsBeasts[1].text)
 	end)
 
-	it("keeps the original line color for kinds without a saved color", function()
+	it("colors crit lines with their own saved color", function()
+		ns.db.colors.critRating = { r = 1, g = 0.5, b = 0 }
 		local _, lines = ProcessLine(wow, preCall, CRIT_LINE, { hyperlink = "item:crit" }, fakes.Color(0.1, 0.9, 0.2))
-		assert.are.same({ { text = "+1% golpe crítico", r = 0.1, g = 0.9, b = 0.2 } }, lines)
+		assert.are.same({ { text = "+1% golpe crítico", r = 1, g = 0.5, b = 0 } }, lines)
 	end)
 
-	it("uses the normal font color when the line has none", function()
+	it("uses the normal font color before the saved settings are loaded, when the line has none", function()
+		ns.db = nil
 		local tooltip = fakes.ItemTooltip(wow, { hyperlink = "item:crit" })
 		preCall(tooltip, { leftText = CRIT_LINE })
 		assert.are.same({ { text = "+1% golpe crítico", r = 1, g = 0.82, b = 0 } }, tooltip.lines)
@@ -380,6 +382,72 @@ describe("Tooltip refresh on modifier changes", function()
 		fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
 		assert.are.equal(0, wow.env.GameTooltip.refreshCount)
 		assert.are.equal(0, wow.env.ItemRefTooltip.refreshCount)
+	end)
+
+	it("rebuilds Blizzard's tooltips once, though they showed equip lines too", function()
+		fakes.ShowItem(wow, wow.env.ItemRefTooltip, wow.env.UIParent, "ANCHOR_PRESERVE", {
+			hyperlink = "item:cosedora",
+			lines = { { leftText = COSEDORA_LINE } },
+		})
+		fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+		assert.are.equal(1, wow.env.ItemRefTooltip.refreshCount)
+	end)
+
+	describe("in another addon's own tooltip", function()
+		local button, ownTooltip, compareTooltip
+
+		local function Texts(tooltip)
+			local texts = {}
+			for _, line in ipairs(tooltip.lines) do
+				table.insert(texts, line.text)
+			end
+			return texts
+		end
+
+		local function ShowCosedora(tooltip, owner)
+			fakes.ShowItem(wow, tooltip, owner, "ANCHOR_RIGHT", {
+				hyperlink = "item:cosedora",
+				lines = { { leftText = COSEDORA_LINE } },
+			})
+		end
+
+		-- Like AtlasLoot with its useGameTooltip setting off: OnEnter fills its own tooltip, adds a line of
+		-- its own, and can show its own comparison tooltip too
+		before_each(function()
+			local function NewTooltip(name)
+				return wow.env.CreateFrame("GameTooltip", name, wow.env.UIParent, "GameTooltipTemplate")
+			end
+			ownTooltip = NewTooltip("AtlasLootTooltip")
+			compareTooltip = NewTooltip("AtlasLootCompareTooltip")
+			button = wow.env.CreateFrame("Button")
+			button.enterCount = 0
+			button:SetScript("OnEnter", function(self)
+				self.enterCount = self.enterCount + 1
+				ShowCosedora(ownTooltip, self)
+				ownTooltip:AddLine("Probabilidad de botín: 5%")
+				if self.compares then
+					ShowCosedora(compareTooltip, self)
+				end
+			end)
+			button.mouseOver = true
+		end)
+
+		it("rebuilds it through its owner too", function()
+			fakes.Fire(button, "OnEnter")
+			wow.keysDown.CTRL = true
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.same({ COSEDORA_LINE, "Probabilidad de botín: 5%" }, Texts(ownTooltip))
+			assert.are.equal(2, button.enterCount)
+		end)
+
+		it("runs an owner once when it shows several of those tooltips", function()
+			button.compares = true
+			fakes.Fire(button, "OnEnter")
+			wow.keysDown.CTRL = true
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.same({ COSEDORA_LINE }, Texts(compareTooltip))
+			assert.are.equal(2, button.enterCount)
+		end)
 	end)
 
 	describe("with lines another addon added after the item's data", function()

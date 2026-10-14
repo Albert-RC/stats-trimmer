@@ -19,7 +19,7 @@ Each line shows what the item adds, as in the game's own item comparison. The or
 - **Compact stat lines** in item tooltips: bags, character pane, chat links and comparison tooltips.
 - **Any client language.** Lines are recognized through the game's own data, not English text. The compact lines use the game's own stat names, in your client's language or another one you pick.
 - **Original text on demand.** Hold **Ctrl** over an item to see the original lines. You can switch the key to Alt or Shift.
-- **Your colors.** Pick a color for each kind of line and see it live in a preview tooltip. Everything starts in the usual equip green, so nothing changes until you want it to.
+- **Your colors.** Pick a color for each kind of line, or one of the game's class colors, and see it live in a preview tooltip. Everything starts in the usual equip green, so nothing changes until you want it to.
 - **Minimap button** that you can drag around the minimap. MinimapButtonButton collects it automatically.
 - **Lightweight.** No libraries and nothing to set up.
 
@@ -45,7 +45,7 @@ Click the minimap button, or go to **Options > AddOns > Stats Trimmer**.
 - **Show original text while holding:** Ctrl (default), Alt or Shift. Keep in mind that Shift also compares items.
 - **Language:** your client's language (default), or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese, without restarting the game. Russian, Korean and Chinese clients offer only English besides their own, since their fonts may lack accented letters. It changes the compact lines (`+10 spell damage`, `+10 daño con hechizos`…) and the game's texts in this window. MP5 and HP5 read the same in every language.
 - **Split spell power into spell damage and spell healing:** off by default. Spell power that adds damage and healing shows as one line, `+26 spell power`, like the game's item comparison; with this on, it shows as `+26 spell damage` and `+26 spell healing`.
-- **Colors:** a color swatch for each kind of line, a Reset button on each row and a "Reset all colors" button. Lines without a color setting yet (weapon skills, crit, dodge and a few others) keep the equip green.
+- **Colors:** a row for each kind of line, grouped in Attack, Defense, Spells and Damage extra (the spell schools) sections that you can collapse (a warrior can hide the spell ones, for example). Each row has a color swatch and a Reset button; "Reset all colors" resets them all. The color picker shows the game's class colors under the color wheel: hover one to see its class, click it to use it.
 - **Preview:** a sample tooltip that updates as you pick colors.
 
 ## When in doubt, it leaves the line alone

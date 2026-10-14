@@ -29,7 +29,7 @@ function ns.GetLanguage()
 end
 
 -- A Blizzard string in a language ("CLIENT" or a bundled one), or nil
-local function GetTextIn(language, name)
+function ns.GetTextIn(language, name)
 	if language == "CLIENT" then
 		return ns.GetClientText(name)
 	end
@@ -39,12 +39,33 @@ end
 
 -- A Blizzard string in the language chosen in the settings, or nil
 function ns.GetText(name)
-	return GetTextIn(ns.GetLanguage(), name)
+	return ns.GetTextIn(ns.GetLanguage(), name)
 end
 
 -- A Blizzard string in English, the fallback when the chosen language lacks it or names it wrongly
 function ns.GetEnglishText(name)
-	return GetLocale() == "enUS" and ns.GetClientText(name) or GetTextIn("enUS", name)
+	return GetLocale() == "enUS" and ns.GetClientText(name) or ns.GetTextIn("enUS", name)
+end
+
+-- The client's class names (WARRIOR -> "Guerrero"), read once
+local clientClassNames
+
+-- A class's name in a language ("CLIENT" or a bundled one), or nil
+local function ClassNameIn(language, classFile)
+	local names
+	if language == "CLIENT" then
+		clientClassNames = clientClassNames or LocalizedClassList(false) or {}
+		names = clientClassNames
+	else
+		names = ns.LOCALE_CLASS_NAMES[language]
+	end
+	return names and NonEmpty(names[classFile])
+end
+
+-- A class's name (WARRIOR) in the language chosen in the settings, then in English, or nil
+function ns.GetClassName(classFile)
+	return ClassNameIn(ns.GetLanguage(), classFile)
+		or ClassNameIn(GetLocale() == "enUS" and "CLIENT" or "enUS", classFile)
 end
 
 -- Lowercase for display, following the client's language rules. C_Intl.ToLower may return nothing.
@@ -69,12 +90,12 @@ local function LowercasedNames(GetName)
 	end, FoldCase)
 end
 
--- The compact lines with Blizzard's stat names in the chosen language, then in English for any line that
--- language can't name. MP5 and HP5 have no names and stay as they are.
-function ns.InLanguage(lines)
-	local language = ns.GetLanguage()
+-- The compact lines with Blizzard's stat names in the chosen language (or `language`, "CLIENT" or a bundled
+-- one), then in English for any line that language can't name. MP5 and HP5 have no names and stay as they are.
+function ns.InLanguage(lines, language)
+	language = language or ns.GetLanguage()
 	namesIn[language] = namesIn[language] or LowercasedNames(function(key)
-		return GetTextIn(language, key)
+		return ns.GetTextIn(language, key)
 	end)
 	englishNames = englishNames or LowercasedNames(ns.GetEnglishText)
 	return ns.LocalizeLines(ns.LocalizeLines(lines, namesIn[language]), englishNames)
@@ -153,13 +174,20 @@ local function IsScanningTooltip(tooltip)
 	return not owner or ((owner == UIParent or owner == WorldFrame) and tooltip:GetAnchorType() == "ANCHOR_NONE")
 end
 
+-- Other addons' own tooltips that showed equip lines (AtlasLoot's, with its useGameTooltip setting off), so
+-- the original-text key rebuilds them too. Blizzard's comparison tooltips follow their main tooltip instead.
+local addonTooltips = setmetatable({}, { __mode = "k" })
+
 -- Line pre-call: returning true keeps the original line out of the tooltip
 local function ReplaceEquipLine(tooltip, lineData)
 	local text = lineData.leftText
-	if not IsReadable(text) or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX then
+	if not IsReadable(text) or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX or IsScanningTooltip(tooltip) then
 		return false
 	end
-	if IsShowingOriginal() or IsScanningTooltip(tooltip) then
+	if not PLAYER_TOOLTIPS[tooltip] then
+		addonTooltips[tooltip] = true
+	end
+	if IsShowingOriginal() then
 		return false
 	end
 
@@ -223,8 +251,9 @@ end
 --   (they never change it); comparison tooltips follow their main tooltip.
 -- - by its owner, as when the mouse enters it again, when another addon added lines after the data
 --   (AtlasLoot's drop rate, DungeonJournal's source): only that addon can add them again.
--- Otherwise it is left as it is, and switches the next time it is built.
-local function RefreshItemTooltip(tooltip)
+-- Otherwise it is left as it is, and switches the next time it is built. `entered` holds the owners already
+-- run: an addon's main and comparison tooltips can share one, which rebuilds both.
+local function RefreshItemTooltip(tooltip, entered)
 	if not (tooltip:IsShown() and tooltip:IsTooltipType(Enum.TooltipDataType.Item)) then
 		return
 	end
@@ -232,7 +261,8 @@ local function RefreshItemTooltip(tooltip)
 		tooltip:RefreshData()
 	else
 		local owner = tooltip:GetOwner()
-		if CanEnterAgain(owner) then
+		if not entered[owner] and CanEnterAgain(owner) then
+			entered[owner] = true
 			ExecuteFrameScript(owner, "OnEnter")
 		end
 	end
@@ -240,8 +270,12 @@ end
 
 -- Rebuilds the shown item tooltips, e.g. after a setting changed what their lines look like
 function ns.RefreshItemTooltips()
-	RefreshItemTooltip(GameTooltip)
-	RefreshItemTooltip(ItemRefTooltip)
+	local entered = {}
+	RefreshItemTooltip(GameTooltip, entered)
+	RefreshItemTooltip(ItemRefTooltip, entered)
+	for tooltip in pairs(addonTooltips) do
+		RefreshItemTooltip(tooltip, entered)
+	end
 end
 
 hooksecurefunc(GameTooltip, "ProcessInfo", RecordProcessedLines)

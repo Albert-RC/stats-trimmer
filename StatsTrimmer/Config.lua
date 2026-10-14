@@ -32,6 +32,7 @@ end
 -- own strings and the addon's English.
 ns.LOCALES = {}
 ns.LOCALE_STRINGS = {}
+ns.LOCALE_CLASS_NAMES = {}
 
 -- The bundled languages a client can show, in menu order: all of them on a client with the Latin alphabet,
 -- only English on the others (Cyrillic, Korean and Chinese fonts may lack accented letters)
@@ -53,12 +54,116 @@ function ns.ResolveLanguage(saved, clientLocale)
 	return "CLIENT"
 end
 
--- Every kind of replacement line, in settings order. `group` separates the rows in the settings window.
+-- Sections of the color rows in the settings window, in order. `labelGlobal` names Blizzard's text for the
+-- section title (its character pane categories), `label` is the fallback and `labelSuffix` is added after
+-- either: Blizzard has no name for spell schools, so that section is its "Damage" plus " extra".
+ns.COLOR_GROUPS = {
+	{ key = "attack", labelGlobal = "STAT_CATEGORY_ATTACK", label = "Attack" },
+	{ key = "defense", labelGlobal = "STAT_CATEGORY_DEFENSE", label = "Defense" },
+	{ key = "spell", labelGlobal = "SPELLS", label = "Spells" },
+	{ key = "school", labelGlobal = "DAMAGE", label = "Damage", labelSuffix = " extra" },
+}
+
+-- Every kind of replacement line, in settings order, grouped by section (`group`, a COLOR_GROUPS key).
 -- `stat` is the key of Blizzard's name for the row label (in the chosen language), with `label` as the
 -- English fallback; a kind without `stat` or `typeStat` always shows `label`. `sample` is the line the
 -- preview tooltip shows: { value, English name, percent = ..., stat = ... }, where its own `stat`
 -- overrides the kind's.
 ns.COLOR_KINDS = {
+	{
+		key = "attackPower",
+		group = "attack",
+		label = "Attack power",
+		stat = "ITEM_MOD_ATTACK_POWER_SHORT",
+		sample = { 4, "attack power" },
+	},
+	{
+		-- Blizzard only names this per creature type: the label is typeStat's name without its last word,
+		-- the type ("poder de ataque contra …")
+		key = "attackPowerVs",
+		group = "attack",
+		label = "Attack power vs type",
+		typeStat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT",
+		sample = { 6, "attack power vs beasts", stat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT" },
+	},
+	{
+		key = "rangedAttackPower",
+		group = "attack",
+		label = "Ranged attack power",
+		stat = "ITEM_MOD_RANGED_ATTACK_POWER_SHORT",
+		sample = { 12, "ranged attack power" },
+	},
+	{
+		key = "feralAttackPower",
+		group = "attack",
+		label = "Feral attack power",
+		stat = "ITEM_MOD_FERAL_ATTACK_POWER_SHORT",
+		sample = { 30, "feral attack power" },
+	},
+	{
+		key = "hitRating",
+		group = "attack",
+		label = "Hit",
+		stat = "ITEM_MOD_HIT_RATING_SHORT",
+		sample = { 1, "hit rating", percent = true },
+	},
+	{
+		key = "critRating",
+		group = "attack",
+		label = "Crit",
+		stat = "ITEM_MOD_CRIT_RATING_SHORT",
+		sample = { 1, "crit rating", percent = true },
+	},
+	{
+		-- One row for every weapon skill, under Blizzard's name for them all
+		key = "weaponSkill",
+		group = "attack",
+		label = "Weapon skills",
+		stat = "STAT_CATEGORY_WEAPON_SKILLS",
+		sample = { 7, "swords skill", stat = "ITEM_MOD_SWORDS_SHORT" },
+	},
+	{
+		key = "defense",
+		group = "defense",
+		label = "Defense",
+		stat = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT",
+		sample = { 3, "defense" },
+	},
+	{
+		key = "dodgeRating",
+		group = "defense",
+		label = "Dodge",
+		stat = "ITEM_MOD_DODGE_RATING_SHORT",
+		sample = { 1, "dodge rating", percent = true },
+	},
+	{
+		key = "parryRating",
+		group = "defense",
+		label = "Parry",
+		stat = "ITEM_MOD_PARRY_RATING_SHORT",
+		sample = { 1, "parry rating", percent = true },
+	},
+	{
+		key = "blockRating",
+		group = "defense",
+		label = "Block",
+		stat = "ITEM_MOD_BLOCK_RATING_SHORT",
+		sample = { 1, "block rating", percent = true },
+	},
+	{
+		key = "blockValue",
+		group = "defense",
+		label = "Block value",
+		stat = "ITEM_MOD_BLOCK_VALUE_SHORT",
+		sample = { 15, "block value" },
+	},
+	{
+		-- MP5 and HP5 read the same in every language
+		key = "hp5",
+		group = "defense",
+		label = "HP5",
+		sample = { 5, "HP5" },
+	},
 	{
 		-- A single stat that adds damage and healing; split into the next two when splitSpellPower is set
 		key = "spellPower",
@@ -80,6 +185,41 @@ ns.COLOR_KINDS = {
 		label = "Spell healing",
 		stat = "ITEM_MOD_SPELL_HEALING_DONE_SHORT",
 		sample = { 30, "spell healing" },
+	},
+	{
+		-- Like attack power vs type. Undead, because some clients name spell damage vs beasts wrongly.
+		key = "spellDamageVs",
+		group = "spell",
+		label = "Spell damage vs type",
+		typeStat = "ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT",
+		sample = { 20, "spell damage vs undead", stat = "ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT" },
+	},
+	{
+		key = "spellHitRating",
+		group = "spell",
+		label = "Spell hit",
+		stat = "ITEM_MOD_HIT_SPELL_RATING_SHORT",
+		sample = { 1, "spell hit rating", percent = true },
+	},
+	{
+		key = "spellCritRating",
+		group = "spell",
+		label = "Spell crit",
+		stat = "ITEM_MOD_CRIT_SPELL_RATING_SHORT",
+		sample = { 1, "spell crit rating", percent = true },
+	},
+	{
+		key = "spellPenetration",
+		group = "spell",
+		label = "Spell penetration",
+		stat = "ITEM_MOD_SPELL_PENETRATION_SHORT",
+		sample = { 10, "spell penetration" },
+	},
+	{
+		key = "mp5",
+		group = "spell",
+		label = "MP5",
+		sample = { 4, "MP5" },
 	},
 	{
 		key = "arcaneDamage",
@@ -123,56 +263,6 @@ ns.COLOR_KINDS = {
 		stat = "ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT",
 		sample = { 12, "shadow damage" },
 	},
-	{
-		-- MP5 and HP5 read the same in every language
-		key = "mp5",
-		group = "regen",
-		label = "MP5",
-		sample = { 4, "MP5" },
-	},
-	{
-		key = "hp5",
-		group = "regen",
-		label = "HP5",
-		sample = { 5, "HP5" },
-	},
-	{
-		key = "attackPower",
-		group = "physical",
-		label = "Attack power",
-		stat = "ITEM_MOD_ATTACK_POWER_SHORT",
-		sample = { 4, "attack power" },
-	},
-	{
-		-- Blizzard only names this per creature type: the label is typeStat's name without its last word,
-		-- the type ("poder de ataque contra …")
-		key = "attackPowerVs",
-		group = "physical",
-		label = "Attack power vs type",
-		typeStat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT",
-		sample = { 6, "attack power vs beasts", stat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT" },
-	},
-	{
-		key = "defense",
-		group = "physical",
-		label = "Defense",
-		stat = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT",
-		sample = { 3, "defense" },
-	},
-	{
-		key = "blockRating",
-		group = "physical",
-		label = "Block rating",
-		stat = "ITEM_MOD_BLOCK_RATING_SHORT",
-		sample = { 1, "block rating", percent = true },
-	},
-	{
-		key = "hitRating",
-		group = "physical",
-		label = "Hit rating",
-		stat = "ITEM_MOD_HIT_RATING_SHORT",
-		sample = { 1, "hit rating", percent = true },
-	},
 }
 
 -- The preview's compact line for a kind, in the same shape the rules produce, so ns.LocalizeLines can
@@ -193,6 +283,8 @@ ns.DEFAULTS = {
 	-- Show spell power as spell damage and spell healing lines instead of its own line
 	splitSpellPower = false,
 	colors = {},
+	-- Color sections collapsed in the settings window: COLOR_GROUPS key -> true
+	collapsedSections = {},
 	minimap = { angle = 200 },
 }
 for _, kind in ipairs(ns.COLOR_KINDS) do
@@ -220,6 +312,15 @@ end
 
 local function IsLanguage(value)
 	return value == "CLIENT" or (type(value) == "string" and ns.LOCALE_STRINGS[value] ~= nil)
+end
+
+local function IsColorGroup(value)
+	for _, group in ipairs(ns.COLOR_GROUPS) do
+		if group.key == value then
+			return true
+		end
+	end
+	return false
 end
 
 local function IsOriginalTextKey(value)
@@ -250,6 +351,16 @@ function ns.LoadSettings(saved)
 	end
 	if type(settings.splitSpellPower) ~= "boolean" then
 		settings.splitSpellPower = ns.DEFAULTS.splitSpellPower
+	end
+
+	-- Only sections that still exist, marked true
+	if type(settings.collapsedSections) ~= "table" then
+		settings.collapsedSections = {}
+	end
+	for key, value in pairs(settings.collapsedSections) do
+		if value ~= true or not IsColorGroup(key) then
+			settings.collapsedSections[key] = nil
+		end
 	end
 
 	if type(settings.colors) ~= "table" then
