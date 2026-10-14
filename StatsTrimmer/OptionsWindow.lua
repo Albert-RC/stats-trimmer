@@ -474,7 +474,7 @@ local function CreateSplitSpellPowerRow(above)
 	splitCheckbox:SetSize(26, 26)
 	splitCheckbox:SetPoint("TOPLEFT", above, "BOTTOMLEFT", -6, -10)
 	splitCheckbox.Text:SetFontObject("GameFontNormal")
-	splitCheckbox.Text:SetText("Split spell power into spell damage and spell healing")
+	splitCheckbox.Text:SetText("Split spell power into spell damage and spell healing when both values are the same")
 	-- The click has already toggled the box
 	splitCheckbox:SetScript("OnClick", function(checkbox)
 		ns.db.splitSpellPower = checkbox:GetChecked()

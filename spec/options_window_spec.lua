@@ -628,7 +628,10 @@ describe("Settings window", function()
 
 		it("starts unchecked, with spell power as its own line in the preview", function()
 			ns.ShowOptions()
-			assert.are.equal("Split spell power into spell damage and spell healing", Checkbox().Text.text)
+			assert.are.equal(
+				"Split spell power into spell damage and spell healing when both values are the same",
+				Checkbox().Text.text
+			)
 			assert.is_false(Checkbox():GetChecked())
 			assert.is_true(PreviewHas("+26 poder con hechizos"))
 		end)

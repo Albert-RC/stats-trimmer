@@ -33,7 +33,7 @@ Click the minimap button, or go to **Options > AddOns > Stats Trimmer**:
 
 - **Show original text while holding:** Ctrl (default), Alt or Shift. Shift also compares items.
 - **Language:** your client's (default), or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese. Russian, Korean and Chinese clients offer only English besides their own, since their fonts may lack accented letters. It changes at once, with no restart.
-- **Split spell power into spell damage and spell healing:** off by default. Spell power that adds damage and healing shows as one line, `+26 spell power`, like the game's item comparison; with this on, it shows as `+26 spell damage` and `+26 spell healing`.
+- **Split spell power into spell damage and spell healing when both values are the same:** off by default. Spell power that adds damage and healing shows as one line, `+26 spell power`, like the game's item comparison; with this on, it shows as `+26 spell damage` and `+26 spell healing`.
 - **Colors:** a row for each kind of line, in collapsible Attack, Defense, Spells and Damage extra (spell schools) sections, each with a swatch and a Reset button, plus "Reset all colors". The color picker offers the game's class colors.
 - **Preview:** a sample tooltip that updates as you pick colors.
 
