@@ -393,6 +393,22 @@ describe("Tooltip refresh on modifier changes", function()
 		assert.are.equal(1, wow.env.ItemRefTooltip.refreshCount)
 	end)
 
+	it("doesn't run the owner of Blizzard's other item tooltips, which would taint it", function()
+		-- A Blizzard UI widget shows its item in EmbeddedItemTooltip from OnEnter
+		local widget = wow.env.CreateFrame("Frame")
+		widget.mouseOver = true
+		widget:SetScript("OnEnter", function(self)
+			fakes.ShowItem(wow, wow.env.EmbeddedItemTooltip, self, "ANCHOR_RIGHT", {
+				hyperlink = "item:cosedora",
+				lines = { { leftText = COSEDORA_LINE } },
+			})
+		end)
+		fakes.Fire(widget, "OnEnter")
+		wow.keysDown.CTRL = true
+		fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+		assert.are.same({}, wow.executedScripts)
+	end)
+
 	describe("in another addon's own tooltip", function()
 		local button, ownTooltip, compareTooltip
 

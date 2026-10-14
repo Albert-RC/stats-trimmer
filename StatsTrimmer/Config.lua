@@ -314,18 +314,10 @@ local function IsLanguage(value)
 	return value == "CLIENT" or (type(value) == "string" and ns.LOCALE_STRINGS[value] ~= nil)
 end
 
-local function IsColorGroup(value)
-	for _, group in ipairs(ns.COLOR_GROUPS) do
-		if group.key == value then
-			return true
-		end
-	end
-	return false
-end
-
-local function IsOriginalTextKey(value)
-	for _, option in ipairs(ns.ORIGINAL_TEXT_KEYS) do
-		if option.key == value then
+-- True when an entry of the list (COLOR_GROUPS, ORIGINAL_TEXT_KEYS) has this key
+local function HasKey(list, value)
+	for _, entry in ipairs(list) do
+		if entry.key == value then
 			return true
 		end
 	end
@@ -343,7 +335,7 @@ end
 function ns.LoadSettings(saved)
 	local settings = type(saved) == "table" and saved or {}
 
-	if not IsOriginalTextKey(settings.originalTextKey) then
+	if not HasKey(ns.ORIGINAL_TEXT_KEYS, settings.originalTextKey) then
 		settings.originalTextKey = ns.DEFAULTS.originalTextKey
 	end
 	if not IsLanguage(settings.language) then
@@ -358,7 +350,7 @@ function ns.LoadSettings(saved)
 		settings.collapsedSections = {}
 	end
 	for key, value in pairs(settings.collapsedSections) do
-		if value ~= true or not IsColorGroup(key) then
+		if value ~= true or not HasKey(ns.COLOR_GROUPS, key) then
 			settings.collapsedSections[key] = nil
 		end
 	end

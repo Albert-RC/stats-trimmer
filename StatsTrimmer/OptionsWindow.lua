@@ -13,9 +13,12 @@ local MIN_WIDTH, MIN_HEIGHT = 600, 690
 -- start right of the portrait, with their dropdowns this far from their labels.
 local TOP_HEIGHT, BOTTOM_HEIGHT, SIDE_MARGIN, PANEL_GAP = 156, 44, 12, 8
 local TOP_ROWS_LEFT, DROPDOWN_GAP = 70, 10
--- A color row's room around its label: the swatch with its gaps on the left, and the gaps around the Reset
--- button on the right (see CreateColorRow)
-local ROW_LEFT, ROW_RIGHT = 32, 10
+-- A color row: the swatch this far from the row's left, the label this far from the swatch and from the Reset
+-- button, and the Reset button this far from the row's right. ROW_LEFT and ROW_RIGHT are the room around the
+-- label, which FitWindow adds to the longest one.
+local SWATCH_LEFT, SWATCH_SIZE, LABEL_GAP_LEFT, LABEL_GAP_RIGHT, RESET_RIGHT = 8, 16, 8, 6, 4
+local ROW_LEFT = SWATCH_LEFT + SWATCH_SIZE + LABEL_GAP_LEFT
+local ROW_RIGHT = LABEL_GAP_RIGHT + RESET_RIGHT
 -- The scroll frame's inset in the colors panel
 local SCROLL_LEFT = 6
 -- The preview tooltip's offset below its panel's top, and its margin inside the panel
@@ -23,8 +26,8 @@ local PREVIEW_TOP, PREVIEW_MARGIN = 34, 12
 -- Color rows: the swatch (16px) and the Reset button share each row's vertical center. Section headers are
 -- ListHeaderThreeSliceTemplate's height.
 local ROW_HEIGHT, SECTION_HEADER_HEIGHT, SECTION_GAP = 24, 26, 6
--- The Reset buttons' size, before they widen to fit their translated text
-local RESET_WIDTH, RESET_HEIGHT = 60, 20
+-- The Reset buttons' height; their width follows their text (FitButton)
+local RESET_HEIGHT = 20
 -- Room on the colors panel's right for the scroll bar
 local SCROLL_BAR_SPACE = 26
 -- Room around a button's text when it is sized to fit a translated label
@@ -48,13 +51,7 @@ end
 -- A Blizzard text in the chosen language (or in `language`, a bundled one), then in English, then the
 -- addon's fallback
 local function Text(globalName, fallback, language)
-	local text
-	if language then
-		text = ns.GetTextIn(language, globalName)
-	else
-		text = ns.GetText(globalName)
-	end
-	return text or ns.GetEnglishText(globalName) or fallback
+	return ns.GetTextIn(language or ns.GetLanguage(), globalName) or ns.GetEnglishText(globalName) or fallback
 end
 
 -- A color row's label, lowercased like the compact lines, in the chosen language or `language`. MP5 and HP5
@@ -71,23 +68,22 @@ local function RowLabel(kind, language)
 	return kind.label
 end
 
--- Remembers how to fill a widget's text; ApplyText fills it. A button also remembers its own width.
+-- Remembers how to fill a widget's text; ApplyText fills it
 local function Translate(widget, GetValue, isButton)
-	table.insert(translated, {
-		widget = widget,
-		GetValue = GetValue,
-		isButton = isButton,
-		width = isButton and widget:GetWidth(),
-	})
+	table.insert(translated, { widget = widget, GetValue = GetValue, isButton = isButton })
 end
 
--- Fills every translated text in the current language. Buttons start again from their own width and
--- widen when their text needs more.
+-- Sizes a button to its text and padding. UIPanelButtonTemplate's buttons get narrower too
+-- (fitTextCanWidthDecrease), so they take no width of their own.
+local function FitButton(button, text)
+	button.fitTextWidthPadding = BUTTON_TEXT_PADDING
+	button:SetTextToFit(text)
+end
+
+-- Fills every translated text in the current language
 local function ApplyText(entry)
 	if entry.isButton then
-		entry.widget:SetWidth(entry.width)
-		entry.widget.fitTextWidthPadding = BUTTON_TEXT_PADDING
-		entry.widget:SetTextToFit(entry.GetValue())
+		FitButton(entry.widget, entry.GetValue())
 	else
 		entry.widget:SetText(entry.GetValue())
 	end
@@ -148,11 +144,9 @@ local function MeasureReference()
 		row.label:SetText(RowLabel(row.kind))
 	end
 	local reset = rowParts[1].reset
-	reset:SetWidth(RESET_WIDTH)
-	reset:SetTextToFit(Text("RESET", "Reset", REFERENCE_LANGUAGE))
+	FitButton(reset, Text("RESET", "Reset", REFERENCE_LANGUAGE))
 	local resetWidth = reset:GetWidth()
-	reset:SetWidth(RESET_WIDTH)
-	reset:SetTextToFit(Text("RESET", "Reset"))
+	FitButton(reset, Text("RESET", "Reset"))
 
 	FillPreview(REFERENCE_LANGUAGE, true)
 	reference = {
@@ -186,14 +180,16 @@ local function FitWindow()
 	local previewWidth = math.max(reference.previewWidth, previewTooltip:GetWidth()) + 2 * PREVIEW_MARGIN
 	local panelsWidth = 2 * SIDE_MARGIN + colorsWidth + PANEL_GAP + previewWidth
 	local previewHeight = PREVIEW_TOP + math.max(reference.previewHeight, previewTooltip:GetHeight()) + PREVIEW_MARGIN
-	frame:SetSize(
-		math.max(MIN_WIDTH, topRowsWidth, panelsWidth),
-		math.max(MIN_HEIGHT, TOP_HEIGHT + previewHeight + BOTTOM_HEIGHT)
-	)
+	local width = math.max(MIN_WIDTH, topRowsWidth, panelsWidth)
+	local height = math.max(MIN_HEIGHT, TOP_HEIGHT + previewHeight + BOTTOM_HEIGHT)
+	frame:SetSize(width, height)
+	-- Scaled down on a screen too small for it (a large UI scale), so it stays whole
+	frame:SetScale(math.min(1, UIParent:GetWidth() / width, UIParent:GetHeight() / height))
 end
 
--- The preview shows the sections that are open, and the window fits it
-local function RefreshPreview()
+-- The preview shows the sections that are open, and the window fits it. A color change keeps every size
+-- (`keepSize`): the color picker changes the color on every move.
+local function RefreshPreview(keepSize)
 	if not (previewTooltip and frame:IsShown()) then
 		return
 	end
@@ -201,7 +197,9 @@ local function RefreshPreview()
 		MeasureReference()
 	end
 	FillPreview()
-	FitWindow()
+	if not keepSize then
+		FitWindow()
+	end
 end
 
 local function RefreshSwatches()
@@ -215,7 +213,7 @@ local function SetColor(kindKey, r, g, b)
 	local color = ns.db.colors[kindKey]
 	color.r, color.g, color.b = r, g, b
 	swatches[kindKey]:SetColorRGB(r, g, b)
-	RefreshPreview()
+	RefreshPreview(true)
 end
 
 -- Blizzard's class colors inside the color picker, in a row under the color wheel: Forever's classes in the
@@ -261,8 +259,9 @@ local function CreateClassPalette()
 			index = index + 1
 		end
 	end
+	-- Only when the pick ends: the picker also hides with UIParent (Alt+Z), still shown and serving the pick
 	ColorPickerFrame:HookScript("OnHide", function()
-		if classPalette:IsShown() then
+		if classPalette:IsShown() and not ColorPickerFrame:IsShown() then
 			classPalette:Hide()
 			ColorPickerFrame:SetHeight(pickerHeight)
 		end
@@ -313,15 +312,16 @@ end
 local function CreateColorRow(parent, kind, y)
 	local center = y - ROW_HEIGHT / 2
 	local swatch = CreateFrame("Button", nil, parent, "ColorSwatchTemplate")
-	swatch:SetPoint("LEFT", parent, "TOPLEFT", 8, center)
+	swatch:SetSize(SWATCH_SIZE, SWATCH_SIZE)
+	swatch:SetPoint("LEFT", parent, "TOPLEFT", SWATCH_LEFT, center)
 	swatch:SetScript("OnClick", function()
 		OpenColorPicker(kind.key)
 	end)
 	swatches[kind.key] = swatch
 
 	local reset = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	reset:SetSize(RESET_WIDTH, RESET_HEIGHT)
-	reset:SetPoint("RIGHT", parent, "TOPRIGHT", -4, center)
+	reset:SetHeight(RESET_HEIGHT)
+	reset:SetPoint("RIGHT", parent, "TOPRIGHT", -RESET_RIGHT, center)
 	Translate(reset, function()
 		return Text("RESET", "Reset")
 	end, true)
@@ -331,8 +331,8 @@ local function CreateColorRow(parent, kind, y)
 
 	-- Between the swatch and the button. FitWindow makes room for the longest name, so none is cut off.
 	local label = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	label:SetPoint("LEFT", swatch, "RIGHT", 8, 0)
-	label:SetPoint("RIGHT", reset, "LEFT", -6, 0)
+	label:SetPoint("LEFT", swatch, "RIGHT", LABEL_GAP_LEFT, 0)
+	label:SetPoint("RIGHT", reset, "LEFT", -LABEL_GAP_RIGHT, 0)
 	label:SetJustifyH("LEFT")
 	label:SetWordWrap(false)
 	Translate(label, function()
@@ -500,7 +500,7 @@ local function CreateColorsPanel()
 	scrollFrame:SetScrollChild(colorRows)
 
 	local resetAll = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	resetAll:SetSize(140, 22)
+	resetAll:SetHeight(22)
 	resetAll:SetPoint("BOTTOMLEFT", 12, 14)
 	Translate(resetAll, function()
 		return "Reset all colors"

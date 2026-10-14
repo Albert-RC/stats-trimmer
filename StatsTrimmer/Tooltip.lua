@@ -37,11 +37,6 @@ function ns.GetTextIn(language, name)
 	return strings and NonEmpty(strings[name]) or nil
 end
 
--- A Blizzard string in the language chosen in the settings, or nil
-function ns.GetText(name)
-	return ns.GetTextIn(ns.GetLanguage(), name)
-end
-
 -- A Blizzard string in English, the fallback when the chosen language lacks it or names it wrongly
 function ns.GetEnglishText(name)
 	return GetLocale() == "enUS" and ns.GetClientText(name) or ns.GetTextIn("enUS", name)
@@ -178,13 +173,20 @@ end
 -- the original-text key rebuilds them too. Blizzard's comparison tooltips follow their main tooltip instead.
 local addonTooltips = setmetatable({}, { __mode = "k" })
 
+-- True for a tooltip of Blizzard's own UI (EmbeddedItemTooltip, the UI widgets' item tooltips): Blizzard's
+-- secure code set its global name. Running its owner's OnEnter from addon code would taint it.
+local function IsBlizzardTooltip(tooltip)
+	local name = tooltip:GetName()
+	return name ~= nil and issecurevariable(name)
+end
+
 -- Line pre-call: returning true keeps the original line out of the tooltip
 local function ReplaceEquipLine(tooltip, lineData)
 	local text = lineData.leftText
 	if not IsReadable(text) or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX or IsScanningTooltip(tooltip) then
 		return false
 	end
-	if not PLAYER_TOOLTIPS[tooltip] then
+	if not PLAYER_TOOLTIPS[tooltip] and not IsBlizzardTooltip(tooltip) then
 		addonTooltips[tooltip] = true
 	end
 	if IsShowingOriginal() then
@@ -273,7 +275,12 @@ function ns.RefreshItemTooltips()
 	local entered = {}
 	RefreshItemTooltip(GameTooltip, entered)
 	RefreshItemTooltip(ItemRefTooltip, entered)
+	-- Listed first: an owner run here can show a tooltip new to addonTooltips, which pairs can't take
+	local tooltips = {}
 	for tooltip in pairs(addonTooltips) do
+		table.insert(tooltips, tooltip)
+	end
+	for _, tooltip in ipairs(tooltips) do
 		RefreshItemTooltip(tooltip, entered)
 	end
 end

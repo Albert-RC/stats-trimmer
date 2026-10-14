@@ -320,6 +320,12 @@ describe("Settings window", function()
 			assert.are.equal(BASE_HEIGHT, wow.env.ColorPickerFrame:GetHeight())
 		end)
 
+		it("stays while the picker only hides with UIParent (Alt+Z), still shown", function()
+			fakes.Fire(wow.env.ColorPickerFrame, "OnHide")
+			assert.is_true(Palette():IsShown())
+			assert.is_true(wow.env.ColorPickerFrame:GetHeight() > BASE_HEIGHT)
+		end)
+
 		it("isn't shown when another addon opens the picker", function()
 			wow.env.ColorPickerFrame:Hide()
 			wow.env.ColorPickerFrame:SetupColorPickerAndShow({ r = 1, g = 1, b = 1, swatchFunc = function() end })
@@ -444,6 +450,17 @@ describe("Settings window", function()
 				fakes.Fire(header, "OnClick", "LeftButton")
 			end
 			assert.are.equal(height, Window():GetHeight())
+		end)
+
+		it("scales down, whole, on a screen too short for it", function()
+			assert.are.equal(1, Window():GetScale())
+			wow = fakes.NewWoW()
+			-- A large UI scale
+			wow.env.UIParent.height = 600
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_true(Window():GetHeight() > 600)
+			assert.is_true(Window():GetHeight() * Window():GetScale() <= 600)
 		end)
 	end)
 

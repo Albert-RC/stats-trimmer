@@ -98,7 +98,7 @@ The `.toc` loads these files in order:
   - `ns.TrustedNames(GetStatName, FoldCase)` makes a stat name getter that leaves out untrusted vs names (see [Creature types](#creature-types)). `context.GetStatName` is one of these, over the client's names.
   - `ns.LocalizeLines(lines, GetStatName)` rebuilds the lines with the names of a `TrustedNames` getter.
 - `Tooltip.lua`: the WoW API side. It registers the line pre-call and checks the equip prefix. It reads the item and its stats, builds `context`, applies the language setting and colors each line with `ns.db.colors[kind]`, falling back to the original line color. It skips tooltips other addons only fill to read an item (see [Other addons' tooltips](#other-addons-tooltips)) and handles the "show original text" key.
-  - `ns.GetClientText(name)` reads the client's own strings (for recognition), `ns.GetText(name)` a string in the chosen language, `ns.GetTextIn(language, name)` one in a given language (`CLIENT` or a bundled one) and `ns.GetEnglishText(name)` one in English. `ns.GetClassName(classFile)` is a class's name in the chosen language, then in English.
+  - `ns.GetClientText(name)` reads the client's own strings (for recognition), `ns.GetTextIn(language, name)` a string in a given language (`CLIENT` or a bundled one; `ns.GetLanguage()` is the chosen one) and `ns.GetEnglishText(name)` one in English. `ns.GetClassName(classFile)` is a class's name in the chosen language, then in English.
   - `ns.GetLanguage()` is the language the texts are shown in (`ns.ResolveLanguage` for this client).
   - `ns.InLanguage(lines[, language])` gives the compact lines Blizzard's names in the chosen language (or `language`), lowercased. Its name getters are made once per language.
   - `ns.ToLower(text)` is the display lowercase.
@@ -111,11 +111,11 @@ The `.toc` loads these files in order:
   - The color picker gets a palette of class colors when the window opens it: Forever's classes in the game's order (`CLASS_SORT_ORDER`), as `ColorSwatchTemplate` swatches in a row under the color wheel, each naming its class in its color (`C_ClassColor.GetClassColor`) on hover.
     - A click calls `ColorPickerFrame.Content.ColorPicker:SetColorRGB`, which runs `swatchFunc` like any change in the picker, so OK and Cancel work as usual.
     - The palette is a child of `ColorPickerFrame`: the picker cancels and hides on any click outside itself (`GLOBAL_MOUSE_DOWN` and `DoesAncestryIncludeAny`).
-    - The picker (331×210 without opacity) has no room for it, so it grows by `PALETTE_HEIGHT` while the palette shows and gets its own height back on `OnHide`. Other addons' picks never show the palette.
+    - The picker (331×210 without opacity) has no room for it, so it grows by `PALETTE_HEIGHT` while the palette shows and gets its own height back when the pick ends (`OnHide` while no longer shown: hiding with UIParent, Alt+Z, keeps both). Other addons' picks never show the palette.
   - Built from Blizzard templates: `PortraitFrameTemplate`, `InsetFrameTemplate`, `ScrollFrameTemplate`, `ListHeaderThreeSliceTemplate`, `WowStyle1DropdownTemplate` with `MenuUtil.CreateRadioMenu`, `ColorSwatchTemplate`, `UIPanelButtonTemplate`, `UICheckButtonTemplate`.
   - The preview is a real `GameTooltipTemplate` tooltip (`StatsTrimmerPreviewTooltip`) filled with `AddLine`.
   - The window is strata HIGH, so the color picker (DIALOG) stays above it.
-  - `FitWindow` sizes the window to its texts after every preview rebuild (opening, language, split, sections, colors): the colors panel to its longest row label (`GetUnboundedStringWidth`) plus the swatch and Reset button, and the window to that panel, the preview tooltip with its margins, the rows above the panels and the preview's height. The panels grow for longer texts, but never get smaller than with Spanish texts and every section open (`REFERENCE_LANGUAGE`): those sizes are measured once, on the window's own labels, Reset button and preview, which then get the chosen language's texts back before anything is drawn. The window is never smaller than 600×690 either.
+  - `FitWindow` sizes the window to its texts after opening and after every language, split or section change (a color change only refills the preview): the colors panel to its longest row label (`GetUnboundedStringWidth`) plus the swatch and Reset button, and the window to that panel, the preview tooltip with its margins, the rows above the panels and the preview's height. The panels grow for longer texts, but never get smaller than with Spanish texts and every section open (`REFERENCE_LANGUAGE`): those sizes are measured once, on the window's own labels, Reset button and preview, which then get the chosen language's texts back before anything is drawn. The window is never smaller than 600×690 either. A screen too small for it (a large UI scale) gets it scaled down, whole (`SetScale`).
 - `MinimapButton.lua`: `StatsTrimmerMinimapButton`, a child of `Minimap` with Blizzard's minimap button textures.
   - It saves its angle in `ns.db.minimap.angle` and follows the minimap's edge when the minimap is resized.
   - MinimapButtonButton collects it with no library: it takes `Minimap` children whose global name contains `MinimapButton`, scanning on `PLAYER_LOGIN` and when its own button is clicked. Once the button has been reparented, dragging and resizes no longer move it.
@@ -164,6 +164,7 @@ Checked on 2026-10-13 with the addons installed in the Forever client: AtlasLoot
   - `hooksecurefunc` on their `ProcessInfo` (which every `SetX` calls) records `NumLines()` after each build, other addons' post-calls included.
   - A tooltip with only those lines is rebuilt from its data with `RefreshData()`. Comparison tooltips follow their main tooltip.
   - A tooltip with more lines has some another addon added with `AddLine`, which `RefreshData()` would lose (see [Other addons' tooltips](#other-addons-tooltips)). Its owner rebuilds it instead, with `ExecuteFrameScript(owner, "OnEnter")`, as when the mouse enters it again. That needs an owner under the mouse with an `OnEnter` script, not protected and without `UpdateTooltip`. Other addons' own tooltips always go this way (only `GameTooltip` and `ItemRefTooltip` record their line count), and an owner is run once even when it shows several of them.
+  - Blizzard's other item tooltips (`EmbeddedItemTooltip`, the UI widgets' `UIWidgetBaseItemEmbeddedTooltipN`) aren't rebuilt: their owners can be Blizzard widgets with an `OnEnter` script, which addon code must not run. The pre-call leaves out any tooltip whose global name is secure (`issecurevariable(name)`), i.e. set by Blizzard's code; addons' named and unnamed tooltips are kept. `issecurevariable` doesn't appear in Forever's UI source: it was checked in game on 2026-10-15 (`/dump issecurevariable("EmbeddedItemTooltip")` prints true), and MinimapButtonButton and Leatrix Plus use it in Forever.
   - Anything else switches the next time it is built. Owners with `UpdateTooltip` (Blizzard's bag and character buttons) get it called by `GameTooltip_OnUpdate` every 0.2 s.
 - Taint risks to watch, since both run from addon code:
   - `RefreshData`: Blizzard notes that tainted tooltip state can show no lines for secret data. If unit or NPC tooltips ever come up empty, stop calling `RefreshData` and rely on the bags' automatic refresh.
@@ -301,7 +302,7 @@ Which languages the dropdown offers depends on the client's font (`ns.GetOffered
 SavedVariables are per account, so a language chosen on one client can be loaded on another. `ns.ResolveLanguage` shows the client's own language when the saved one is the client's language, or one the client doesn't offer. The saved value isn't changed, so it applies again when the client changes back.
 
 Text lookup:
-- `ns.GetText(name)`: the client's strings (`_G`) when `ns.GetLanguage()` is `CLIENT`, otherwise the bundled table.
+- `ns.GetTextIn(language, name)`: the client's strings (`_G`) when `language` is `CLIENT`, otherwise the bundled table. The chosen language is `ns.GetLanguage()`.
 - `ns.GetEnglishText(name)`: the client's strings on an enUS client, otherwise the bundled `enUS`.
 - `ns.GetClientText(name)`: always the client's strings. Equip lines are recognized with these, since the tooltip is in the client's language.
 
@@ -336,7 +337,7 @@ Blizzard's data has mistakes that fall back to English:
 Each falls back to Blizzard's English, then to the addon's English. The rest are the addon's own phrases and stay in English: the row titles, the help text, the spell power checkbox, "Reset all colors", "Sample Item", the minimap tooltip and the Options panel.
 
 Translated text can be longer, so:
-- buttons are sized with `SetTextToFit` (`UIButtonFitToTextBehaviorMixin`, part of `UIPanelButtonTemplate`), starting again from their own width when the language changes;
+- buttons are sized to their text plus a padding with `SetTextToFit` (`UIButtonFitToTextBehaviorMixin`, part of `UIPanelButtonTemplate`, which lets them get narrower too: `fitTextCanWidthDecrease`);
 - row labels sit between the swatch and the Reset button without wrapping, and `FitWindow` widens the colors panel to the longest one, so none is cut off;
 - the preview's longest line varies too ("+20 dégâts des sorts contre les morts-vivants" in frFR), so the window widens to the preview tooltip. Clients in other languages use their own texts, which can't be measured beforehand.
 
@@ -353,12 +354,12 @@ Unit tests run on LuaJIT 2.1 (Lua 5.1 compatible) through `spec/runner.lua`, a m
 - The runner supports `describe`, `it`, `before_each`, `assert.are.same/equal/near` and `assert.is_nil/is_not_nil/is_true/is_false`. Only use those.
 - Each spec file starts with a clean set of `describe` blocks, so a file that fails while loading doesn't affect the next one.
 - `spec/helpers.lua` `LoadAddon(name, files, env)` loads addon files with `(addonName, ns)` like the client does. Without `env`, only pure files can be loaded.
-- Game-facing files are tested against `spec/fakes.lua` (`fakes.NewWoW()`). It is a fake WoW API that records scripts, hooks, events, tooltip lines, colors, positions, the color picker, the radio menus, check button states, Settings registrations, secret texts and `ExecuteFrameScript` calls. Its class colors (`fakes.CLASS_COLORS`) are made exact in hex. Its `ColorPickerFrame` is a frame like Blizzard's: setting it up or changing `Content.ColorPicker`'s color runs `swatchFunc`, and hiding it runs its `OnHide` hooks.
+- Game-facing files are tested against `spec/fakes.lua` (`fakes.NewWoW()`). It is a fake WoW API that records scripts, hooks, events, tooltip lines, colors, positions, the color picker, the radio menus, check button states, Settings registrations, secret texts and `ExecuteFrameScript` calls. Its class colors (`fakes.CLASS_COLORS`) are made exact in hex. Its `ColorPickerFrame` is a frame like Blizzard's: setting it up or changing `Content.ColorPicker`'s color runs `swatchFunc`, and hiding it runs its `OnHide` hooks. Blizzard's tooltips (`EmbeddedItemTooltip` too) have secure global names for `issecurevariable`; frames the addon or the specs create don't.
   - The default world is an esES client whose globals are the bundled esES strings (`fakes.LocaleStrings("esES")`, which match the client exactly). `fakes.NewWoW({ locale = "enUS" })` has none, which exercises the fallbacks.
   - `fakes.FoldCase` stands in for `C_Intl.FoldCase` for the letters the specs use.
   - Load into it with `helpers.LoadAddon(name, files, wow.env)` or `helpers.StartStatsTrimmer(wow)`, which loads the full `.toc` and fires `ADDON_LOADED`.
   - Drive it with `fakes.Fire(frame, script)`, `fakes.ClickCheckButton(button)` (which toggles the button before `OnClick`, like the client) and `fakes.FireEvent(wow, event, ...)`.
-  - Text is measured with `fakes.TEXT_METRICS` (6 per character, 14 per tooltip line, 20 of tooltip padding), which a world can change in `wow.textMetrics`.
+  - Text is measured with `fakes.TEXT_METRICS` (6 per character, 14 per tooltip line, 20 of tooltip padding), which a world can change in `wow.textMetrics`. `UIParent` is 1365×768.
   - Tooltips: `fakes.ItemTooltip(wow, data)` is another addon's tooltip in the middle of processing, for calling the pre-call directly. `fakes.ShowItem(wow, tooltip, owner, anchorType, data)` fills one like the client: `SetOwner`, then `ProcessInfo`, which runs the registered line pre-calls and shows it.
   - Frame methods the specs don't care about are listed explicitly as no-ops. Any other missing method fails, so a misspelled WoW method is caught.
 - Every `.toc` file must be loaded by some spec, otherwise LuaCov silently leaves it out. `spec/addon_load_spec.lua` loads the whole `.toc`.
@@ -366,7 +367,7 @@ Unit tests run on LuaJIT 2.1 (Lua 5.1 compatible) through `spec/runner.lua`, a m
 - Expected values (labels, names) are written in the spec, not copied from the code's tables, so typos are caught.
 - When adding tests, check that they catch a real bug: change the code on purpose, see the right test fail, restore.
 
-Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. On 2026-10-14 it was 100% of 1024 lines with 267 tests.
+Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. On 2026-10-14 it was 100% of 1019 lines with 270 tests.
 
 The tests cover the logic. Game-facing behavior still has to be checked in game.
 

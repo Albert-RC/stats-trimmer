@@ -22,6 +22,7 @@ read_globals = {
 	"GetLocale",
 	"hooksecurefunc",
 	"issecretvalue",
+	"issecurevariable",
 	"IsAltKeyDown",
 	"IsControlKeyDown",
 	"IsShiftKeyDown",

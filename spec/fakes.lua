@@ -84,7 +84,7 @@ function fakes.FoldCase(text)
 	return folded
 end
 
--- A color object with the ColorMixin methods the addon uses
+-- A color object with the ColorMixin method the addon uses
 function fakes.Color(r, g, b)
 	return {
 		r = r,
@@ -92,12 +92,6 @@ function fakes.Color(r, g, b)
 		b = b,
 		GetRGB = function(self)
 			return self.r, self.g, self.b
-		end,
-		WrapTextInColorCode = function(self, text)
-			local function Hex(channel)
-				return ("%02x"):format(math.floor(channel * 255 + 0.5))
-			end
-			return "|cff" .. Hex(self.r) .. Hex(self.g) .. Hex(self.b) .. text .. "|r"
 		end,
 	}
 end
@@ -210,12 +204,14 @@ function Frame:GetChecked()
 	return self.checked == true
 end
 
--- UIButtonFitToTextBehaviorMixin: widens the button to its text and padding
+-- UIButtonFitToTextBehaviorMixin: sizes the button to its text and padding. It only widens it unless
+-- fitTextCanWidthDecrease is set, as UIPanelButtonTemplate does.
 function Frame:SetTextToFit(text)
 	self:SetText(text)
 	self.fitsText = true
+	local minWidth = self.fitTextCanWidthDecrease and 0 or (self.width or 0)
 	local textWidth = Length(text) * self.wow.textMetrics.charWidth + (self.fitTextWidthPadding or 0)
-	self.width = math.max(self.width or 0, textWidth)
+	self.width = math.max(minWidth, textWidth)
 end
 
 -- FontString: the text's width without truncation
@@ -293,6 +289,14 @@ end
 
 function Frame:GetEffectiveScale()
 	return self.scale
+end
+
+function Frame:SetScale(scale)
+	self.scale = scale
+end
+
+function Frame:GetScale()
+	return self.scale or 1
 end
 
 -- ScrollFrame
@@ -396,6 +400,9 @@ function fakes.NewFrame(wow, frameType, name, parent, template)
 		frame.Text = fakes.NewFrame(wow, "FontString", nil, frame)
 	elseif template == "ListHeaderThreeSliceTemplate" then
 		frame.Name = fakes.NewFrame(wow, "FontString", nil, frame)
+	elseif template == "UIPanelButtonTemplate" then
+		-- From UIPanelButtonNoTooltipTemplate's KeyValues
+		frame.fitTextCanWidthDecrease = true
 	end
 	table.insert(wow.frames, frame)
 	if name then
@@ -539,10 +546,14 @@ function fakes.NewWoW(options)
 	env.CreateFrame = function(frameType, name, parent, template)
 		return fakes.NewFrame(wow, frameType, name, parent, template)
 	end
+	-- A 1920×1080 screen with the UI scale off: the UI is 768 high
 	env.UIParent = fakes.NewFrame(wow, "Frame", "UIParent")
+	env.UIParent.width, env.UIParent.height = 1365, 768
 	env.WorldFrame = fakes.NewFrame(wow, "Frame", "WorldFrame")
 	env.Minimap = fakes.NewFrame(wow, "Frame", "Minimap", env.UIParent)
 	env.Minimap.width, env.Minimap.centerX, env.Minimap.centerY, env.Minimap.scale = 140, 500, 400, 1
+	-- Blizzard's item tooltips, whose global names Blizzard's secure code set
+	wow.secureGlobals = {}
 	for _, name in ipairs({
 		"GameTooltip",
 		"ItemRefTooltip",
@@ -550,8 +561,15 @@ function fakes.NewWoW(options)
 		"ShoppingTooltip2",
 		"ItemRefShoppingTooltip1",
 		"ItemRefShoppingTooltip2",
+		"EmbeddedItemTooltip",
 	}) do
 		fakes.NewFrame(wow, "GameTooltip", name, env.UIParent)
+		wow.secureGlobals[name] = true
+	end
+	-- Only Blizzard's globals are secure, not those addon code set. The client also says so for unset names,
+	-- which the addon never asks about.
+	env.issecurevariable = function(name)
+		return wow.secureGlobals[name] == true
 	end
 	env.ExecuteFrameScript = function(frame, scriptName, ...)
 		table.insert(wow.executedScripts, { frame = frame, scriptName = scriptName })

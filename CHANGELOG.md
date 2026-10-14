@@ -4,7 +4,7 @@
 
 - Every kind of compact line has its own color row now, including crit, spell hit, spell crit, dodge, parry, block value, weapon skills, spell damage against a creature type, ranged and feral attack power, and spell penetration.
 - The color rows are grouped in Attack, Defense, Spells and Damage extra (the spell schools) sections, titled with the game's own names, and scroll inside the settings window. Click a section's title to collapse or expand it; the preview leaves out collapsed sections, and they stay collapsed next time.
-- The settings window sizes itself to its texts in the chosen language: stat names are no longer cut off, and the preview always fits. It grows for languages with longer texts, but never gets smaller than its size in Spanish with every section open.
+- The settings window sizes itself to its texts in the chosen language: stat names are no longer cut off, and the preview always fits. It grows for languages with longer texts, but never gets smaller than its size in Spanish with every section open. On a screen too small for it (a large UI scale) it is scaled down to fit.
 - The color picker shows the colors of the game's classes under the color wheel: hover one to see its class, in the chosen language, and click it to use it.
 - The spell power setting says when it applies: "Split spell power into spell damage and spell healing when both values are the same".
 - Holding Ctrl also switches other addons' own item tooltips at once, such as AtlasLoot's when it doesn't use the game's tooltip.
