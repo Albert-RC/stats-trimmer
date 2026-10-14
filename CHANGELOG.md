@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 (2026-10-14)
 
 - Every kind of compact line has its own color row now, including crit, spell hit, spell crit, dodge, parry, block value, weapon skills, spell damage against a creature type, ranged and feral attack power, and spell penetration.
 - The color rows are grouped in Attack, Defense, Spells and Damage extra (the spell schools) sections, titled with the game's own names, and scroll inside the settings window. Click a section's title to collapse or expand it; the preview leaves out collapsed sections, and they stay collapsed next time.
