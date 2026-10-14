@@ -8,9 +8,11 @@ globals = {
 
 -- Read-only WoW API (extend as needed)
 read_globals = {
+	"C_ClassColor",
 	"C_CreatureInfo",
 	"C_Intl",
 	"C_Item",
+	"CLASS_SORT_ORDER",
 	"ColorPickerFrame",
 	"CreateFrame",
 	"Enum",
@@ -20,12 +22,14 @@ read_globals = {
 	"GetLocale",
 	"hooksecurefunc",
 	"issecretvalue",
+	"issecurevariable",
 	"IsAltKeyDown",
 	"IsControlKeyDown",
 	"IsShiftKeyDown",
 	"ITEM_SPELL_TRIGGER_ONEQUIP",
 	"ItemRefTooltip",
 	"LocaleUtil",
+	"LocalizedClassList",
 	"MenuUtil",
 	"Minimap",
 	"NORMAL_FONT_COLOR",

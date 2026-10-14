@@ -21,17 +21,24 @@ for _, name in ipairs({
 	"SetJustifyH",
 	"SetMovable",
 	"SetPortraitToAsset",
-	"SetSize",
 	"SetTexCoord",
 	"SetTexture",
 	"SetTitle",
 	"SetToplevel",
-	"SetWidth",
 	"SetWordWrap",
 	"StartMoving",
 	"StopMovingOrSizing",
 }) do
 	Frame[name] = NoOp
+end
+
+-- Text metrics: every character is this wide, every tooltip line this tall, and a tooltip has this padding.
+-- A world can change them in wow.textMetrics.
+fakes.TEXT_METRICS = { charWidth = 6, lineHeight = 14, tooltipPadding = 20 }
+
+-- Characters in a UTF-8 text, not bytes
+local function Length(text)
+	return select(2, tostring(text or ""):gsub("[^\128-\191]", ""))
 end
 
 -- Runs a frame's script handler, like the client does; returns what the handler returns
@@ -89,6 +96,19 @@ function fakes.Color(r, g, b)
 	}
 end
 
+-- Class colors chosen to be exact in hex (the game's own are close to these)
+fakes.CLASS_COLORS = {
+	WARRIOR = { 0.8, 0.6, 0.4 },
+	PALADIN = { 1, 0.6, 0.8 },
+	PRIEST = { 1, 1, 1 },
+	SHAMAN = { 0, 0.4, 0.8 },
+	DRUID = { 1, 0.4, 0 },
+	ROGUE = { 1, 1, 0.4 },
+	MAGE = { 0.2, 0.8, 1 },
+	WARLOCK = { 0.6, 0.6, 1 },
+	HUNTER = { 0.6, 0.8, 0.4 },
+}
+
 function Frame:SetScript(name, handler)
 	self.scripts[name] = handler
 end
@@ -134,6 +154,14 @@ function Frame:IsShown()
 	return self.shown
 end
 
+function Frame:SetShown(shown)
+	if shown then
+		self:Show()
+	else
+		self:Hide()
+	end
+end
+
 -- Set frame.protected or frame.mouseOver to change these
 function Frame:IsProtected()
 	return self.protected == true, false
@@ -155,10 +183,11 @@ function Frame:SetParent(parent)
 	self.parent = parent
 end
 
-function Frame:SetText(text)
+-- On a tooltip, SetText starts it again with one line, in the given color
+function Frame:SetText(text, r, g, b)
 	self.text = text
 	if self.lines then
-		self.lines = { { text = text } }
+		self.lines = { { text = text, r = r, g = g, b = b } }
 	end
 end
 
@@ -175,10 +204,19 @@ function Frame:GetChecked()
 	return self.checked == true
 end
 
--- UIButtonFitToTextBehaviorMixin: the width isn't modeled, only that the text was fitted
+-- UIButtonFitToTextBehaviorMixin: sizes the button to its text and padding. It only widens it unless
+-- fitTextCanWidthDecrease is set, as UIPanelButtonTemplate does.
 function Frame:SetTextToFit(text)
 	self:SetText(text)
 	self.fitsText = true
+	local minWidth = self.fitTextCanWidthDecrease and 0 or (self.width or 0)
+	local textWidth = Length(text) * self.wow.textMetrics.charWidth + (self.fitTextWidthPadding or 0)
+	self.width = math.max(minWidth, textWidth)
+end
+
+-- FontString: the text's width without truncation
+function Frame:GetUnboundedStringWidth()
+	return Length(self.text) * self.wow.textMetrics.charWidth
 end
 
 function Frame:SetColorRGB(r, g, b)
@@ -205,8 +243,44 @@ function Frame.GetFrameLevel()
 	return 1
 end
 
+function Frame:SetSize(width, height)
+	self.width, self.height = width, height
+end
+
+function Frame:SetWidth(width)
+	self.width = width
+end
+
+function Frame:SetHeight(height)
+	self.height = height
+end
+
+-- A tooltip is as wide as its longest line and as tall as its lines, plus padding
 function Frame:GetWidth()
+	if self.frameType == "GameTooltip" then
+		local longest = 0
+		for _, line in ipairs(self.lines) do
+			longest = math.max(longest, Length(line.text))
+		end
+		return longest * self.wow.textMetrics.charWidth + self.wow.textMetrics.tooltipPadding
+	end
 	return self.width
+end
+
+function Frame:GetHeight()
+	if self.frameType == "GameTooltip" then
+		return #self.lines * self.wow.textMetrics.lineHeight + self.wow.textMetrics.tooltipPadding
+	end
+	return self.height
+end
+
+-- ListHeaderThreeSliceTemplate: a click runs the handler, like ListHeaderMixin:OnClick
+function Frame:SetClickHandler(handler)
+	self.scripts.OnClick = handler
+end
+
+function Frame:UpdateCollapsedState(collapsed)
+	self.collapsed = collapsed
 end
 
 function Frame:GetCenter()
@@ -215,6 +289,19 @@ end
 
 function Frame:GetEffectiveScale()
 	return self.scale
+end
+
+function Frame:SetScale(scale)
+	self.scale = scale
+end
+
+function Frame:GetScale()
+	return self.scale or 1
+end
+
+-- ScrollFrame
+function Frame:SetScrollChild(child)
+	self.scrollChild = child
 end
 
 function Frame:CreateFontString()
@@ -311,6 +398,11 @@ function fakes.NewFrame(wow, frameType, name, parent, template)
 		frame.CloseButton = fakes.NewFrame(wow, "Button", nil, frame, "UIPanelCloseButton")
 	elseif template == "UICheckButtonTemplate" then
 		frame.Text = fakes.NewFrame(wow, "FontString", nil, frame)
+	elseif template == "ListHeaderThreeSliceTemplate" then
+		frame.Name = fakes.NewFrame(wow, "FontString", nil, frame)
+	elseif template == "UIPanelButtonTemplate" then
+		-- From UIPanelButtonNoTooltipTemplate's KeyValues
+		frame.fitTextCanWidthDecrease = true
 	end
 	table.insert(wow.frames, frame)
 	if name then
@@ -378,6 +470,7 @@ function fakes.NewWoW(options)
 		sounds = {},
 		colorPicker = { rgb = { 1, 1, 1 } },
 		radioMenus = {}, -- MenuUtil.CreateRadioMenu calls, in creation order
+		textMetrics = setmetatable({}, { __index = fakes.TEXT_METRICS }),
 	}
 
 	local english = options.locale == "enUS"
@@ -453,10 +546,14 @@ function fakes.NewWoW(options)
 	env.CreateFrame = function(frameType, name, parent, template)
 		return fakes.NewFrame(wow, frameType, name, parent, template)
 	end
+	-- A 1920×1080 screen with the UI scale off: the UI is 768 high
 	env.UIParent = fakes.NewFrame(wow, "Frame", "UIParent")
+	env.UIParent.width, env.UIParent.height = 1365, 768
 	env.WorldFrame = fakes.NewFrame(wow, "Frame", "WorldFrame")
 	env.Minimap = fakes.NewFrame(wow, "Frame", "Minimap", env.UIParent)
 	env.Minimap.width, env.Minimap.centerX, env.Minimap.centerY, env.Minimap.scale = 140, 500, 400, 1
+	-- Blizzard's item tooltips, whose global names Blizzard's secure code set
+	wow.secureGlobals = {}
 	for _, name in ipairs({
 		"GameTooltip",
 		"ItemRefTooltip",
@@ -464,8 +561,15 @@ function fakes.NewWoW(options)
 		"ShoppingTooltip2",
 		"ItemRefShoppingTooltip1",
 		"ItemRefShoppingTooltip2",
+		"EmbeddedItemTooltip",
 	}) do
 		fakes.NewFrame(wow, "GameTooltip", name, env.UIParent)
+		wow.secureGlobals[name] = true
+	end
+	-- Only Blizzard's globals are secure, not those addon code set. The client also says so for unset names,
+	-- which the addon never asks about.
+	env.issecurevariable = function(name)
+		return wow.secureGlobals[name] == true
 	end
 	env.ExecuteFrameScript = function(frame, scriptName, ...)
 		table.insert(wow.executedScripts, { frame = frame, scriptName = scriptName })
@@ -480,6 +584,41 @@ function fakes.NewWoW(options)
 			return unpack(results)
 		end
 	end
+
+	-- Forever's classes, in the game's order (CLASS_SORT_ORDER), with their names on this client
+	env.CLASS_SORT_ORDER = { "WARRIOR", "PALADIN", "PRIEST", "SHAMAN", "DRUID", "ROGUE", "MAGE", "WARLOCK", "HUNTER" }
+	local classNames = english
+			and {
+				WARRIOR = "Warrior",
+				PALADIN = "Paladin",
+				PRIEST = "Priest",
+				SHAMAN = "Shaman",
+				DRUID = "Druid",
+				ROGUE = "Rogue",
+				MAGE = "Mage",
+				WARLOCK = "Warlock",
+				HUNTER = "Hunter",
+			}
+		or {
+			WARRIOR = "Guerrero",
+			PALADIN = "Paladín",
+			PRIEST = "Sacerdote",
+			SHAMAN = "Chamán",
+			DRUID = "Druida",
+			ROGUE = "Pícaro",
+			MAGE = "Mago",
+			WARLOCK = "Brujo",
+			HUNTER = "Cazador",
+		}
+	env.LocalizedClassList = function()
+		return classNames
+	end
+	env.C_ClassColor = {
+		GetClassColor = function(classFile)
+			local color = fakes.CLASS_COLORS[classFile]
+			return color and fakes.Color(unpack(color))
+		end,
+	}
 
 	env.TooltipDataProcessor = {
 		AddLinePreCall = function(lineType, handler)
@@ -518,14 +657,28 @@ function fakes.NewWoW(options)
 		table.insert(wow.sounds, soundKitID)
 	end
 
-	env.ColorPickerFrame = {
-		SetupColorPickerAndShow = function(_, info)
-			wow.colorPicker.info = info
-		end,
-		GetColorRGB = function()
-			return unpack(wow.colorPicker.rgb)
-		end,
+	-- Like Blizzard's: setting it up selects the color, which runs swatchFunc, and so does any later color
+	-- change. It hides with its own OnHide, which addons can hook.
+	local colorPicker = fakes.NewFrame(wow, "Frame", "ColorPickerFrame", env.UIParent)
+	colorPicker.shown = false
+	colorPicker.height = 210
+	colorPicker.Content = {
+		ColorPicker = {
+			SetColorRGB = function(_, r, g, b)
+				wow.colorPicker.rgb = { r, g, b }
+				wow.colorPicker.info.swatchFunc()
+			end,
+		},
 	}
+	function colorPicker:SetupColorPickerAndShow(info)
+		wow.colorPicker.info = info
+		self.Content.ColorPicker:SetColorRGB(info.r, info.g, info.b)
+		self:Show()
+	end
+	function colorPicker.GetColorRGB()
+		return unpack(wow.colorPicker.rgb)
+	end
+	env.ColorPickerFrame = colorPicker
 	env.MenuUtil = {
 		CreateRadioMenu = function(dropdown, isSelected, setSelected, ...)
 			table.insert(

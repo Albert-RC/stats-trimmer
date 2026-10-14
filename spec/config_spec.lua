@@ -49,9 +49,99 @@ describe("DEFAULTS", function()
 			"defense",
 			"blockRating",
 			"hitRating",
+			"critRating",
+			"spellHitRating",
+			"spellCritRating",
+			"dodgeRating",
+			"parryRating",
+			"blockValue",
+			"weaponSkill",
+			"spellDamageVs",
+			"rangedAttackPower",
+			"feralAttackPower",
+			"spellPenetration",
 		}) do
 			assert.is_true(keys[key])
 		end
+	end)
+end)
+
+describe("color sections", function()
+	local ns = LoadConfig()
+
+	-- The kinds of each section, in COLOR_KINDS order
+	local function Sections()
+		local sections = {}
+		for _, group in ipairs(ns.COLOR_GROUPS) do
+			local keys = {}
+			for _, kind in ipairs(ns.COLOR_KINDS) do
+				if kind.group == group.key then
+					table.insert(keys, kind.key)
+				end
+			end
+			table.insert(sections, { group.key, keys })
+		end
+		return sections
+	end
+
+	it("are attack, defense, spells and spell schools, with MP5 among spells and HP5 in defense", function()
+		assert.are.same({
+			{
+				"attack",
+				{
+					"attackPower",
+					"attackPowerVs",
+					"rangedAttackPower",
+					"feralAttackPower",
+					"hitRating",
+					"critRating",
+					"weaponSkill",
+				},
+			},
+			{ "defense", { "defense", "dodgeRating", "parryRating", "blockRating", "blockValue", "hp5" } },
+			{
+				"spell",
+				{
+					"spellPower",
+					"spellDamage",
+					"spellHealing",
+					"spellDamageVs",
+					"spellHitRating",
+					"spellCritRating",
+					"spellPenetration",
+					"mp5",
+				},
+			},
+			{
+				"school",
+				{ "arcaneDamage", "fireDamage", "frostDamage", "holyDamage", "natureDamage", "shadowDamage" },
+			},
+		}, Sections())
+	end)
+
+	it("hold every kind, listed section by section so the preview follows the window's order", function()
+		local ordered = {}
+		for _, section in ipairs(Sections()) do
+			for _, key in ipairs(section[2]) do
+				table.insert(ordered, key)
+			end
+		end
+		local keys = {}
+		for _, kind in ipairs(ns.COLOR_KINDS) do
+			table.insert(keys, kind.key)
+		end
+		assert.are.same(keys, ordered)
+	end)
+
+	it("are titled with Blizzard's names for these stat categories, spell schools as its damage plus extra", function()
+		local titles = {}
+		for _, group in ipairs(ns.COLOR_GROUPS) do
+			table.insert(titles, { group.labelGlobal, group.labelSuffix })
+		end
+		assert.are.same(
+			{ { "STAT_CATEGORY_ATTACK" }, { "STAT_CATEGORY_DEFENSE" }, { "SPELLS" }, { "DAMAGE", " extra" } },
+			titles
+		)
 	end)
 end)
 
@@ -169,6 +259,7 @@ describe("LoadSettings", function()
 		assert.is_false(settings.splitSpellPower)
 		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.frostDamage)
 		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.spellPower)
+		assert.are.same({}, settings.collapsedSections)
 		assert.are.equal(200, settings.minimap.angle)
 	end)
 
@@ -178,6 +269,7 @@ describe("LoadSettings", function()
 			language = "deDE",
 			splitSpellPower = true,
 			colors = { frostDamage = { r = 0.2, g = 0.6, b = 1 } },
+			collapsedSections = { spell = true, defense = true },
 			minimap = { angle = 45 },
 		}
 		local settings = ns.LoadSettings(saved)
@@ -187,7 +279,15 @@ describe("LoadSettings", function()
 		assert.is_true(settings.splitSpellPower)
 		assert.are.same({ r = 0.2, g = 0.6, b = 1 }, settings.colors.frostDamage)
 		assert.are.same({ r = 0, g = 1, b = 0 }, settings.colors.spellDamage)
+		assert.are.same({ spell = true, defense = true }, settings.collapsedSections)
 		assert.are.equal(45, settings.minimap.angle)
+	end)
+
+	it("keeps only collapsed sections that exist, marked true", function()
+		local settings =
+			ns.LoadSettings({ collapsedSections = { spell = true, regen = true, attack = 1, defense = false } })
+		assert.are.same({ spell = true }, settings.collapsedSections)
+		assert.are.same({}, ns.LoadSettings({ collapsedSections = "spell" }).collapsedSections)
 	end)
 
 	it("doesn't share color tables with the defaults", function()

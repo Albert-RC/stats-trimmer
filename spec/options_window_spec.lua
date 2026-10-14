@@ -183,6 +183,287 @@ describe("Settings window", function()
 		end)
 	end)
 
+	describe("color sections", function()
+		-- A section's header, by its title
+		local function Section(title)
+			for _, header in ipairs(fakes.FindFrames(wow, { template = "ListHeaderThreeSliceTemplate" })) do
+				if header.Name.text == title then
+					return header
+				end
+			end
+		end
+
+		-- Whether a kind's row is shown: rows sit in their section's body
+		local function RowShown(key)
+			return Swatch(key):GetParent():IsShown()
+		end
+
+		before_each(function()
+			ns.ShowOptions()
+		end)
+
+		it("start expanded", function()
+			for _, title in ipairs({ "Ataque", "Defensa", "Hechizos", "Daño extra" }) do
+				assert.is_false(Section(title).collapsed)
+			end
+			assert.is_true(RowShown("frostDamage"))
+		end)
+
+		it("collapse and expand with a click on their header, and remember it", function()
+			fakes.Fire(Section("Hechizos"), "OnClick", "LeftButton")
+			assert.is_true(Section("Hechizos").collapsed)
+			assert.is_false(RowShown("spellDamage"))
+			assert.is_true(RowShown("frostDamage"))
+			assert.is_true(RowShown("attackPower"))
+			assert.are.same({ spell = true }, ns.db.collapsedSections)
+
+			fakes.Fire(Section("Hechizos"), "OnClick", "LeftButton")
+			assert.is_false(Section("Hechizos").collapsed)
+			assert.is_true(RowShown("spellDamage"))
+			assert.are.same({}, ns.db.collapsedSections)
+		end)
+
+		it("leave a collapsed section's lines out of the preview", function()
+			fakes.Fire(Section("Daño extra"), "OnClick", "LeftButton")
+			local texts = PreviewTexts()
+			assert.are.equal(3 + 7 + 6 + 8, #texts)
+			assert.are.equal("+4 MP5", texts[#texts])
+		end)
+
+		it("open collapsed when they were saved collapsed", function()
+			wow = fakes.NewWoW()
+			wow.env.StatsTrimmerDB = { collapsedSections = { spell = true } }
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_true(Section("Hechizos").collapsed)
+			assert.is_false(RowShown("spellDamage"))
+			assert.is_false(Section("Ataque").collapsed)
+		end)
+	end)
+
+	describe("class color palette", function()
+		local BASE_HEIGHT = 210
+
+		-- The palette is the color picker's only child the addon makes
+		local function Palette()
+			return fakes.FindFrames(wow, { parent = wow.env.ColorPickerFrame })[1]
+		end
+
+		local function PaletteSwatches()
+			return fakes.FindFrames(wow, { template = "ColorSwatchTemplate", parent = Palette() })
+		end
+
+		before_each(function()
+			ns.ShowOptions()
+			fakes.Fire(Swatch("frostDamage"), "OnClick")
+		end)
+
+		it("shows Forever's class colors in the color picker, in the game's order", function()
+			assert.is_true(Palette():IsShown())
+			local colors = {}
+			for _, swatch in ipairs(PaletteSwatches()) do
+				table.insert(colors, swatch.color)
+			end
+			assert.are.same({
+				{ r = 0.8, g = 0.6, b = 0.4 },
+				{ r = 1, g = 0.6, b = 0.8 },
+				{ r = 1, g = 1, b = 1 },
+				{ r = 0, g = 0.4, b = 0.8 },
+				{ r = 1, g = 0.4, b = 0 },
+				{ r = 1, g = 1, b = 0.4 },
+				{ r = 0.2, g = 0.8, b = 1 },
+				{ r = 0.6, g = 0.6, b = 1 },
+				{ r = 0.6, g = 0.8, b = 0.4 },
+			}, colors)
+		end)
+
+		it("names each class in its color on hover", function()
+			local mage = PaletteSwatches()[7]
+			fakes.Fire(mage, "OnEnter")
+			assert.is_true(wow.env.GameTooltip:IsShown())
+			assert.are.same({ { text = "Mago", r = 0.2, g = 0.8, b = 1 } }, wow.env.GameTooltip.lines)
+			fakes.Fire(mage, "OnLeave")
+			assert.is_false(wow.env.GameTooltip:IsShown())
+		end)
+
+		it("names the classes in the chosen language, in English where Blizzard has none for it", function()
+			LanguageMenu().setSelected("deDE")
+			fakes.Fire(PaletteSwatches()[1], "OnEnter")
+			assert.are.equal("Krieger", wow.env.GameTooltip.text)
+			-- Forever's Italian data has no class names
+			LanguageMenu().setSelected("itIT")
+			fakes.Fire(PaletteSwatches()[1], "OnEnter")
+			assert.are.equal("Warrior", wow.env.GameTooltip.text)
+		end)
+
+		it("sets the picker to the clicked class color, which updates the row live", function()
+			fakes.Fire(PaletteSwatches()[7], "OnClick")
+			local mage = { r = 0.2, g = 0.8, b = 1 }
+			assert.are.same({ 0.2, 0.8, 1 }, wow.colorPicker.rgb)
+			assert.are.same(mage, ns.db.colors.frostDamage)
+			assert.are.same(mage, Swatch("frostDamage").color)
+			assert.are.same(mage, PreviewColor("frostDamage"))
+		end)
+
+		it("leaves the previous color when the picker is cancelled", function()
+			fakes.Fire(PaletteSwatches()[7], "OnClick")
+			wow.colorPicker.info.cancelFunc({ r = 0.2, g = 0.6, b = 1 })
+			assert.are.same({ r = 0.2, g = 0.6, b = 1 }, ns.db.colors.frostDamage)
+		end)
+
+		it("makes the picker taller only while it shows", function()
+			assert.is_true(wow.env.ColorPickerFrame:GetHeight() > BASE_HEIGHT)
+			-- Another row opens the picker while it is still shown
+			fakes.Fire(Swatch("spellDamage"), "OnClick")
+			wow.env.ColorPickerFrame:Hide()
+			assert.is_false(Palette():IsShown())
+			assert.are.equal(BASE_HEIGHT, wow.env.ColorPickerFrame:GetHeight())
+		end)
+
+		it("stays while the picker only hides with UIParent (Alt+Z), still shown", function()
+			fakes.Fire(wow.env.ColorPickerFrame, "OnHide")
+			assert.is_true(Palette():IsShown())
+			assert.is_true(wow.env.ColorPickerFrame:GetHeight() > BASE_HEIGHT)
+		end)
+
+		it("isn't shown when another addon opens the picker", function()
+			wow.env.ColorPickerFrame:Hide()
+			wow.env.ColorPickerFrame:SetupColorPickerAndShow({ r = 1, g = 1, b = 1, swatchFunc = function() end })
+			assert.is_false(Palette():IsShown())
+			assert.are.equal(BASE_HEIGHT, wow.env.ColorPickerFrame:GetHeight())
+		end)
+
+		it("is made once, however often the picker opens", function()
+			wow.env.ColorPickerFrame:Hide()
+			fakes.Fire(Swatch("spellDamage"), "OnClick")
+			assert.is_true(Palette():IsShown())
+			assert.are.equal(1, #fakes.FindFrames(wow, { parent = wow.env.ColorPickerFrame }))
+			assert.are.equal(9, #PaletteSwatches())
+		end)
+	end)
+
+	describe("size", function()
+		local LANGUAGES = { "CLIENT", "enUS", "deDE", "esMX", "frFR", "itIT", "ptBR" }
+
+		local function Window()
+			return wow.env.StatsTrimmerOptionsFrame
+		end
+
+		local function ColorsPanel()
+			return fakes.FindFrames(wow, { template = "InsetFrameTemplate" })[1]
+		end
+
+		-- The preview panel's width: the window's, without the colors panel, the window's sides (12 each) and
+		-- the gap between the panels (8). The tooltip needs it with a margin of 12 on each side.
+		local function PreviewFits()
+			local room = Window():GetWidth() - ColorsPanel():GetWidth() - 2 * 12 - 8
+			return wow.env.StatsTrimmerPreviewTooltip:GetWidth() + 2 * 12 <= room
+		end
+
+		-- A row label's room: the colors panel's width without the scroll frame's inset (6) and scroll bar (26),
+		-- the swatch and its gaps (32), and the Reset button with its gaps (10). Rows sit in their section's body.
+		local function LabelsFit()
+			local panelWidth = ColorsPanel():GetWidth()
+			local bodies = {}
+			for _, kind in ipairs(ns.COLOR_KINDS) do
+				bodies[Swatch(kind.key):GetParent()] = true
+			end
+			for _, region in ipairs(wow.frames) do
+				if region.frameType == "FontString" and bodies[region.parent] then
+					local reset =
+						fakes.FindFrames(wow, { template = "UIPanelButtonTemplate", parent = region.parent })[1]
+					if region:GetUnboundedStringWidth() > panelWidth - 6 - 26 - 32 - 10 - reset:GetWidth() then
+						return false
+					end
+				end
+			end
+			return true
+		end
+
+		before_each(function()
+			ns.ShowOptions()
+		end)
+
+		it("fits the preview's longest line and every whole stat name, in every language", function()
+			for _, language in ipairs(LANGUAGES) do
+				LanguageMenu().setSelected(language)
+				assert.is_true(PreviewFits())
+				assert.is_true(LabelsFit())
+			end
+		end)
+
+		it("grows for longer texts and narrows again when they go", function()
+			local spanish = Window():GetWidth()
+			LanguageMenu().setSelected("frFR")
+			local french = Window():GetWidth()
+			assert.is_true(french > spanish)
+			-- Spells holds the longest French line, "+20 dégâts des sorts contre les morts-vivants"
+			for _, header in ipairs(fakes.FindFrames(wow, { template = "ListHeaderThreeSliceTemplate" })) do
+				if header.Name.text == "Sorts" then
+					fakes.Fire(header, "OnClick", "LeftButton")
+				end
+			end
+			assert.is_true(Window():GetWidth() < french)
+			assert.is_true(Window():GetWidth() >= spanish)
+			assert.is_true(PreviewFits())
+		end)
+
+		it("keeps its Spanish size with shorter texts: English, or sections collapsed", function()
+			local width, height, colorsWidth = Window():GetWidth(), Window():GetHeight(), ColorsPanel():GetWidth()
+			LanguageMenu().setSelected("enUS")
+			assert.are.equal(width, Window():GetWidth())
+			assert.are.equal(colorsWidth, ColorsPanel():GetWidth())
+			LanguageMenu().setSelected("CLIENT")
+			for _, header in ipairs(fakes.FindFrames(wow, { template = "ListHeaderThreeSliceTemplate" })) do
+				fakes.Fire(header, "OnClick", "LeftButton")
+			end
+			assert.are.equal(width, Window():GetWidth())
+			assert.are.equal(height, Window():GetHeight())
+			assert.are.equal(colorsWidth, ColorsPanel():GetWidth())
+		end)
+
+		it("measures its Spanish size on any client, and keeps the client's own texts", function()
+			local spanishWidth = Window():GetWidth()
+			wow = fakes.NewWoW({ locale = "enUS" })
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.are.equal(spanishWidth, Window():GetWidth())
+			assert.is_true(HasText("attack power"))
+			assert.are.equal("+4 attack power", PreviewTexts()[4])
+			local resets = fakes.FindFrames(wow, { template = "UIPanelButtonTemplate", text = "Reset" })
+			assert.are.equal(#ns.COLOR_KINDS, #resets)
+		end)
+
+		it("grows taller when the preview needs it, keeping it whole", function()
+			wow = fakes.NewWoW()
+			wow.textMetrics.lineHeight = 20
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			-- The preview panel is the window's height without 156 above it and 44 below; the tooltip starts 34
+			-- below its top and keeps a margin of 12 below
+			local room = Window():GetHeight() - 156 - 44
+			assert.is_true(Window():GetHeight() > 690)
+			assert.is_true(34 + wow.env.StatsTrimmerPreviewTooltip:GetHeight() + 12 <= room)
+			-- And keeps that height, its Spanish one, with every section collapsed
+			local height = Window():GetHeight()
+			for _, header in ipairs(fakes.FindFrames(wow, { template = "ListHeaderThreeSliceTemplate" })) do
+				fakes.Fire(header, "OnClick", "LeftButton")
+			end
+			assert.are.equal(height, Window():GetHeight())
+		end)
+
+		it("scales down, whole, on a screen too short for it", function()
+			assert.are.equal(1, Window():GetScale())
+			wow = fakes.NewWoW()
+			-- A large UI scale
+			wow.env.UIParent.height = 600
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_true(Window():GetHeight() > 600)
+			assert.is_true(Window():GetHeight() * Window():GetScale() <= 600)
+		end)
+	end)
+
 	describe("original text key dropdown", function()
 		before_each(function()
 			ns.ShowOptions()
@@ -229,22 +510,33 @@ describe("Settings window", function()
 			local texts = PreviewTexts()
 			assert.are.same({ "Sample Item", "Se liga al equiparlo", "+5 aguante" }, { texts[1], texts[2], texts[3] })
 			assert.are.same({
+				"+4 poder de ataque",
+				"+6 poder de ataque contra bestias",
+				"+12 poder de ataque a distancia",
+				"+30 poder de ataque bajo forma",
+				"+1% golpe",
+				"+1% golpe crítico",
+				"+7 habilidad con espadas",
+				"+3 defensa",
+				"+1% esquivar",
+				"+1% parar",
+				"+1% bloquear",
+				"+15 valor de bloqueo",
+				"+5 HP5",
 				"+26 poder con hechizos",
 				"+10 daño con hechizos",
 				"+30 sanación con hechizos",
+				"+20 daño con hechizos contra no-muertos",
+				"+1% golpe (hechizo)",
+				"+1% golpe crítico (hechizo)",
+				"+10 perforación de hechizo",
+				"+4 MP5",
 				"+12 daño arcano",
 				"+12 daño de fuego",
 				"+32 daño de escarcha",
 				"+12 daño sagrado",
 				"+12 daño de naturaleza",
 				"+12 daño de las sombras",
-				"+4 MP5",
-				"+5 HP5",
-				"+4 poder de ataque",
-				"+6 poder de ataque contra bestias",
-				"+3 defensa",
-				"+1% bloquear",
-				"+1% golpe",
 			}, { unpack(texts, 4) })
 		end)
 
@@ -273,22 +565,33 @@ describe("Settings window", function()
 			local texts = PreviewTexts()
 			assert.are.same({ "Sample Item", "Binds when equipped", "+5 Stamina" }, { texts[1], texts[2], texts[3] })
 			assert.are.same({
+				"+4 attack power",
+				"+6 attack power vs beasts",
+				"+12 ranged attack power",
+				"+30 attack power in forms",
+				"+1% hit",
+				"+1% critical strike",
+				"+7 swords skill",
+				"+3 defense",
+				"+1% dodge",
+				"+1% parry",
+				"+1% block",
+				"+15 block value",
+				"+5 HP5",
 				"+26 spell power",
 				"+10 spell damage",
 				"+30 spell healing",
+				"+20 spell damage vs undead",
+				"+1% hit (spell)",
+				"+1% critical strike (spell)",
+				"+10 spell piercing",
+				"+4 MP5",
 				"+12 arcane damage",
 				"+12 fire damage",
 				"+32 frost damage",
 				"+12 holy damage",
 				"+12 nature damage",
 				"+12 shadow damage",
-				"+4 MP5",
-				"+5 HP5",
-				"+4 attack power",
-				"+6 attack power vs beasts",
-				"+3 defense",
-				"+1% block",
-				"+1% hit",
 			}, { unpack(texts, 4) })
 		end)
 
@@ -322,7 +625,7 @@ describe("Settings window", function()
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
 			assert.is_true(LanguageMenu().isSelected("CLIENT"))
-			assert.are.equal("+26 poder con hechizos", PreviewTexts()[4])
+			assert.are.equal("+26 poder con hechizos", PreviewTexts()[3 + KindIndex("spellPower")])
 		end)
 	end)
 
@@ -342,7 +645,10 @@ describe("Settings window", function()
 
 		it("starts unchecked, with spell power as its own line in the preview", function()
 			ns.ShowOptions()
-			assert.are.equal("Split spell power into spell damage and spell healing", Checkbox().Text.text)
+			assert.are.equal(
+				"Split spell power into spell damage and spell healing when both values are the same",
+				Checkbox().Text.text
+			)
 			assert.is_false(Checkbox():GetChecked())
 			assert.is_true(PreviewHas("+26 poder con hechizos"))
 		end)
@@ -354,7 +660,8 @@ describe("Settings window", function()
 			fakes.ClickCheckButton(Checkbox())
 			assert.is_true(ns.db.splitSpellPower)
 			assert.is_false(PreviewHas("+26 poder con hechizos"))
-			assert.are.equal("+10 daño con hechizos", PreviewTexts()[4])
+			-- Spell damage takes spell power's place
+			assert.are.equal("+10 daño con hechizos", PreviewTexts()[3 + KindIndex("spellPower")])
 			assert.are.equal(1, tooltip.refreshCount)
 		end)
 
@@ -401,8 +708,30 @@ describe("Settings window", function()
 				"defensa",
 				"bloquear",
 				"golpe",
+				"poder de ataque a distancia",
+				"poder de ataque bajo forma",
+				"golpe crítico",
+				"habilidades con las armas",
+				"esquivar",
+				"parar",
+				"valor de bloqueo",
+				"daño con hechizos contra …",
+				"golpe (hechizo)",
+				"golpe crítico (hechizo)",
+				"perforación de hechizo",
 			}) do
 				assert.is_true(HasText(label))
+			end
+		end)
+
+		it("title the color sections with Blizzard's names, in the chosen language", function()
+			ns.ShowOptions()
+			for _, title in ipairs({ "Ataque", "Defensa", "Hechizos", "Daño extra" }) do
+				assert.is_true(HasText(title))
+			end
+			LanguageMenu().setSelected("enUS")
+			for _, title in ipairs({ "Attack", "Defense", "Spells", "Damage extra" }) do
+				assert.is_true(HasText(title))
 			end
 		end)
 
@@ -426,9 +755,9 @@ describe("Settings window", function()
 			ns.LOCALE_STRINGS.enUS.ITEM_MOD_HIT_RATING_SHORT = nil
 			ns.LOCALE_STRINGS.enUS.ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT = nil
 			ns.ShowOptions()
-			assert.is_true(HasText("hit rating"))
+			assert.is_true(HasText("hit"))
 			assert.is_true(HasText("attack power vs type"))
-			assert.are.equal("+1% hit rating", PreviewTexts()[#PreviewTexts()])
+			assert.are.equal("+1% hit rating", PreviewTexts()[3 + KindIndex("hitRating")])
 		end)
 	end)
 end)
