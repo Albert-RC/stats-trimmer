@@ -1,5 +1,6 @@
 # Generates StatsTrimmer/Locales.lua: the client strings Stats Trimmer shows, in every language it offers,
-# taken from Forever's GlobalStrings and ChrClasses on wago.tools. Run it again when the client build changes.
+# taken from Forever's GlobalStrings, ChrClasses and SpellName on wago.tools. Run it again when the client build
+# changes.
 # Usage: ./scripts/update-locales.ps1 [-Build 1.60.1.70338]
 param([string]$Build = "1.60.1.70338")
 
@@ -8,11 +9,21 @@ $ErrorActionPreference = "Stop"
 # Languages with the Latin alphabet, which every client's font can show. Other clients get their own
 # language from the game itself.
 $locales = @("enUS", "deDE", "esES", "esMX", "frFR", "itIT", "ptBR")
-# Interface texts, besides every ITEM_MOD_*_SHORT stat name
+# Interface texts and the words of food lines, besides every ITEM_MOD_*_SHORT stat name
 $uiKeys = @(
 	"CTRL_KEY", "ALT_KEY", "SHIFT_KEY", "RESET", "PREVIEW", "COLORS", "ITEM_BIND_ON_EQUIP",
-	"STAT_CATEGORY_ATTACK", "STAT_CATEGORY_DEFENSE", "SPELLS", "STAT_CATEGORY_WEAPON_SKILLS", "DAMAGE"
+	"STAT_CATEGORY_ATTACK", "STAT_CATEGORY_DEFENSE", "SPELLS", "STAT_CATEGORY_WEAPON_SKILLS", "DAMAGE", "COMBAT",
+	"MINIMAP_TRACKING_VENDOR_FOOD", "HEALTH", "MANA", "COMBAT_XP_GAIN", "ARMOR",
+	"INT_SPELL_DURATION_SEC", "INT_SPELL_DURATION_MIN"
 )
+# The Well Fed buff's name isn't a GlobalString: it is bundled as WELL_FED, from this spell's name (the same
+# spell Tooltip.lua asks the client for)
+$wellFedSpell = "19705"
+# Nor is the experience Forever's Well Fed buffs add, which only counts for kills. It is bundled as
+# KILL_EXPERIENCE, from this spell's aura description without its number and the two words before it:
+# "Experience gained from kills increased by $w1%." -> "Experience gained from kills", "Durch Siege erhaltene
+# Erfahrung um $w1% erhöht." -> "Durch Siege erhaltene Erfahrung".
+$experienceSpell = "1243969"
 # Forever's classes (CLASS_SORT_ORDER in the game): their male names, as LocalizedClassList(false) gives them
 $classes = @("WARRIOR", "PALADIN", "PRIEST", "SHAMAN", "DRUID", "ROGUE", "MAGE", "WARLOCK", "HUNTER")
 
@@ -20,6 +31,8 @@ $root = Split-Path -Parent $PSScriptRoot
 $output = Join-Path $root "StatsTrimmer/Locales.lua"
 $download = Join-Path ([System.IO.Path]::GetTempPath()) "StatsTrimmer-GlobalStrings.csv"
 $classesDownload = Join-Path ([System.IO.Path]::GetTempPath()) "StatsTrimmer-ChrClasses.csv"
+$spellNamesDownload = Join-Path ([System.IO.Path]::GetTempPath()) "StatsTrimmer-SpellName.csv"
+$spellsDownload = Join-Path ([System.IO.Path]::GetTempPath()) "StatsTrimmer-Spell.csv"
 
 function ConvertTo-LuaString([string]$text) {
 	$escaped = $text.Replace('\', '\\').Replace('"', '\"').Replace("`r", '\r').Replace("`n", '\n')
@@ -76,8 +89,23 @@ try {
 			}
 		}
 
+		$url = "https://wago.tools/db2/SpellName/csv?build=$Build&locale=$locale"
+		Invoke-WebRequest -Uri $url -OutFile $spellNamesDownload -UseBasicParsing
+		$wellFed = Import-Csv -Path $spellNamesDownload -Encoding utf8 | Where-Object { $_.ID -eq $wellFedSpell }
+		if ($wellFed -and $wellFed.Name_lang) {
+			$strings["WELL_FED"] = $wellFed.Name_lang
+		}
+
+		$url = "https://wago.tools/db2/Spell/csv?build=$Build&locale=$locale"
+		Invoke-WebRequest -Uri $url -OutFile $spellsDownload -UseBasicParsing
+		$experience = Import-Csv -Path $spellsDownload -Encoding utf8 | Where-Object { $_.ID -eq $experienceSpell }
+		$aura = if ($experience) { $experience.AuraDescription_lang -replace '\$w1\s*%', '' -replace '\s+', ' ' }
+		if ($aura -and $aura.Trim().TrimEnd('.').Trim() -match '^(.+\S) \S+ \S+$') {
+			$strings["KILL_EXPERIENCE"] = $Matches[1]
+		}
+
 		$statCount = @($strings.Keys | Where-Object { $_ -like "ITEM_MOD_*" }).Count
-		$missing = @($uiKeys | Where-Object { -not $strings.ContainsKey($_) })
+		$missing = @(($uiKeys + "WELL_FED", "KILL_EXPERIENCE") | Where-Object { -not $strings.ContainsKey($_) })
 		if ($statCount -lt 100 -or $missing.Count -gt 0) {
 			throw "$locale looks incomplete: $statCount stat names, missing $($missing -join ', ')"
 		}
@@ -91,7 +119,7 @@ try {
 	}
 }
 finally {
-	Remove-Item $download, $classesDownload -ErrorAction SilentlyContinue
+	Remove-Item $download, $classesDownload, $spellNamesDownload, $spellsDownload -ErrorAction SilentlyContinue
 }
 
 $lines.Add("}")

@@ -14,6 +14,8 @@ becomes
 
 Each line shows what the item adds, as in the game's own item comparison. The original "up to" is about how much of that bonus each spell gets, not the bonus itself.
 
+Food and drink get the same treatment: `+530 health (24 sec)`, `+10 attack power (well fed, 15 min)`.
+
 - **Any client language.** Lines are recognized through the game's own item data, not English text. The compact lines use the game's own stat names, in your client's language or another one you pick in the addon.
 - **When in doubt, it leaves the line alone.** A line is only rewritten when exactly one of the item's stats can own it.
 - **Original text on demand.** Hold Ctrl (or Alt, or Shift) over an item to see the original lines.
@@ -34,8 +36,9 @@ Click the minimap button, or go to **Options > AddOns > Stats Trimmer**:
 - **Show original text while holding:** Ctrl (default), Alt or Shift. Shift also compares items.
 - **Language:** your client's (default), or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese. Russian, Korean and Chinese clients offer only English besides their own, since their fonts may lack accented letters. It changes at once, with no restart.
 - **Split spell power into spell damage and spell healing when both values are the same:** off by default. Spell power that adds damage and healing shows as one line, `+26 spell power`, like the game's item comparison; with this on, it shows as `+26 spell damage` and `+26 spell healing`.
-- **Colors:** a row for each kind of line, in collapsible Attack, Defense, Spells and Damage extra (spell schools) sections, each with a swatch and a Reset button, plus "Reset all colors". The color picker offers the game's class colors.
-- **Preview:** a sample tooltip that updates as you pick colors.
+- **Tabs:** Combat, for items' lines and the spell power setting, and Food & Drink, for food's lines.
+- **Colors:** a row for each kind of line, in collapsible Attack, Defense, Spells and Damage extra (spell schools) sections in Combat, each with a swatch and a Reset button, plus "Reset these colors" for the tab. The color picker offers the game's class colors.
+- **Preview:** a sample item, or a sample food, that updates as you pick colors.
 
 ## Reporting a problem
 

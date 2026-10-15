@@ -33,6 +33,9 @@ end
 ns.LOCALES = {}
 ns.LOCALE_STRINGS = {}
 ns.LOCALE_CLASS_NAMES = {}
+-- What each food's Use line shows, filled by FoodData.lua. Without it, as right after the update that added it,
+-- every Use line keeps its original text.
+ns.FOODS = {}
 
 -- The bundled languages a client can show, in menu order: all of them on a client with the Latin alphabet,
 -- only English on the others (Cyrillic, Korean and Chinese fonts may lack accented letters)
@@ -54,21 +57,44 @@ function ns.ResolveLanguage(saved, clientLocale)
 	return "CLIENT"
 end
 
--- Sections of the color rows in the settings window, in order. `labelGlobal` names Blizzard's text for the
--- section title (its character pane categories), `label` is the fallback and `labelSuffix` is added after
--- either: Blizzard has no name for spell schools, so that section is its "Damage" plus " extra".
-ns.COLOR_GROUPS = {
-	{ key = "attack", labelGlobal = "STAT_CATEGORY_ATTACK", label = "Attack" },
-	{ key = "defense", labelGlobal = "STAT_CATEGORY_DEFENSE", label = "Defense" },
-	{ key = "spell", labelGlobal = "SPELLS", label = "Spells" },
-	{ key = "school", labelGlobal = "DAMAGE", label = "Damage", labelSuffix = " extra" },
+-- Tabs of the settings window, in order: items' lines and food's lines. `labelGlobal` names Blizzard's text for
+-- the tab, `label` is the fallback. `spellPowerSplit` marks the tab that also holds the spell power split.
+ns.SETTINGS_TABS = {
+	{ key = "combat", labelGlobal = "COMBAT", label = "Combat", spellPowerSplit = true },
+	{ key = "food", labelGlobal = "MINIMAP_TRACKING_VENDOR_FOOD", label = "Food & Drink" },
 }
+
+-- Sections of the color rows in the settings window, in order, each in a tab (`tab`, a SETTINGS_TABS key).
+-- `labelGlobal` names Blizzard's text for the section title (its character pane categories, the minimap's
+-- tracking of food vendors), `label` is the fallback and `labelSuffix` is added after either: Blizzard has no
+-- name for spell schools, so that section is its "Damage" plus " extra".
+ns.COLOR_GROUPS = {
+	{ key = "attack", tab = "combat", labelGlobal = "STAT_CATEGORY_ATTACK", label = "Attack" },
+	{ key = "defense", tab = "combat", labelGlobal = "STAT_CATEGORY_DEFENSE", label = "Defense" },
+	{ key = "spell", tab = "combat", labelGlobal = "SPELLS", label = "Spells" },
+	{ key = "school", tab = "combat", labelGlobal = "DAMAGE", label = "Damage", labelSuffix = " extra" },
+	{ key = "food", tab = "food", labelGlobal = "MINIMAP_TRACKING_VENDOR_FOOD", label = "Food & Drink" },
+}
+
+-- True for a section with a header that collapses it: one of several in its tab. The only section of a tab has
+-- the tab's name already, and its rows always show.
+function ns.IsCollapsible(groupKey)
+	local tab, count = nil, {}
+	for _, group in ipairs(ns.COLOR_GROUPS) do
+		count[group.tab] = (count[group.tab] or 0) + 1
+		if group.key == groupKey then
+			tab = group.tab
+		end
+	end
+	return tab ~= nil and count[tab] > 1
+end
 
 -- Every kind of replacement line, in settings order, grouped by section (`group`, a COLOR_GROUPS key).
 -- `stat` is the key of Blizzard's name for the row label (in the chosen language), with `label` as the
 -- English fallback; a kind without `stat` or `typeStat` always shows `label`. `sample` is the line the
--- preview tooltip shows: { value, English name, percent = ..., stat = ... }, where its own `stat`
--- overrides the kind's.
+-- preview tooltip shows: { value, English name, percent = ..., stat = ..., details = ... }, where its own
+-- `stat` overrides the kind's and `details` are a food line's (ns.FormatDetails). Food lines also use the
+-- attack power, spell damage, spell healing and crit kinds, for those Well Fed buffs.
 ns.COLOR_KINDS = {
 	{
 		key = "attackPower",
@@ -263,6 +289,71 @@ ns.COLOR_KINDS = {
 		stat = "ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT",
 		sample = { 12, "shadow damage" },
 	},
+	{
+		key = "health",
+		group = "food",
+		label = "Health",
+		stat = "HEALTH",
+		sample = { 530, "health", details = { seconds = 24 } },
+	},
+	{
+		key = "mana",
+		group = "food",
+		label = "Mana",
+		stat = "MANA",
+		sample = { 803, "mana", details = { seconds = 24 } },
+	},
+	{
+		-- The bonus Forever's Well Fed buffs add for some players, to the experience from kills only
+		key = "experience",
+		group = "food",
+		label = "Experience",
+		stat = "COMBAT_XP_GAIN",
+		sample = { 5, "experience gained from kills", percent = true, stat = "KILL_EXPERIENCE" },
+	},
+	{
+		-- Primary stats and armor only come from Well Fed buffs: on items they are white lines
+		key = "stamina",
+		group = "food",
+		label = "Stamina",
+		stat = "ITEM_MOD_STAMINA_SHORT",
+		sample = { 6, "stamina", details = { wellFedMinutes = 15 } },
+	},
+	{
+		key = "intellect",
+		group = "food",
+		label = "Intellect",
+		stat = "ITEM_MOD_INTELLECT_SHORT",
+		sample = { 6, "intellect", details = { wellFedMinutes = 15 } },
+	},
+	{
+		key = "strength",
+		group = "food",
+		label = "Strength",
+		stat = "ITEM_MOD_STRENGTH_SHORT",
+		sample = { 6, "strength", details = { wellFedMinutes = 15 } },
+	},
+	{
+		key = "agility",
+		group = "food",
+		label = "Agility",
+		stat = "ITEM_MOD_AGILITY_SHORT",
+		sample = { 6, "agility", details = { wellFedMinutes = 15 } },
+	},
+	{
+		key = "spirit",
+		group = "food",
+		label = "Spirit",
+		stat = "ITEM_MOD_SPIRIT_SHORT",
+		sample = { 6, "spirit", details = { wellFedMinutes = 15 } },
+	},
+	{
+		key = "armor",
+		group = "food",
+		label = "Armor",
+		stat = "ARMOR",
+		sample = { 150, "armor", details = { wellFedMinutes = 15 } },
+	},
 }
 
 -- The preview's compact line for a kind, in the same shape the rules produce, so ns.LocalizeLines can
@@ -270,7 +361,7 @@ ns.COLOR_KINDS = {
 function ns.GetSampleLine(kind)
 	local value, name = unpack(kind.sample)
 	local stat = kind.sample.stat or kind.stat
-	return ns.CompactLine(kind.key, value, name, stat and { stat }, kind.sample.percent)
+	return ns.CompactLine(kind.key, value, name, stat and { stat }, kind.sample.percent, kind.sample.details)
 end
 
 -- Same green as the game's own equip lines, so nothing changes until the user picks a color
@@ -314,7 +405,7 @@ local function IsLanguage(value)
 	return value == "CLIENT" or (type(value) == "string" and ns.LOCALE_STRINGS[value] ~= nil)
 end
 
--- True when an entry of the list (COLOR_GROUPS, ORIGINAL_TEXT_KEYS) has this key
+-- True when an entry of the list (ORIGINAL_TEXT_KEYS) has this key
 local function HasKey(list, value)
 	for _, entry in ipairs(list) do
 		if entry.key == value then
@@ -345,12 +436,12 @@ function ns.LoadSettings(saved)
 		settings.splitSpellPower = ns.DEFAULTS.splitSpellPower
 	end
 
-	-- Only sections that still exist, marked true
+	-- Only sections that still exist and can collapse, marked true
 	if type(settings.collapsedSections) ~= "table" then
 		settings.collapsedSections = {}
 	end
 	for key, value in pairs(settings.collapsedSections) do
-		if value ~= true or not HasKey(ns.COLOR_GROUPS, key) then
+		if value ~= true or not ns.IsCollapsible(key) then
 			settings.collapsedSections[key] = nil
 		end
 	end

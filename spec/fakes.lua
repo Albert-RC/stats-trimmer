@@ -175,6 +175,14 @@ function Frame:GetName()
 	return self.name
 end
 
+function Frame:SetID(id)
+	self.id = id
+end
+
+function Frame:GetID()
+	return self.id or 0
+end
+
 function Frame:GetParent()
 	return self.parent
 end
@@ -340,16 +348,17 @@ function Frame:NumLines()
 end
 
 -- Like TooltipDataHandlerMixin:ProcessInfo, which every SetX method (SetHyperlink, SetBagItem...) calls:
--- builds the tooltip from the info's data, where the line pre-calls can consume each line, and shows it.
--- The specs' lines are all None lines.
+-- builds the tooltip from the info's data, where the line pre-calls for each line's type can consume it, and
+-- shows it. Lines without a type are None lines.
 function Frame:ProcessInfo(info)
 	self.lines = {}
 	self.primaryInfo = info
 	self.processingInfo = info
 	for _, lineData in ipairs(info.tooltipData.lines or {}) do
 		local consumed = false
+		local lineType = lineData.type or self.wow.env.Enum.TooltipDataLineType.None
 		for _, preCall in ipairs(self.wow.preCalls) do
-			consumed = preCall.handler(self, lineData)
+			consumed = preCall.lineType == lineType and preCall.handler(self, lineData)
 			if consumed then
 				break
 			end
@@ -377,8 +386,12 @@ function Frame:RefreshData()
 	self.refreshCount = self.refreshCount + 1
 end
 
--- Like CreateFrame: named frames also become globals of the world's environment
+-- Like CreateFrame: named frames also become globals of the world's environment, and "$parent" in a name is the
+-- parent's name
 function fakes.NewFrame(wow, frameType, name, parent, template)
+	if name and parent and parent.name then
+		name = name:gsub("%$parent", parent.name)
+	end
 	local frame = setmetatable({
 		wow = wow,
 		frameType = frameType,
@@ -403,6 +416,10 @@ function fakes.NewFrame(wow, frameType, name, parent, template)
 	elseif template == "UIPanelButtonTemplate" then
 		-- From UIPanelButtonNoTooltipTemplate's KeyValues
 		frame.fitTextCanWidthDecrease = true
+	elseif template == "PanelTabButtonTemplate" then
+		-- The template's parentArray
+		parent.Tabs = parent.Tabs or {}
+		table.insert(parent.Tabs, frame)
 	end
 	table.insert(wow.frames, frame)
 	if name then
@@ -449,10 +466,17 @@ function fakes.FindFrames(wow, filter)
 	return found
 end
 
+-- Strings of the esES client that Locales.lua doesn't bundle, as the client has them
+fakes.ES_CLIENT_STRINGS = {
+	ITEM_SPELL_TRIGGER_ONEQUIP = "Equipar:",
+	ITEM_SPELL_TRIGGER_ONUSE = "Usar:",
+	ITEM_COOLDOWN_TOTAL = "(%s de tiempo de reutilización).",
+}
+
 -- A fresh fake world.
--- options.locale: "esES" (default) or "enUS", for the "Equip:" prefix and creature type names. Only the esES
--- client has Blizzard's strings as globals (fakes.LocaleStrings); the enUS one has none, which exercises the
--- fallbacks.
+-- options.locale: "esES" (default) or "enUS", for the "Equip:" and "Use:" prefixes, creature type names and the
+-- Well Fed buff's name. Only the esES client has Blizzard's strings as globals (fakes.LocaleStrings and
+-- fakes.ES_CLIENT_STRINGS); the enUS one has only the prefixes, which exercises the fallbacks.
 function fakes.NewWoW(options)
 	options = options or {}
 	local env = setmetatable({}, { __index = _G })
@@ -480,6 +504,13 @@ function fakes.NewWoW(options)
 		for name, value in pairs(fakes.LocaleStrings("esES")) do
 			env[name] = value
 		end
+		for name, value in pairs(fakes.ES_CLIENT_STRINGS) do
+			env[name] = value
+		end
+		-- Not GlobalStrings: the client gives the first as the Well Fed spell's name, and has no text of its own
+		-- for the second
+		env.WELL_FED = nil
+		env.KILL_EXPERIENCE = nil
 	end
 	env.GetLocale = function()
 		return english and "enUS" or "esES"
@@ -511,7 +542,17 @@ function fakes.NewWoW(options)
 	}
 	-- The specs only use letters for which lowercase and case folding agree
 	env.C_Intl = { FoldCase = fakes.FoldCase, ToLower = fakes.FoldCase }
-	env.ITEM_SPELL_TRIGGER_ONEQUIP = english and "Equip:" or "Equipar:"
+	if english then
+		env.ITEM_SPELL_TRIGGER_ONEQUIP = "Equip:"
+		env.ITEM_SPELL_TRIGGER_ONUSE = "Use:"
+	end
+	-- Spell names: wow.spellNames[spellID]. 19705 is a Well Fed buff.
+	wow.spellNames = { [19705] = english and "Well Fed" or "Bien alimentado" }
+	env.C_Spell = {
+		GetSpellName = function(spellID)
+			return wow.spellNames[spellID]
+		end,
+	}
 	local creatureTypes = english
 			and {
 				[1] = "Beast",
@@ -536,10 +577,25 @@ function fakes.NewWoW(options)
 
 	env.Enum = {
 		TooltipDataType = { Item = 0, Unit = 2 },
-		TooltipDataLineType = { None = 0 },
+		TooltipDataLineType = { None = 0, ItemSpellTriggerOnUse = 44 },
 	}
 	env.NORMAL_FONT_COLOR = fakes.Color(1, 0.82, 0)
-	env.SOUNDKIT = { IG_CHARACTER_INFO_OPEN = 839, IG_CHARACTER_INFO_CLOSE = 840 }
+	env.SOUNDKIT = { IG_CHARACTER_INFO_OPEN = 839, IG_CHARACTER_INFO_CLOSE = 840, IG_CHARACTER_INFO_TAB = 841 }
+
+	-- Blizzard's helpers for PanelTabButtonTemplate tabs: the selected one is marked `selected`, and a tab is as
+	-- wide as its text and 20 of padding
+	env.PanelTemplates_SetNumTabs = function(frame, numTabs)
+		frame.numTabs = numTabs
+	end
+	env.PanelTemplates_SetTab = function(frame, id)
+		frame.selectedTab = id
+		for index, tab in ipairs(frame.Tabs) do
+			tab.selected = index == id
+		end
+	end
+	env.PanelTemplates_TabResize = function(tab)
+		tab.width = Length(tab.text) * wow.textMetrics.charWidth + 20
+	end
 	env.UISpecialFrames = {}
 	env.tinsert = table.insert
 

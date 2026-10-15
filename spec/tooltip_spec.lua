@@ -21,7 +21,7 @@ local function Setup(prepare)
 	end
 	local ns = helpers.LoadAddon(
 		"StatsTrimmer",
-		{ "Util.lua", "Config.lua", "Locales.lua", "Rules.lua", "Tooltip.lua" },
+		{ "Util.lua", "Config.lua", "Locales.lua", "FoodData.lua", "Rules.lua", "FoodRules.lua", "Tooltip.lua" },
 		wow.env
 	)
 	ns.db = ns.LoadSettings(nil)
@@ -45,9 +45,10 @@ describe("Tooltip line pre-call", function()
 		wow, ns, preCall = Setup()
 	end)
 
-	it("is registered for None lines, which is how Forever sends equip lines", function()
-		assert.are.equal(1, #wow.preCalls)
+	it("is registered for None lines, which is how Forever sends equip lines, and Use lines", function()
+		assert.are.equal(2, #wow.preCalls)
 		assert.are.equal(wow.env.Enum.TooltipDataLineType.None, wow.preCalls[1].lineType)
+		assert.are.equal(wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse, wow.preCalls[2].lineType)
 	end)
 
 	it("replaces an equip line with compact lines in the saved colors", function()
@@ -291,6 +292,153 @@ describe("Tooltip line pre-call", function()
 			wow.keysDown.ALT = true
 			assert.is_false((ProcessLine(wow, preCall, COSEDORA_LINE)))
 		end)
+	end)
+end)
+
+describe("Food Use lines", function()
+	-- Spongy Morel and Longjaw Mud Snapper on the esES client, from their spells' esES descriptions. Longjaw's well
+	-- fed part isn't translated.
+	local MOREL_LINE = "Usar: Restaura 530 p. de salud durante 24 s. Debes permanecer sentado mientras comes."
+	local SNAPPER_LINE = "Usar: Restaura 530 p. de salud durante 24 s. Debes permanecer sentado mientras comes. If you "
+		.. "spend at least 10 sec eating, you will become well fed and gain 10 Attack Power for 15 min. Además, la "
+		.. "experiencia obtenida al matar enemigos aumenta un 5%. (1 |4s:s; de tiempo de reutilización)."
+	local MOREL_SPELL, SNAPPER_SPELL = 435, 1249506
+	local wow, ns, preCall
+
+	local function UseLine(text, spellID)
+		return {
+			leftText = text,
+			leftColor = fakes.Color(0, 1, 0),
+			type = wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse,
+			spellID = spellID,
+		}
+	end
+
+	-- Runs the Use line pre-call on a food's line; returns whether it was consumed and the lines the addon added
+	local function ProcessUseLine(text, spellID, tooltip)
+		tooltip = tooltip or fakes.ItemTooltip(wow, { hyperlink = "item:food" })
+		local consumed = preCall(tooltip, UseLine(text, spellID))
+		return consumed, tooltip.lines
+	end
+
+	local function Texts(text, spellID)
+		local texts = {}
+		for _, line in ipairs(select(2, ProcessUseLine(text, spellID))) do
+			table.insert(texts, line.text)
+		end
+		return texts
+	end
+
+	before_each(function()
+		wow, ns = Setup()
+		preCall = wow.preCalls[2].handler
+	end)
+
+	it("replaces a food's Use line with compact lines in the saved colors", function()
+		ns.db.colors.health = { r = 1, g = 0, b = 0 }
+		ns.db.colors.attackPower = { r = 0, g = 0, b = 1 }
+		ns.db.colors.experience = { r = 1, g = 1, b = 0 }
+		local consumed, lines = ProcessUseLine(SNAPPER_LINE, SNAPPER_SPELL)
+		assert.is_true(consumed)
+		assert.are.same({
+			{ text = "+530 salud (24 s)", r = 1, g = 0, b = 0 },
+			{ text = "+10 poder de ataque (bien alimentado, 15 min)", r = 0, g = 0, b = 1 },
+			{ text = "+5% experiencia obtenida al matar enemigos", r = 1, g = 1, b = 0 },
+		}, lines)
+	end)
+
+	it("follows the language setting", function()
+		ns.db.language = "enUS"
+		assert.are.same(
+			{ "+530 health (24 sec)", "+10 attack power (well fed, 15 min)", "+5% experience gained from kills" },
+			Texts(SNAPPER_LINE, SNAPPER_SPELL)
+		)
+	end)
+
+	it("names the Well Fed buff as the client does", function()
+		wow.spellNames[19705] = "Bien Nutrido"
+		assert.are.equal("+10 poder de ataque (bien nutrido, 15 min)", Texts(SNAPPER_LINE, SNAPPER_SPELL)[2])
+	end)
+
+	it("shows a line in Blizzard's English when the client lacks the Well Fed buff's name", function()
+		wow.spellNames[19705] = nil
+		assert.are.same(
+			{ "+530 salud (24 s)", "+10 attack power (well fed, 15 min)", "+5% experiencia obtenida al matar enemigos" },
+			Texts(SNAPPER_LINE, SNAPPER_SPELL)
+		)
+	end)
+
+	it("names the experience from kills in Blizzard's English on a client whose language isn't bundled", function()
+		-- The client has no text of its own for it; the fake client's other strings stay esES
+		wow.env.GetLocale = function()
+			return "ruRU"
+		end
+		assert.are.same(
+			{ "+530 salud (24 s)", "+10 poder de ataque (bien alimentado, 15 min)", "+5% experience gained from kills" },
+			Texts(SNAPPER_LINE, SNAPPER_SPELL)
+		)
+	end)
+
+	it("is replaced in the item tooltips the client builds, by the Use line pre-call only", function()
+		fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+			lines = { { leftText = "Colmenilla esponjosa" }, UseLine(MOREL_LINE, MOREL_SPELL) },
+		})
+		local texts = {}
+		for _, line in ipairs(wow.env.GameTooltip.lines) do
+			table.insert(texts, line.text)
+		end
+		assert.are.same({ "Colmenilla esponjosa", "+530 salud (24 s)" }, texts)
+	end)
+
+	describe("leaves the line alone", function()
+		local function AssertUntouched(consumed, lines)
+			assert.is_false(consumed)
+			assert.are.same({}, lines)
+		end
+
+		it("when its spell isn't a food's", function()
+			AssertUntouched(ProcessUseLine("Usar: Te devuelve a Molino Tarren.", 8690))
+		end)
+
+		it("when it doesn't show what its food's spell does", function()
+			AssertUntouched(ProcessUseLine(MOREL_LINE, SNAPPER_SPELL))
+		end)
+
+		it("when its spell ID is a secret", function()
+			wow.secretTexts[MOREL_SPELL] = true
+			AssertUntouched(ProcessUseLine(MOREL_LINE, MOREL_SPELL))
+		end)
+
+		it("when its text is a secret", function()
+			wow.secretTexts[MOREL_LINE] = true
+			AssertUntouched(ProcessUseLine(MOREL_LINE, MOREL_SPELL))
+		end)
+
+		it("when another addon only reads it", function()
+			local tooltip = fakes.ItemTooltip(wow, { hyperlink = "item:food" })
+			tooltip:SetOwner(wow.env.UIParent, "ANCHOR_NONE")
+			AssertUntouched(ProcessUseLine(MOREL_LINE, MOREL_SPELL, tooltip))
+		end)
+
+		it("while the original text key is held", function()
+			wow.keysDown.CTRL = true
+			AssertUntouched(ProcessUseLine(MOREL_LINE, MOREL_SPELL))
+		end)
+	end)
+
+	it("rebuilds another addon's own tooltip with a food line through its owner when the key changes", function()
+		local ownTooltip =
+			wow.env.CreateFrame("GameTooltip", "AtlasLootTooltip", wow.env.UIParent, "GameTooltipTemplate")
+		local button = wow.env.CreateFrame("Button")
+		button.mouseOver = true
+		button:SetScript("OnEnter", function(self)
+			fakes.ShowItem(wow, ownTooltip, self, "ANCHOR_RIGHT", { lines = { UseLine(MOREL_LINE, MOREL_SPELL) } })
+		end)
+		fakes.Fire(button, "OnEnter")
+		assert.are.equal("+530 salud (24 s)", ownTooltip.lines[1].text)
+		wow.keysDown.CTRL = true
+		fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+		assert.are.equal(MOREL_LINE, ownTooltip.lines[1].text)
 	end)
 end)
 

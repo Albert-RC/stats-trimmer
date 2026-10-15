@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Food and drink get compact lines too. `Use: Restores 530 health over 24 sec. Must remain seated while eating.` becomes `+530 health (24 sec)`, and a drink `+803 mana (24 sec)`.
+- Well Fed buffs show as the stat they give and how long it lasts, `+10 attack power (well fed, 15 min)`, plus `+5% experience gained from kills` when the game shows that bonus. Foods that restore a percentage every second read `+2% health/s (25 sec)`.
+- Durations, "well fed" and the stat names are the game's own, in the chosen language: `+530 salud (24 s)`, `+10 poder de ataque (bien alimentado, 15 min)`.
+- The settings window has two tabs, named with the game's own words: Combat, with the item sections, the sample item and the spell power setting, and Food & Drink, with rows for health, mana, experience and the stats only Well Fed buffs give (stamina, intellect, strength, agility, spirit and armor), and a sample food. Well Fed attack power, spell damage, healing and crit use their rows in Combat.
+- "Reset all colors" is now "Reset these colors": it resets the open tab's colors only.
+- Foods whose text says something else keep it as it is: alcohol, fishing and herbalism buffs, buffs that only work in one zone, and a few special foods.
+- After updating, restart the game instead of using `/reload`: the new files are only loaded on a restart.
+
 ## v0.4.0 (2026-10-14)
 
 - Every kind of compact line has its own color row now, including crit, spell hit, spell crit, dodge, parry, block value, weapon skills, spell damage against a creature type, ranged and feral attack power, and spell penetration.

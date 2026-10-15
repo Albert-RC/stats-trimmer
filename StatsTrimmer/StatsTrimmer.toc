@@ -21,7 +21,9 @@
 Util.lua
 Config.lua
 Locales.lua
+FoodData.lua
 Rules.lua
+FoodRules.lua
 Tooltip.lua
 OptionsWindow.lua
 MinimapButton.lua

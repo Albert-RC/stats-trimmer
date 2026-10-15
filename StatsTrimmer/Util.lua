@@ -53,15 +53,60 @@ function ns.FormatLine(value, percent, name)
 	return ("+%s%s %s"):format(value, percent and "%" or "", name)
 end
 
--- A compact line. `text` is the English line; `value`, `percent` and the stat keys in `stats` let
--- ns.LocalizeLines rebuild it with Blizzard's stat names, and without `stats` it is never translated.
--- `kind` picks its color (ns.COLOR_KINDS); unknown kinds keep the original line color.
-function ns.CompactLine(kind, value, name, stats, percent)
+-- The words of a food line's details in the addon's own English, by the name of Blizzard's (see FormatDetails).
+-- They are the last resort, when a language lacks Blizzard's.
+local ENGLISH_DETAILS = {
+	INT_SPELL_DURATION_SEC = "%d sec",
+	INT_SPELL_DURATION_MIN = "%d min",
+	WELL_FED = "well fed",
+}
+
+local function EnglishDetail(name)
+	return ENGLISH_DETAILS[name]
+end
+
+-- A duration in Blizzard's format for it ("%d sec")
+local function FormatDuration(format, amount)
+	return (format:gsub("%%d", tostring(amount), 1))
+end
+
+-- What follows a food line's stat name: "/s" for a rate (`perSecond`), then how long a restore takes
+-- (`seconds`), " (24 sec)", or how long a Well Fed buff lasts (`wellFedMinutes`), " (well fed, 15 min)".
+-- GetText(name) gives the words: Blizzard's INT_SPELL_DURATION_SEC, INT_SPELL_DURATION_MIN and WELL_FED, the
+-- buff's name. "" without details, nil when GetText lacks a word they need. "/s" reads the same in every
+-- language, like MP5.
+function ns.FormatDetails(details, GetText)
+	if not details then
+		return ""
+	end
+	local text = details.perSecond and "/s" or ""
+	if details.seconds then
+		local seconds = GetText("INT_SPELL_DURATION_SEC")
+		if not seconds then
+			return nil
+		end
+		text = text .. (" (%s)"):format(FormatDuration(seconds, details.seconds))
+	elseif details.wellFedMinutes then
+		local name, minutes = GetText("WELL_FED"), GetText("INT_SPELL_DURATION_MIN")
+		if not (name and minutes) then
+			return nil
+		end
+		text = text .. (" (%s, %s)"):format(name, FormatDuration(minutes, details.wellFedMinutes))
+	end
+	return text
+end
+
+-- A compact line. `text` is the English line; `value`, `percent`, `details` and the stat keys in `stats` let
+-- ns.LocalizeLines rebuild it with Blizzard's names, and without `stats` it is never translated. `details`
+-- are a food line's (see FormatDetails). `kind` picks its color (ns.COLOR_KINDS); unknown kinds keep the
+-- original line color.
+function ns.CompactLine(kind, value, name, stats, percent, details)
 	return {
 		kind = kind,
-		text = ns.FormatLine(value, percent, name),
+		text = ns.FormatLine(value, percent, name) .. ns.FormatDetails(details, EnglishDetail),
 		value = value,
 		percent = percent,
 		stats = stats,
+		details = details,
 	}
 end
