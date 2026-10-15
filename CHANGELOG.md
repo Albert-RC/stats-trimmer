@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.0 (2026-10-15)
 
 - Food and drink get compact lines too. `Use: Restores 530 health over 24 sec. Must remain seated while eating.` becomes `+530 health (24 sec)`, and a drink `+803 mana (24 sec)`.
 - Well Fed buffs show as the stat they give and how long it lasts, `+10 attack power (well fed, 15 min)`, plus `+5% experience gained from kills` when the game shows that bonus. Foods that restore a percentage every second read `+2% health/s (25 sec)`.
