@@ -1,8 +1,13 @@
--- Game-facing glue: reads the item behind a tooltip line and swaps equip lines for compact ones
+-- Game-facing glue: reads the item behind a tooltip line and swaps equip lines and food's Use lines for compact
+-- ones
 local _, ns = ...
 
--- Localized "Equip:" prefix, provided by the client in every locale
+-- Localized "Equip:" and "Use:" prefixes, provided by the client in every locale
 local EQUIP_PREFIX = ITEM_SPELL_TRIGGER_ONEQUIP
+local USE_PREFIX = ITEM_SPELL_TRIGGER_ONUSE
+
+-- A spell named Well Fed, whose name is Blizzard's for that buff. update-locales.ps1 bundles the same name.
+local WELL_FED_SPELL = 19705
 
 -- Unicode-aware lowercase, so type names like "Élémentaire" or "Нежить" are found whatever their case.
 -- C_Intl.FoldCase may return nothing.
@@ -17,9 +22,26 @@ local function NonEmpty(value)
 	end
 end
 
+-- Blizzard's texts that aren't GlobalStrings, by the name the bundled languages give them. The client gives the
+-- Well Fed buff's name through its API. The experience from kills comes from a buff's description, which no API
+-- gives: the client's language has the bundled one, if any.
+local CLIENT_TEXTS = {
+	WELL_FED = function()
+		return C_Spell.GetSpellName(WELL_FED_SPELL)
+	end,
+	KILL_EXPERIENCE = function()
+		local strings = ns.LOCALE_STRINGS[GetLocale()]
+		return strings and strings.KILL_EXPERIENCE
+	end,
+}
+
 -- A Blizzard string in the client's own language (an ITEM_MOD_*_SHORT stat name, RESET...), or nil. Equip
 -- lines are always recognized with these: the tooltip is in the client's language.
 function ns.GetClientText(name)
+	local GetText = CLIENT_TEXTS[name]
+	if GetText then
+		return NonEmpty(GetText())
+	end
 	return NonEmpty(_G[name])
 end
 
@@ -169,8 +191,8 @@ local function IsScanningTooltip(tooltip)
 	return not owner or ((owner == UIParent or owner == WorldFrame) and tooltip:GetAnchorType() == "ANCHOR_NONE")
 end
 
--- Other addons' own tooltips that showed equip lines (AtlasLoot's, with its useGameTooltip setting off), so
--- the original-text key rebuilds them too. Blizzard's comparison tooltips follow their main tooltip instead.
+-- Other addons' own tooltips that showed equip or food lines (AtlasLoot's, with its useGameTooltip setting off),
+-- so the original-text key rebuilds them too. Blizzard's comparison tooltips follow their main tooltip instead.
 local addonTooltips = setmetatable({}, { __mode = "k" })
 
 -- True for a tooltip of Blizzard's own UI (EmbeddedItemTooltip, the UI widgets' item tooltips): Blizzard's
@@ -180,16 +202,38 @@ local function IsBlizzardTooltip(tooltip)
 	return name ~= nil and issecurevariable(name)
 end
 
--- Line pre-call: returning true keeps the original line out of the tooltip
-local function ReplaceEquipLine(tooltip, lineData)
-	local text = lineData.leftText
-	if not IsReadable(text) or text:sub(1, #EQUIP_PREFIX) ~= EQUIP_PREFIX or IsScanningTooltip(tooltip) then
+-- True when a line with this prefix may be replaced: its text can be read and the player sees the tooltip.
+-- Remembers other addons' tooltips that show such lines, which the original-text key rebuilds; while it is
+-- held, nothing is replaced.
+local function CanReplace(tooltip, text, prefix)
+	if not IsReadable(text) or text:sub(1, #prefix) ~= prefix or IsScanningTooltip(tooltip) then
 		return false
 	end
 	if not PLAYER_TOOLTIPS[tooltip] and not IsBlizzardTooltip(tooltip) then
 		addonTooltips[tooltip] = true
 	end
-	if IsShowingOriginal() then
+	return not IsShowingOriginal()
+end
+
+-- Adds the compact lines in the chosen language. Each line uses the color the user picked for its kind; the
+-- original line color is the fallback.
+local function AddCompactLines(tooltip, lineData, lines)
+	local colors = ns.db and ns.db.colors or {}
+	local fallback = lineData.leftColor or NORMAL_FONT_COLOR
+	for _, line in ipairs(ns.InLanguage(lines)) do
+		local color = colors[line.kind]
+		if color then
+			tooltip:AddLine(line.text, color.r, color.g, color.b)
+		else
+			tooltip:AddLine(line.text, fallback:GetRGB())
+		end
+	end
+end
+
+-- Line pre-calls: returning true keeps the original line out of the tooltip
+local function ReplaceEquipLine(tooltip, lineData)
+	local text = lineData.leftText
+	if not CanReplace(tooltip, text, EQUIP_PREFIX) then
 		return false
 	end
 
@@ -210,24 +254,32 @@ local function ReplaceEquipLine(tooltip, lineData)
 	if not lines then
 		return false
 	end
-	lines = ns.InLanguage(lines)
-
-	-- Each line uses the color the user picked for its kind; the original line color is the fallback
-	local colors = ns.db and ns.db.colors or {}
-	local fallback = lineData.leftColor or NORMAL_FONT_COLOR
-	for _, line in ipairs(lines) do
-		local color = colors[line.kind]
-		if color then
-			tooltip:AddLine(line.text, color.r, color.g, color.b)
-		else
-			tooltip:AddLine(line.text, fallback:GetRGB())
-		end
-	end
+	AddCompactLines(tooltip, lineData, lines)
 	return true
 end
 
--- In Forever, equip lines arrive with type None, not ItemSpellTriggerOnEquip
+-- A food's Use line: its spell's ID says which food it is (ns.FOODS)
+local function ReplaceUseLine(tooltip, lineData)
+	local spellID = lineData.spellID
+	local food = type(spellID) == "number" and not issecretvalue(spellID) and ns.FOODS[spellID]
+	local text = lineData.leftText
+	if not food or not CanReplace(tooltip, text, USE_PREFIX) then
+		return false
+	end
+
+	local context = { usePrefix = USE_PREFIX, cooldownFormat = ns.GetClientText("ITEM_COOLDOWN_TOTAL") }
+	local lines = ns.GetFoodReplacement(text, food, context)
+	if not lines then
+		return false
+	end
+	AddCompactLines(tooltip, lineData, lines)
+	return true
+end
+
+-- In Forever, equip lines arrive with type None, not ItemSpellTriggerOnEquip. Use lines do arrive as
+-- ItemSpellTriggerOnUse, with their spell's ID.
 TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.None, ReplaceEquipLine)
+TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.ItemSpellTriggerOnUse, ReplaceUseLine)
 
 -- How many lines each tooltip had right after its data was processed, other addons' tooltip post-calls
 -- included. Rebuilding from the data only runs those again: lines added later with AddLine would be lost.

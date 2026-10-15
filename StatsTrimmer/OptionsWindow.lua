@@ -1,12 +1,14 @@
--- Settings window, built from Blizzard templates: original-text key, language, spell power split, a color per
--- line kind in collapsible sections, and a live preview that is a real GameTooltip. The color picker it opens
--- gets a palette of Blizzard's class colors. Blizzard's own texts (key names, RESET, COLORS, stat and class
--- names...) follow the language setting and switch on the spot; the addon's own phrases are in English.
+-- Settings window, built from Blizzard templates: original-text key and language, then a tab for items' lines
+-- (combat) and one for food's (SETTINGS_TABS). Each tab has a color per line kind, in collapsible sections, and a
+-- live preview that is a real GameTooltip: a sample item, or a sample food. The combat tab also has the spell
+-- power split. The color picker it opens gets a palette of Blizzard's class colors. Blizzard's own texts (key
+-- names, RESET, COLORS, tab, stat and class names...) follow the language setting and switch on the spot; the
+-- addon's own phrases are in English.
 local _, ns = ...
 
 -- The window sizes itself to its texts, which depend on the language and the open sections (FitWindow). Its
--- panels grow for longer texts, but never get smaller than with this language's texts and every section open,
--- and the window never gets smaller than this.
+-- panels grow for longer texts, but never get smaller than with this language's texts and every section of every
+-- tab open, so switching tabs doesn't resize it. The window never gets smaller than this either.
 local REFERENCE_LANGUAGE = "esES"
 local MIN_WIDTH, MIN_HEIGHT = 600, 690
 -- Room above and below the two panels, at the window's sides and between the panels. The rows above the panels
@@ -23,6 +25,8 @@ local ROW_RIGHT = LABEL_GAP_RIGHT + RESET_RIGHT
 local SCROLL_LEFT = 6
 -- The preview tooltip's offset below its panel's top, and its margin inside the panel
 local PREVIEW_TOP, PREVIEW_MARGIN = 34, 12
+-- The first tab's offset from the window's bottom left, as Blizzard's inspect window has it
+local TAB_LEFT, TAB_TOP = 11, 2
 -- Color rows: the swatch (16px) and the Reset button share each row's vertical center. Section headers are
 -- ListHeaderThreeSliceTemplate's height.
 local ROW_HEIGHT, SECTION_HEADER_HEIGHT, SECTION_GAP = 24, 26, 6
@@ -35,17 +39,30 @@ local BUTTON_TEXT_PADDING = 24
 -- The class color palette: how much taller the color picker gets for it, and its swatches' spacing
 local PALETTE_HEIGHT, PALETTE_SWATCH_STEP = 28, 20
 
-local frame, previewTooltip, keyDropdown, splitCheckbox, colorsPanel, colorRows
+local frame, previewTooltip, foodTooltip, keyDropdown, splitCheckbox, colorsPanel, colorRows
 local swatches = {} -- kind key -> ColorSwatchTemplate button
 local rowParts = {} -- { kind, label, reset } of every color row, to size the colors panel
 local topRows = {} -- the labels and dropdown of the rows above the panels, to size the window
 local sections = {} -- { group, header, body }, in COLOR_GROUPS order
-local translated = {} -- { widget, GetValue, isButton, width }: texts set again when the language changes
+local translated = {} -- { widget, GetValue, Fit }: texts set again when the language changes
+local previewTooltips = {} -- SETTINGS_TABS key -> its preview tooltip
 
--- The section of each kind, to leave collapsed sections out of the preview
-local kindGroups = {}
-for _, kind in ipairs(ns.COLOR_KINDS) do
-	kindGroups[kind.key] = kind.group
+-- The tab shown: the first one when the window opens for the first time, then the one left open
+local selectedTab = 1
+
+-- The section and tab of each kind, to leave collapsed sections out of the preview and fill each tab's preview
+local kindGroups, kindTabs = {}, {}
+for _, group in ipairs(ns.COLOR_GROUPS) do
+	for _, kind in ipairs(ns.COLOR_KINDS) do
+		if kind.group == group.key then
+			kindGroups[kind.key] = kind.group
+			kindTabs[kind.key] = group.tab
+		end
+	end
+end
+
+local function SelectedTabKey()
+	return ns.SETTINGS_TABS[selectedTab].key
 end
 
 -- A Blizzard text in the chosen language (or in `language`, a bundled one), then in English, then the
@@ -68,9 +85,10 @@ local function RowLabel(kind, language)
 	return kind.label
 end
 
--- Remembers how to fill a widget's text; ApplyText fills it
-local function Translate(widget, GetValue, isButton)
-	table.insert(translated, { widget = widget, GetValue = GetValue, isButton = isButton })
+-- Remembers how to fill a widget's text; ApplyText fills it. `Fit(widget, text)` sets a text that sizes its
+-- widget (a button's or a tab's).
+local function Translate(widget, GetValue, Fit)
+	table.insert(translated, { widget = widget, GetValue = GetValue, Fit = Fit })
 end
 
 -- Sizes a button to its text and padding. UIPanelButtonTemplate's buttons get narrower too
@@ -80,10 +98,16 @@ local function FitButton(button, text)
 	button:SetTextToFit(text)
 end
 
--- Fills every translated text in the current language
+-- Sizes a tab to its text, as Blizzard's tabs do when shown
+local function FitTab(tab, text)
+	tab:SetText(text)
+	PanelTemplates_TabResize(tab)
+end
+
+-- Fills a translated text in the current language
 local function ApplyText(entry)
-	if entry.isButton then
-		FitButton(entry.widget, entry.GetValue())
+	if entry.Fit then
+		entry.Fit(entry.widget, entry.GetValue())
 	else
 		entry.widget:SetText(entry.GetValue())
 	end
@@ -110,28 +134,43 @@ local function GetSampleLines(language)
 	return sampleLines[language]
 end
 
--- Fills the preview tooltip with the sample item, in the chosen language or `language`. Unless `everything`,
--- it leaves out collapsed sections, and split spell power, which looks like the spell damage and healing
--- samples already there.
+-- Fills the preview tooltips, in the chosen language or `language`: the sample item's, with the combat tab's
+-- lines, and the sample food's, with the food tab's. Only the shown tab's preview shows. Unless `everything`,
+-- they leave out collapsed sections, and split spell power, which looks like the spell damage and healing
+-- samples already there. Returns the room the preview takes: the largest of both tooltips, which take turns in
+-- the same place, so switching tabs doesn't resize the window.
 local function FillPreview(language, everything)
 	local panel = previewTooltip:GetParent()
-	previewTooltip:SetOwner(panel, "ANCHOR_NONE")
-	previewTooltip:ClearAllPoints()
-	previewTooltip:SetPoint("TOP", panel, "TOP", 0, -PREVIEW_TOP)
+	for _, tooltip in pairs(previewTooltips) do
+		tooltip:SetOwner(panel, "ANCHOR_NONE")
+		tooltip:ClearAllPoints()
+		tooltip:SetPoint("TOPLEFT", panel, "TOPLEFT", PREVIEW_MARGIN, -PREVIEW_TOP)
+	end
 	previewTooltip:AddLine("Sample Item", 0.12, 1, 0)
 	previewTooltip:AddLine(Text("ITEM_BIND_ON_EQUIP", "Binds when equipped", language), 1, 1, 1)
 	previewTooltip:AddLine(ns.FormatLine(5, false, Text("ITEM_MOD_STAMINA_SHORT", "Stamina", language)), 1, 1, 1)
+	foodTooltip:AddLine("Sample Food", 1, 1, 1)
+
 	for _, line in ipairs(GetSampleLines(language or ns.GetLanguage())) do
 		local hidden = (ns.db.splitSpellPower and line.kind == "spellPower") or IsCollapsed(kindGroups[line.kind])
 		if everything or not hidden then
 			local color = ns.db.colors[line.kind]
-			previewTooltip:AddLine(line.text, color.r, color.g, color.b)
+			previewTooltips[kindTabs[line.kind]]:AddLine(line.text, color.r, color.g, color.b)
 		end
 	end
-	previewTooltip:Show()
+	local width, height = 0, 0
+	for tabKey, tooltip in pairs(previewTooltips) do
+		-- A GameTooltip takes its size when shown
+		tooltip:Show()
+		width = math.max(width, tooltip:GetWidth())
+		height = math.max(height, tooltip:GetHeight())
+		tooltip:SetShown(tabKey == SelectedTabKey())
+	end
+	return width, height
 end
 
--- The sizes with REFERENCE_LANGUAGE's texts and every section open, below which the panels never shrink:
+-- The sizes with REFERENCE_LANGUAGE's texts and every section of every tab open, below which the panels never
+-- shrink:
 -- { rowsWidth, previewWidth, previewHeight }. Measured once, on the window's own labels, Reset button and
 -- preview, which get the chosen language's texts back before anything is drawn.
 local reference
@@ -148,18 +187,18 @@ local function MeasureReference()
 	local resetWidth = reset:GetWidth()
 	FitButton(reset, Text("RESET", "Reset"))
 
-	FillPreview(REFERENCE_LANGUAGE, true)
+	local previewWidth, previewHeight = FillPreview(REFERENCE_LANGUAGE, true)
 	reference = {
 		rowsWidth = ROW_LEFT + labelWidth + ROW_RIGHT + resetWidth,
-		previewWidth = previewTooltip:GetWidth(),
-		previewHeight = previewTooltip:GetHeight(),
+		previewWidth = previewWidth,
+		previewHeight = previewHeight,
 	}
 end
 
--- Sizes the window to what it shows: the colors panel to its longest row, so no stat name is cut off, and
--- the window to that panel, the preview tooltip, the rows above them and the preview's height. The panels
--- keep at least their reference size. Runs after the preview is built: a GameTooltip takes its size when shown.
-local function FitWindow()
+-- Sizes the window to what it shows: the colors panel to its longest row in either tab, so no stat name is cut
+-- off, and the window to that panel, the preview (`tooltipsWidth` and `tooltipsHeight`, from FillPreview), the
+-- rows above them and the preview's height. The panels keep at least their reference size.
+local function FitWindow(tooltipsWidth, tooltipsHeight)
 	local labelWidth, resetWidth = 0, 0
 	for _, row in ipairs(rowParts) do
 		labelWidth = math.max(labelWidth, row.label:GetUnboundedStringWidth())
@@ -177,9 +216,9 @@ local function FitWindow()
 		splitCheckbox:GetWidth() + splitCheckbox.Text:GetUnboundedStringWidth()
 	)
 	local topRowsWidth = TOP_ROWS_LEFT + widestTopRow + SIDE_MARGIN
-	local previewWidth = math.max(reference.previewWidth, previewTooltip:GetWidth()) + 2 * PREVIEW_MARGIN
+	local previewWidth = math.max(reference.previewWidth, tooltipsWidth) + 2 * PREVIEW_MARGIN
 	local panelsWidth = 2 * SIDE_MARGIN + colorsWidth + PANEL_GAP + previewWidth
-	local previewHeight = PREVIEW_TOP + math.max(reference.previewHeight, previewTooltip:GetHeight()) + PREVIEW_MARGIN
+	local previewHeight = PREVIEW_TOP + math.max(reference.previewHeight, tooltipsHeight) + PREVIEW_MARGIN
 	local width = math.max(MIN_WIDTH, topRowsWidth, panelsWidth)
 	local height = math.max(MIN_HEIGHT, TOP_HEIGHT + previewHeight + BOTTOM_HEIGHT)
 	frame:SetSize(width, height)
@@ -196,9 +235,9 @@ local function RefreshPreview(keepSize)
 	if not reference then
 		MeasureReference()
 	end
-	FillPreview()
+	local tooltipsWidth, tooltipsHeight = FillPreview()
 	if not keepSize then
-		FitWindow()
+		FitWindow(tooltipsWidth, tooltipsHeight)
 	end
 end
 
@@ -324,7 +363,7 @@ local function CreateColorRow(parent, kind, y)
 	reset:SetPoint("RIGHT", parent, "TOPRIGHT", -RESET_RIGHT, center)
 	Translate(reset, function()
 		return Text("RESET", "Reset")
-	end, true)
+	end, FitButton)
 	reset:SetScript("OnClick", function()
 		ResetColor(kind.key)
 	end)
@@ -341,28 +380,39 @@ local function CreateColorRow(parent, kind, y)
 	table.insert(rowParts, { kind = kind, label = label, reset = reset })
 end
 
--- Stacks the sections: each header under the previous section's rows, or under its header when that
--- section is collapsed. The scroll child takes their height.
+-- Stacks the shown tab's sections: each header under the previous section's rows, or under its header when
+-- that section is collapsed. The only section of a tab has no header (ns.IsCollapsible). Other tabs' sections
+-- hide. The scroll child takes their height.
 local function LayoutSections()
 	local height, above = 0, nil
-	for _, section in ipairs(sections) do
-		local collapsed = IsCollapsed(section.group.key)
-		section.header:UpdateCollapsedState(collapsed)
-		section.body:SetShown(not collapsed)
-		section.header:ClearAllPoints()
+	-- Anchors a region under the previous one, `gap` below it, or at the top
+	local function Stack(region, gap)
+		region:ClearAllPoints()
 		if above then
-			section.header:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -SECTION_GAP)
-			section.header:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -SECTION_GAP)
-			height = height + SECTION_GAP
+			region:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -gap)
+			region:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -gap)
+			height = height + gap
 		else
-			section.header:SetPoint("TOPLEFT")
-			section.header:SetPoint("TOPRIGHT")
+			region:SetPoint("TOPLEFT")
+			region:SetPoint("TOPRIGHT")
 		end
-		height = height + SECTION_HEADER_HEIGHT
-		above = section.header
-		if not collapsed then
+		above = region
+	end
+
+	for _, section in ipairs(sections) do
+		local shown = section.group.tab == SelectedTabKey()
+		local titled = shown and ns.IsCollapsible(section.group.key)
+		local collapsed = IsCollapsed(section.group.key)
+		section.header:SetShown(titled)
+		section.header:UpdateCollapsedState(collapsed)
+		section.body:SetShown(shown and not collapsed)
+		if titled then
+			Stack(section.header, SECTION_GAP)
+			height = height + SECTION_HEADER_HEIGHT
+		end
+		if shown and not collapsed then
+			Stack(section.body, 0)
 			height = height + section.bodyHeight
-			above = section.body
 		end
 	end
 	colorRows:SetHeight(height)
@@ -386,9 +436,8 @@ local function CreateColorSection(group)
 		return Text(group.labelGlobal, group.label) .. (group.labelSuffix or "")
 	end)
 
+	-- LayoutSections places it
 	local body = CreateFrame("Frame", nil, colorRows)
-	body:SetPoint("TOPLEFT", header, "BOTTOMLEFT")
-	body:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT")
 	local y = 0
 	for _, kind in ipairs(ns.COLOR_KINDS) do
 		if kind.group == group.key then
@@ -499,15 +548,18 @@ local function CreateColorsPanel()
 	end
 	scrollFrame:SetScrollChild(colorRows)
 
-	local resetAll = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	resetAll:SetHeight(22)
-	resetAll:SetPoint("BOTTOMLEFT", 12, 14)
-	Translate(resetAll, function()
-		return "Reset all colors"
-	end, true)
-	resetAll:SetScript("OnClick", function()
+	-- Only the shown tab's colors
+	local resetShown = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	resetShown:SetHeight(22)
+	resetShown:SetPoint("BOTTOMLEFT", 12, 14)
+	Translate(resetShown, function()
+		return "Reset these colors"
+	end, FitButton)
+	resetShown:SetScript("OnClick", function()
 		for _, kind in ipairs(ns.COLOR_KINDS) do
-			ResetColor(kind.key)
+			if kindTabs[kind.key] == SelectedTabKey() then
+				ResetColor(kind.key)
+			end
 		end
 	end)
 end
@@ -518,10 +570,45 @@ local function CreatePreviewPanel()
 	panel:SetPoint("BOTTOMRIGHT", -SIDE_MARGIN, BOTTOM_HEIGHT)
 	CreateHeader(panel, "PREVIEW", "Preview")
 
-	-- Kept in the window's strata so the color picker (DIALOG) stays on top of it
+	-- Kept in the window's strata so the color picker (DIALOG) stays on top of them
 	previewTooltip = CreateFrame("GameTooltip", "StatsTrimmerPreviewTooltip", panel, "GameTooltipTemplate")
-	previewTooltip:SetFrameStrata(frame:GetFrameStrata())
-	previewTooltip:SetFrameLevel(panel:GetFrameLevel() + 10)
+	foodTooltip = CreateFrame("GameTooltip", "StatsTrimmerFoodPreviewTooltip", panel, "GameTooltipTemplate")
+	previewTooltips = { combat = previewTooltip, food = foodTooltip }
+	for _, tooltip in pairs(previewTooltips) do
+		tooltip:SetFrameStrata(frame:GetFrameStrata())
+		tooltip:SetFrameLevel(panel:GetFrameLevel() + 10)
+	end
+end
+
+-- Shows the selected tab: its tab button, its sections, its preview and, in the combat tab, the spell power
+-- split
+local function ShowSelectedTab()
+	PanelTemplates_SetTab(frame, selectedTab)
+	splitCheckbox:SetShown(ns.SETTINGS_TABS[selectedTab].spellPowerSplit == true)
+	LayoutSections()
+	RefreshPreview()
+end
+
+-- Blizzard's tabs under the window, as in its inspect window: one per SETTINGS_TABS entry, named with Blizzard's
+-- text for it
+local function CreateTabs()
+	for index, tab in ipairs(ns.SETTINGS_TABS) do
+		local button = CreateFrame("Button", "$parentTab" .. index, frame, "PanelTabButtonTemplate")
+		button:SetID(index)
+		Translate(button, function()
+			return Text(tab.labelGlobal, tab.label)
+		end, FitTab)
+		button:SetScript("OnClick", function(self)
+			PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
+			selectedTab = self:GetID()
+			ShowSelectedTab()
+		end)
+		if index == 1 then
+			button:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", TAB_LEFT, TAB_TOP)
+		end
+	end
+	-- Anchors each tab after the previous one
+	PanelTemplates_SetNumTabs(frame, #ns.SETTINGS_TABS)
 end
 
 local function CreateWindow()
@@ -548,6 +635,7 @@ local function CreateWindow()
 	CreateSplitSpellPowerRow(CreateLanguageRow(CreateOriginalTextRow()))
 	CreateColorsPanel()
 	CreatePreviewPanel()
+	CreateTabs()
 	for _, entry in ipairs(translated) do
 		ApplyText(entry)
 	end
@@ -557,12 +645,12 @@ local function CreateWindow()
 		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
 		splitCheckbox:SetChecked(ns.db.splitSpellPower)
 		RefreshSwatches()
-		LayoutSections()
-		RefreshPreview()
+		ShowSelectedTab()
 	end)
 	frame:SetScript("OnHide", function()
 		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
 		previewTooltip:Hide()
+		foodTooltip:Hide()
 	end)
 end
 

@@ -54,3 +54,55 @@ describe("GetOnlyPercent", function()
 		assert.is_nil(ns.GetOnlyPercent("Equip: Increases your chance to block by 1% for 10 sec."))
 	end)
 end)
+
+describe("FormatDetails", function()
+	-- Blizzard's esES words, as Locales.lua bundles them
+	local function Spanish(name)
+		return ({ INT_SPELL_DURATION_SEC = "%d s", INT_SPELL_DURATION_MIN = "%d min", WELL_FED = "bien alimentado" })[name]
+	end
+
+	it("is empty without details", function()
+		assert.are.equal("", ns.FormatDetails(nil, Spanish))
+	end)
+
+	it("adds how long a restore takes", function()
+		assert.are.equal(" (24 s)", ns.FormatDetails({ seconds = 24 }, Spanish))
+	end)
+
+	it("adds the Well Fed buff's name and how long it lasts", function()
+		assert.are.equal(" (bien alimentado, 15 min)", ns.FormatDetails({ wellFedMinutes = 15 }, Spanish))
+	end)
+
+	it("marks a rate with /s, the same in every language", function()
+		assert.are.equal("/s (25 s)", ns.FormatDetails({ perSecond = true, seconds = 25 }, Spanish))
+	end)
+
+	it("fills in the number wherever the language puts it", function()
+		local function Words(name)
+			return ({ INT_SPELL_DURATION_SEC = "%d Sek." })[name]
+		end
+		assert.are.equal(" (24 Sek.)", ns.FormatDetails({ seconds = 24 }, Words))
+	end)
+
+	it("returns nil when a word is missing", function()
+		local function NoWellFed(name)
+			return name ~= "WELL_FED" and Spanish(name) or nil
+		end
+		assert.is_nil(ns.FormatDetails({ wellFedMinutes = 15 }, NoWellFed))
+		assert.is_nil(ns.FormatDetails({ seconds = 24 }, function() end))
+	end)
+end)
+
+describe("CompactLine", function()
+	it("writes the English line, with a food line's details", function()
+		assert.are.equal("+4 attack power", ns.CompactLine("attackPower", 4, "attack power").text)
+		assert.are.equal(
+			"+530 health (24 sec)",
+			ns.CompactLine("health", 530, "health", nil, nil, { seconds = 24 }).text
+		)
+		local wellFed = ns.CompactLine("stamina", 6, "stamina", nil, nil, { wellFedMinutes = 15 })
+		assert.are.equal("+6 stamina (well fed, 15 min)", wellFed.text)
+		local rate = ns.CompactLine("health", 2, "health", nil, true, { perSecond = true, seconds = 25 })
+		assert.are.equal("+2% health/s (25 sec)", rate.text)
+	end)
+end)

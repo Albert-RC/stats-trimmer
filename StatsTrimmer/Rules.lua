@@ -515,17 +515,19 @@ local function GetStatNames(line, GetStatName)
 	return names
 end
 
--- The compact lines with Blizzard's stat names from GetStatName (a getter made with ns.TrustedNames)
--- instead of English ("+10 Daño con hechizos"). A line naming several stats (a group of weapon skills,
--- several creature types) becomes one line per stat. A line stays as it is when one of its names is missing
--- or untrusted, so a second pass with other names can still translate it.
+-- The compact lines with Blizzard's names from GetStatName (a getter made with ns.TrustedNames) instead of
+-- English ("+10 Daño con hechizos"), food lines' details included ("(24 s)"). A line naming several stats (a
+-- group of weapon skills, several creature types) becomes one line per stat. A line stays as it is when one
+-- of its names is missing or untrusted, so a second pass with other names can still translate it.
 function ns.LocalizeLines(lines, GetStatName)
 	local localized = {}
 	for _, line in ipairs(lines) do
 		local names = GetStatNames(line, GetStatName)
-		if names then
+		local details = names and ns.FormatDetails(line.details, GetStatName)
+		if details then
 			for _, name in ipairs(names) do
-				table.insert(localized, { kind = line.kind, text = FormatLine(line.value, line.percent, name) })
+				local text = FormatLine(line.value, line.percent, name) .. details
+				table.insert(localized, { kind = line.kind, text = text })
 			end
 		else
 			table.insert(localized, line)

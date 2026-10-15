@@ -60,6 +60,15 @@ describe("DEFAULTS", function()
 			"rangedAttackPower",
 			"feralAttackPower",
 			"spellPenetration",
+			"health",
+			"mana",
+			"experience",
+			"stamina",
+			"intellect",
+			"strength",
+			"agility",
+			"spirit",
+			"armor",
 		}) do
 			assert.is_true(keys[key])
 		end
@@ -84,7 +93,7 @@ describe("color sections", function()
 		return sections
 	end
 
-	it("are attack, defense, spells and spell schools, with MP5 among spells and HP5 in defense", function()
+	it("are attack, defense, spells, spell schools and food, with MP5 among spells and HP5 in defense", function()
 		assert.are.same({
 			{
 				"attack",
@@ -116,7 +125,27 @@ describe("color sections", function()
 				"school",
 				{ "arcaneDamage", "fireDamage", "frostDamage", "holyDamage", "natureDamage", "shadowDamage" },
 			},
+			{
+				"food",
+				{ "health", "mana", "experience", "stamina", "intellect", "strength", "agility", "spirit", "armor" },
+			},
 		}, Sections())
+	end)
+
+	it("are in the combat tab but food and drink, which has a tab of its own", function()
+		local tabs = {}
+		for _, group in ipairs(ns.COLOR_GROUPS) do
+			table.insert(tabs, group.tab)
+		end
+		assert.are.same({ "combat", "combat", "combat", "combat", "food" }, tabs)
+	end)
+
+	it("collapse only when they share their tab", function()
+		for _, key in ipairs({ "attack", "defense", "spell", "school" }) do
+			assert.is_true(ns.IsCollapsible(key))
+		end
+		assert.is_false(ns.IsCollapsible("food"))
+		assert.is_false(ns.IsCollapsible("unknown"))
 	end)
 
 	it("hold every kind, listed section by section so the preview follows the window's order", function()
@@ -133,15 +162,18 @@ describe("color sections", function()
 		assert.are.same(keys, ordered)
 	end)
 
-	it("are titled with Blizzard's names for these stat categories, spell schools as its damage plus extra", function()
+	it("are titled with Blizzard's names, spell schools as its damage plus extra", function()
 		local titles = {}
 		for _, group in ipairs(ns.COLOR_GROUPS) do
 			table.insert(titles, { group.labelGlobal, group.labelSuffix })
 		end
-		assert.are.same(
-			{ { "STAT_CATEGORY_ATTACK" }, { "STAT_CATEGORY_DEFENSE" }, { "SPELLS" }, { "DAMAGE", " extra" } },
-			titles
-		)
+		assert.are.same({
+			{ "STAT_CATEGORY_ATTACK" },
+			{ "STAT_CATEGORY_DEFENSE" },
+			{ "SPELLS" },
+			{ "DAMAGE", " extra" },
+			{ "MINIMAP_TRACKING_VENDOR_FOOD" },
+		}, titles)
 	end)
 end)
 
@@ -176,6 +208,14 @@ describe("sample lines", function()
 		local line = ns.GetSampleLine(Kind("attackPowerVs"))
 		assert.are.equal("+6 attack power vs beasts", line.text)
 		assert.are.same({ "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT" }, line.stats)
+	end)
+
+	it("show food lines with their details", function()
+		assert.are.equal("+530 health (24 sec)", ns.GetSampleLine(Kind("health")).text)
+		assert.are.equal("+5% experience gained from kills", ns.GetSampleLine(Kind("experience")).text)
+		local stamina = ns.GetSampleLine(Kind("stamina"))
+		assert.are.equal("+6 stamina (well fed, 15 min)", stamina.text)
+		assert.are.same({ wellFedMinutes = 15 }, stamina.details)
 	end)
 end)
 
@@ -283,9 +323,10 @@ describe("LoadSettings", function()
 		assert.are.equal(45, settings.minimap.angle)
 	end)
 
-	it("keeps only collapsed sections that exist, marked true", function()
-		local settings =
-			ns.LoadSettings({ collapsedSections = { spell = true, regen = true, attack = 1, defense = false } })
+	it("keeps only collapsed sections that exist and can collapse, marked true", function()
+		local settings = ns.LoadSettings({
+			collapsedSections = { spell = true, regen = true, attack = 1, defense = false, food = true },
+		})
 		assert.are.same({ spell = true }, settings.collapsedSections)
 		assert.are.same({}, ns.LoadSettings({ collapsedSections = "spell" }).collapsedSections)
 	end)
@@ -323,5 +364,27 @@ describe("LoadSettings", function()
 		assert.are.equal(200, settings.minimap.angle)
 		assert.are.equal(200, ns.LoadSettings({ minimap = { angle = math.huge } }).minimap.angle)
 		assert.are.equal(200, ns.LoadSettings({ minimap = { angle = -math.huge } }).minimap.angle)
+	end)
+end)
+
+describe("settings tabs", function()
+	local ns = LoadConfig()
+
+	it("are combat and food and drink, named with Blizzard's texts, the spell power split in combat", function()
+		local tabs = {}
+		for _, tab in ipairs(ns.SETTINGS_TABS) do
+			table.insert(tabs, { tab.key, tab.labelGlobal, tab.spellPowerSplit })
+		end
+		assert.are.same({ { "combat", "COMBAT", true }, { "food", "MINIMAP_TRACKING_VENDOR_FOOD" } }, tabs)
+	end)
+
+	it("each hold some section", function()
+		for _, tab in ipairs(ns.SETTINGS_TABS) do
+			local count = 0
+			for _, group in ipairs(ns.COLOR_GROUPS) do
+				count = count + (group.tab == tab.key and 1 or 0)
+			end
+			assert.is_true(count > 0)
+		end
 	end)
 end)

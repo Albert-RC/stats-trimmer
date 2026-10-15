@@ -12,6 +12,8 @@ describe("Stats Trimmer load order", function()
 			position[file] = index
 		end
 		assert.is_true(position["Util.lua"] < position["Rules.lua"])
+		assert.is_true(position["Util.lua"] < position["FoodRules.lua"])
+		assert.is_true(position["Config.lua"] < position["FoodData.lua"])
 		assert.is_true(position["Config.lua"] < position["Core.lua"])
 		assert.are.equal("Core.lua", files[#files])
 	end)
@@ -20,7 +22,8 @@ describe("Stats Trimmer load order", function()
 		local wow = fakes.NewWoW()
 		local ns = helpers.StartStatsTrimmer(wow)
 		assert.is_not_nil(ns.db)
-		assert.are.equal(1, #wow.preCalls)
+		assert.are.equal(2, #wow.preCalls)
+		assert.is_not_nil(ns.FOODS[435])
 		assert.is_not_nil(wow.env.StatsTrimmerMinimapButton)
 		assert.are.equal(1, #wow.categories)
 	end)
@@ -45,5 +48,29 @@ describe("Stats Trimmer load order", function()
 
 		ns.ShowOptions()
 		assert.is_true(wow.env.StatsTrimmerOptionsFrame:IsShown())
+	end)
+
+	it("works without the food files, which /reload doesn't load right after the update that added them", function()
+		local wow = fakes.NewWoW()
+		local withoutFood = {}
+		for _, file in ipairs(files) do
+			if file ~= "FoodData.lua" and file ~= "FoodRules.lua" then
+				table.insert(withoutFood, file)
+			end
+		end
+		local ns = helpers.LoadAddon("StatsTrimmer", withoutFood, wow.env)
+		fakes.FireEvent(wow, "ADDON_LOADED", "StatsTrimmer")
+
+		-- Spongy Morel's Use line keeps its text
+		local text = "Usar: Restaura 530 p. de salud durante 24 s. Debes permanecer sentado mientras comes."
+		fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+			lines = {
+				{ leftText = text, type = wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse, spellID = 435 },
+			},
+		})
+		assert.are.equal(text, wow.env.GameTooltip.lines[1].text)
+
+		ns.ShowOptions()
+		assert.are.equal("+530 salud (24 s)", wow.env.StatsTrimmerFoodPreviewTooltip.lines[2].text)
 	end)
 end)
