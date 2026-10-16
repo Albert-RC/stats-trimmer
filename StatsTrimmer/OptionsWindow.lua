@@ -222,8 +222,14 @@ local function FitWindow(tooltipsWidth, tooltipsHeight)
 	local width = math.max(MIN_WIDTH, topRowsWidth, panelsWidth)
 	local height = math.max(MIN_HEIGHT, TOP_HEIGHT + previewHeight + BOTTOM_HEIGHT)
 	frame:SetSize(width, height)
-	-- Scaled down on a screen too small for it (a large UI scale), so it stays whole
-	frame:SetScale(math.min(1, UIParent:GetWidth() / width, UIParent:GetHeight() / height))
+	-- The tabs extend below the frame. Include them in both the scale and the screen bounds, so they stay
+	-- visible on a small screen (a large UI scale) and when the window is dragged to the bottom edge.
+	local tabsBelow = 0
+	for _, tab in ipairs(frame.Tabs) do
+		tabsBelow = math.max(tabsBelow, tab:GetHeight() - TAB_TOP)
+	end
+	frame:SetClampRectInsets(0, 0, 0, -tabsBelow)
+	frame:SetScale(math.min(1, UIParent:GetWidth() / width, UIParent:GetHeight() / (height + tabsBelow)))
 end
 
 -- The preview shows the sections that are open, and the window fits it. A color change keeps every size
@@ -651,6 +657,11 @@ local function CreateWindow()
 		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
 		previewTooltip:Hide()
 		foodTooltip:Hide()
+	end)
+	frame:RegisterEvent("UI_SCALE_CHANGED")
+	frame:RegisterEvent("DISPLAY_SIZE_CHANGED")
+	frame:SetScript("OnEvent", function()
+		RefreshPreview()
 	end)
 end
 

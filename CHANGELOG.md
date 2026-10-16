@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The settings window keeps its tabs on screen at large UI scales, including when dragged to the bottom edge, and adjusts when the UI scale or display size changes.
+
 ## v0.5.0 (2026-10-15)
 
 - Food and drink get compact lines too. `Use: Restores 530 health over 24 sec. Must remain seated while eating.` becomes `+530 health (24 sec)`, and a drink `+803 mana (24 sec)`.

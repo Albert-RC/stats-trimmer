@@ -307,6 +307,14 @@ function Frame:GetScale()
 	return self.scale or 1
 end
 
+function Frame:SetClampRectInsets(left, right, top, bottom)
+	self.clampRectInsets = { left, right, top, bottom }
+end
+
+function Frame:GetClampRectInsets()
+	return unpack(self.clampRectInsets or { 0, 0, 0, 0 })
+end
+
 -- ScrollFrame
 function Frame:SetScrollChild(child)
 	self.scrollChild = child
@@ -417,7 +425,8 @@ function fakes.NewFrame(wow, frameType, name, parent, template)
 		-- From UIPanelButtonNoTooltipTemplate's KeyValues
 		frame.fitTextCanWidthDecrease = true
 	elseif template == "PanelTabButtonTemplate" then
-		-- The template's parentArray
+		-- The template's height and parentArray
+		frame.height = 32
 		parent.Tabs = parent.Tabs or {}
 		table.insert(parent.Tabs, frame)
 	end

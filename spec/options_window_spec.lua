@@ -597,7 +597,21 @@ describe("Settings window", function()
 			assert.are.equal(height, Window():GetHeight())
 		end)
 
-		it("scales down, whole, on a screen too short for it", function()
+		-- The frame and the tabs below it must both fit, and the screen clamp must cover every tab, which keeps them
+		-- on screen when the window is dragged down. The fake doesn't clamp: the drag itself is checked in game.
+		local function AssertWindowAndTabsFit()
+			local window = Window()
+			local bottomInset = select(4, window:GetClampRectInsets())
+			local tabTop = window.Tabs[1].points[1][5]
+			for _, tab in ipairs(window.Tabs) do
+				assert.is_true(bottomInset <= tabTop - tab:GetHeight())
+			end
+			local scale = window:GetScale()
+			assert.is_true((window:GetHeight() - bottomInset) * scale <= wow.env.UIParent:GetHeight() + 0.001)
+			assert.is_true(window:GetWidth() * scale <= wow.env.UIParent:GetWidth() + 0.001)
+		end
+
+		it("scales down with its tabs on a screen too short for it", function()
 			assert.are.equal(1, Window():GetScale())
 			wow = fakes.NewWoW()
 			-- A large UI scale
@@ -605,7 +619,24 @@ describe("Settings window", function()
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
 			assert.is_true(Window():GetHeight() > 600)
-			assert.is_true(Window():GetHeight() * Window():GetScale() <= 600)
+			AssertWindowAndTabsFit()
+			ShowFoodTab()
+			AssertWindowAndTabsFit()
+		end)
+
+		it("extends its screen clamp below the frame to cover its tabs", function()
+			AssertWindowAndTabsFit()
+		end)
+
+		it("fits again when the UI scale or display size changes while open", function()
+			for _, event in ipairs({ "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED" }) do
+				for _, size in ipairs({ { 1365, 600 }, { 500, 768 }, { 1365, 768 } }) do
+					wow.env.UIParent:SetSize(unpack(size))
+					fakes.FireEvent(wow, event)
+					AssertWindowAndTabsFit()
+				end
+				assert.are.equal(1, Window():GetScale())
+			end
 		end)
 	end)
 
