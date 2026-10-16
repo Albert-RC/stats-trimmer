@@ -24,7 +24,9 @@ Locales.lua
 FoodData.lua
 Rules.lua
 FoodRules.lua
+Localization.lua
 Tooltip.lua
+ClassPalette.lua
 OptionsWindow.lua
 MinimapButton.lua
 SettingsCategory.lua

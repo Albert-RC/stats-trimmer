@@ -20,11 +20,16 @@ local function Setup(prepare, locale)
 	if prepare then
 		prepare(wow)
 	end
-	local ns = helpers.LoadAddon(
-		"StatsTrimmer",
-		{ "Util.lua", "Config.lua", "Locales.lua", "FoodData.lua", "Rules.lua", "FoodRules.lua", "Tooltip.lua" },
-		wow.env
-	)
+	local ns = helpers.LoadAddon("StatsTrimmer", {
+		"Util.lua",
+		"Config.lua",
+		"Locales.lua",
+		"FoodData.lua",
+		"Rules.lua",
+		"FoodRules.lua",
+		"Localization.lua",
+		"Tooltip.lua",
+	}, wow.env)
 	ns.db = ns.LoadSettings(nil)
 	wow.items["item:cosedora"] = COSEDORA_STATS
 	wow.items["item:crit"] = { ITEM_MOD_CRIT_RATING_SHORT = 14 }
