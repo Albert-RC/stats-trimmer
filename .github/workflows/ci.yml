@@ -44,6 +44,9 @@ jobs:
       - name: Coverage
         shell: pwsh
         run: ./scripts/coverage.ps1 -LuaCov "$env:RUNNER_TEMP/luacov/src"
+      - name: Generators
+        shell: pwsh
+        run: ./scripts/test-generators.ps1
 
   package:
     name: Package
