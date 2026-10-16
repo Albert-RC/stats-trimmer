@@ -47,6 +47,8 @@ jobs:
       - name: Generators
         shell: pwsh
         run: ./scripts/test-generators.ps1
+      - name: Release script
+        run: bash scripts/test-release.sh
 
   package:
     name: Package
