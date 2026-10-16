@@ -480,6 +480,7 @@ fakes.ES_CLIENT_STRINGS = {
 	ITEM_SPELL_TRIGGER_ONEQUIP = "Equipar:",
 	ITEM_SPELL_TRIGGER_ONUSE = "Usar:",
 	ITEM_COOLDOWN_TOTAL = "(%s de tiempo de reutilización).",
+	SECONDS_ABBR = "%d |4s:s;",
 }
 
 -- A fresh fake world.

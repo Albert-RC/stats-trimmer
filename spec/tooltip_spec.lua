@@ -430,6 +430,15 @@ describe("Food Use lines", function()
 			wow.keysDown.CTRL = true
 			AssertUntouched(ProcessUseLine(MOREL_LINE, MOREL_SPELL))
 		end)
+
+		it("when its cooldown is a minute, not the second foods share", function()
+			AssertUntouched(ProcessUseLine(MOREL_LINE .. " (1 |4min:min; de tiempo de reutilización).", MOREL_SPELL))
+		end)
+
+		it("when it has a cooldown and the client has no text for seconds", function()
+			wow.env.SECONDS_ABBR = nil
+			AssertUntouched(ProcessUseLine(SNAPPER_LINE, SNAPPER_SPELL))
+		end)
 	end)
 
 	it("rebuilds another addon's own tooltip with a food line through its owner when the key changes", function()

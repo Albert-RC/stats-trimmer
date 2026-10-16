@@ -267,7 +267,11 @@ local function ReplaceUseLine(tooltip, lineData)
 		return false
 	end
 
-	local context = { usePrefix = USE_PREFIX, cooldownFormat = ns.GetClientText("ITEM_COOLDOWN_TOTAL") }
+	local context = {
+		usePrefix = USE_PREFIX,
+		cooldownFormat = ns.GetClientText("ITEM_COOLDOWN_TOTAL"),
+		secondsFormat = ns.GetClientText("SECONDS_ABBR"),
+	}
 	local lines = ns.GetFoodReplacement(text, food, context)
 	if not lines then
 		return false

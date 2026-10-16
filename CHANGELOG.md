@@ -3,6 +3,7 @@
 ## Unreleased
 
 - An equip line with more than one percentage, such as a hit bonus next to a movement speed bonus, keeps its original text instead of losing the second one.
+- Food whose cooldown is a minute or an hour keeps its original text, which shows it. Only the 1 second cooldown foods share is left out.
 - The settings window keeps its tabs on screen at large UI scales, including when dragged to the bottom edge, and adjusts when the UI scale or display size changes.
 
 ## v0.5.0 (2026-10-15)
