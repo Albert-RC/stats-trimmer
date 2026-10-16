@@ -3,5 +3,6 @@ Thumbs.db
 *.zip
 .release/
 CLAUDE.md
+AGENTS.md
 luacov.stats.out
 luacov.report.out
