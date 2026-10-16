@@ -72,8 +72,26 @@ function fakes.LocaleStrings(locale)
 	return ns.LOCALE_STRINGS[locale]
 end
 
--- Folded capitals besides ASCII that the specs use; string.lower leaves them as they are
-local FOLDED_CAPITALS = { ["É"] = "é", ["Ж"] = "ж", ["Н"] = "н", ["С"] = "с" }
+-- The strings of a client whose language Stats Trimmer doesn't bundle, which scripts/update-locales.ps1 generates:
+-- { strings, classNames, creatureTypes, wellFed }
+function fakes.ClientStrings(locale)
+	return assert(loadfile("spec/fixtures/ClientStrings-" .. locale .. ".lua"))()
+end
+
+-- A character in UTF-8, for codes under 0x800
+local function Utf8(code)
+	if code < 0x80 then
+		return string.char(code)
+	end
+	return string.char(0xC0 + math.floor(code / 0x40), 0x80 + code % 0x40)
+end
+
+-- Folded capitals besides ASCII that the specs use, which string.lower leaves as they are: É and the Cyrillic
+-- alphabet (А-Я, and Ё)
+local FOLDED_CAPITALS = { ["É"] = "é", [Utf8(0x401)] = Utf8(0x451) }
+for code = 0x410, 0x42F do
+	FOLDED_CAPITALS[Utf8(code)] = Utf8(code + 0x20)
+end
 
 -- Like C_Intl.FoldCase for the letters the specs use
 function fakes.FoldCase(text)
@@ -518,9 +536,10 @@ fakes.ES_CLIENT_STRINGS = {
 }
 
 -- A fresh fake world.
--- options.locale: "esES" (default) or "enUS", for the "Equip:" and "Use:" prefixes, creature type names and the
--- Well Fed buff's name. Only the esES client has Blizzard's strings as globals (fakes.LocaleStrings and
--- fakes.ES_CLIENT_STRINGS); the enUS one has only the prefixes, which exercises the fallbacks.
+-- options.locale: "esES" (default), "enUS" or "ruRU", for the client's strings, creature type names, class names
+-- and the Well Fed buff's name. The esES client has Blizzard's strings as globals (fakes.LocaleStrings and
+-- fakes.ES_CLIENT_STRINGS), and so does the ruRU one, a client whose language isn't bundled
+-- (fakes.ClientStrings). The enUS one has only the prefixes, which exercises the fallbacks.
 function fakes.NewWoW(options)
 	options = options or {}
 	local env = setmetatable({}, { __index = _G })
@@ -542,10 +561,12 @@ function fakes.NewWoW(options)
 		textMetrics = setmetatable({}, { __index = fakes.TEXT_METRICS }),
 	}
 
-	local english = options.locale == "enUS"
+	local locale = options.locale or "esES"
+	local english, russian = locale == "enUS", locale == "ruRU"
+	local client = russian and fakes.ClientStrings("ruRU")
 	-- Addon code reads client strings through _G, which must be this world
 	env._G = env
-	if not english then
+	if locale == "esES" then
 		for name, value in pairs(fakes.LocaleStrings("esES")) do
 			env[name] = value
 		end
@@ -556,21 +577,31 @@ function fakes.NewWoW(options)
 		-- for the second
 		env.WELL_FED = nil
 		env.KILL_EXPERIENCE = nil
+	elseif russian then
+		for name, value in pairs(client.strings) do
+			env[name] = value
+		end
 	end
 	env.GetLocale = function()
-		return english and "enUS" or "esES"
+		return locale
 	end
-	-- The esES client's names are its real LFG_LIST_LANGUAGE_* strings; the enUS ones are made up
-	local localeNames = english
-			and {
-				enUS = "English",
-				deDE = "German",
-				esES = "Spanish",
-				esMX = "Spanish (Mexico)",
-				frFR = "French",
-				itIT = "Italian",
-				ptBR = "Portuguese",
-			}
+	-- The esES client's names are its real LFG_LIST_LANGUAGE_* strings; the enUS ones are made up. The ruRU
+	-- client reads its own, like LocaleUtil.GetLocaleDisplayName.
+	local localeNames = russian
+			and setmetatable({}, {
+				__index = function(_, name)
+					return env["LFG_LIST_LANGUAGE_" .. name:upper()] or name
+				end,
+			})
+		or english and {
+			enUS = "English",
+			deDE = "German",
+			esES = "Spanish",
+			esMX = "Spanish (Mexico)",
+			frFR = "French",
+			itIT = "Italian",
+			ptBR = "Portuguese",
+		}
 		or {
 			enUS = "Inglés",
 			deDE = "Alemán",
@@ -581,8 +612,8 @@ function fakes.NewWoW(options)
 			ptBR = "Portugués",
 		}
 	env.LocaleUtil = {
-		GetLocaleDisplayName = function(locale)
-			return localeNames[locale]
+		GetLocaleDisplayName = function(name)
+			return localeNames[name]
 		end,
 	}
 	-- The specs only use letters for which lowercase and case folding agree
@@ -592,23 +623,23 @@ function fakes.NewWoW(options)
 		env.ITEM_SPELL_TRIGGER_ONUSE = "Use:"
 	end
 	-- Spell names: wow.spellNames[spellID]. 19705 is a Well Fed buff.
-	wow.spellNames = { [19705] = english and "Well Fed" or "Bien alimentado" }
+	wow.spellNames = { [19705] = english and "Well Fed" or russian and client.wellFed or "Bien alimentado" }
 	env.C_Spell = {
 		GetSpellName = function(spellID)
 			return wow.spellNames[spellID]
 		end,
 	}
-	local creatureTypes = english
-			and {
-				[1] = "Beast",
-				[2] = "Dragonkin",
-				[3] = "Demon",
-				[4] = "Elemental",
-				[5] = "Giant",
-				[6] = "Undead",
-				[7] = "Humanoid",
-				[9] = "Mechanical",
-			}
+	local creatureTypes = russian and client.creatureTypes
+		or english and {
+			[1] = "Beast",
+			[2] = "Dragonkin",
+			[3] = "Demon",
+			[4] = "Elemental",
+			[5] = "Giant",
+			[6] = "Undead",
+			[7] = "Humanoid",
+			[9] = "Mechanical",
+		}
 		or {
 			[1] = "Bestia",
 			[2] = "Dragonante",
@@ -688,18 +719,18 @@ function fakes.NewWoW(options)
 
 	-- Forever's classes, in the game's order (CLASS_SORT_ORDER), with their names on this client
 	env.CLASS_SORT_ORDER = { "WARRIOR", "PALADIN", "PRIEST", "SHAMAN", "DRUID", "ROGUE", "MAGE", "WARLOCK", "HUNTER" }
-	local classNames = english
-			and {
-				WARRIOR = "Warrior",
-				PALADIN = "Paladin",
-				PRIEST = "Priest",
-				SHAMAN = "Shaman",
-				DRUID = "Druid",
-				ROGUE = "Rogue",
-				MAGE = "Mage",
-				WARLOCK = "Warlock",
-				HUNTER = "Hunter",
-			}
+	local classNames = russian and client.classNames
+		or english and {
+			WARRIOR = "Warrior",
+			PALADIN = "Paladin",
+			PRIEST = "Priest",
+			SHAMAN = "Shaman",
+			DRUID = "Druid",
+			ROGUE = "Rogue",
+			MAGE = "Mage",
+			WARLOCK = "Warlock",
+			HUNTER = "Hunter",
+		}
 		or {
 			WARRIOR = "Guerrero",
 			PALADIN = "Paladín",

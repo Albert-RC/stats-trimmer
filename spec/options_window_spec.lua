@@ -832,29 +832,38 @@ describe("Settings window", function()
 		end)
 
 		it("offers only English besides the client's language on a client without the Latin alphabet", function()
-			wow = fakes.NewWoW()
-			wow.env.GetLocale = function()
-				return "ruRU"
-			end
-			wow.env.LocaleUtil.GetLocaleDisplayName = function(locale)
-				return locale
-			end
+			wow = fakes.NewWoW({ locale = "ruRU" })
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
-			assert.are.same({ { "ruRU", "CLIENT" }, { "enUS", "enUS" } }, LanguageMenu().options)
+			assert.are.same(
+				{ { "Русский", "CLIENT" }, { "Английский", "enUS" } },
+				LanguageMenu().options
+			)
 		end)
 
 		it("marks the client's entry for a saved language the client's font can't show", function()
-			-- Saved on another client; the fake client's own strings stay esES
-			wow = fakes.NewWoW()
-			wow.env.GetLocale = function()
-				return "ruRU"
-			end
+			-- Saved on another client
+			wow = fakes.NewWoW({ locale = "ruRU" })
 			wow.env.StatsTrimmerDB = { language = "deDE" }
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
 			assert.is_true(LanguageMenu().isSelected("CLIENT"))
-			assert.are.equal("+26 poder con hechizos", PreviewTexts()[3 + KindIndex("spellPower")])
+			assert.are.equal("+26 к силе заклинаний", PreviewTexts()[3 + KindIndex("spellPower")])
+		end)
+
+		it("shows a client's own texts when its language isn't bundled, lowercased like the compact lines", function()
+			wow = fakes.NewWoW({ locale = "ruRU" })
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_true(HasText("Сброс"))
+			assert.is_true(HasText("Цвета"))
+			assert.is_true(HasText("магическое лечение"))
+			assert.is_true(HasText("Бой"))
+			assert.are.equal("+10 урон от заклинаний", PreviewTexts()[3 + KindIndex("spellDamage")])
+			assert.are.same(
+				{ "Sample Food", "+530 здоровье (24 сек)" },
+				{ unpack(FoodPreviewTexts(), 1, 2) }
+			)
 		end)
 	end)
 
