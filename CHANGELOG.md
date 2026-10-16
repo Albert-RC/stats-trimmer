@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.1 (2026-10-16)
 
 - An equip line with more than one percentage, such as a hit bonus next to a movement speed bonus, keeps its original text instead of losing the second one.
 - Food whose cooldown is a minute or an hour keeps its original text, which shows it. Only the 1 second cooldown foods share is left out.

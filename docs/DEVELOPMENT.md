@@ -449,7 +449,7 @@ Unit tests run on LuaJIT 2.1 (Lua 5.1 compatible) through `spec/runner.lua`, a m
 - Expected values (labels, names) are written in the spec, not copied from the code's tables, so typos are caught.
 - When adding tests, check that they catch a real bug: change the code on purpose, see the right test fail, restore.
 
-Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. On 2026-10-15 it was 100% of 1688 lines (465 of them the generated `FoodData.lua`) with 333 tests.
+Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. On 2026-10-16 it was 100% of 1709 lines (465 of them the generated `FoodData.lua`) with 348 tests.
 
 The tests cover the logic. Game-facing behavior still has to be checked in game.
 
