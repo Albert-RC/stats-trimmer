@@ -219,17 +219,17 @@ describe("block rating", function()
 	local text = "Equipar: Aumenta un 1.0% la probabilidad de bloquear ataques con un escudo."
 
 	it("reads the percentage from the text (esES)", function()
-		assert.are.same({ L("blockRating", "+1% block rating") }, Replace(text, stats))
+		assert.are.same({ L("blockRating", "+1% block") }, Replace(text, stats))
 	end)
 
 	it("reads the percentage from the text (enUS)", function()
 		local enText = "Equip: Increases your chance to block attacks with a shield by 1%."
-		assert.are.same({ L("blockRating", "+1% block rating") }, Replace(enText, stats, "enUS"))
+		assert.are.same({ L("blockRating", "+1% block") }, Replace(enText, stats, "enUS"))
 	end)
 
 	it("still works when the item also has defense, which isn't a percentage", function()
 		local withDefense = { ITEM_MOD_BLOCK_RATING_SHORT = 5, ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = 3 }
-		assert.are.same({ L("blockRating", "+1% block rating") }, Replace(text, withDefense))
+		assert.are.same({ L("blockRating", "+1% block") }, Replace(text, withDefense))
 	end)
 
 	it("leaves the line alone when another rating could own the percentage", function()
@@ -359,12 +359,12 @@ describe("hit rating", function()
 
 	it("reads the percentage from the text, not the rating (esES)", function()
 		local text = "Equipar: Mejora tu probabilidad de golpear un 1%."
-		assert.are.same({ L("hitRating", "+1% hit rating") }, Replace(text, stats))
+		assert.are.same({ L("hitRating", "+1% hit") }, Replace(text, stats))
 	end)
 
 	it("reads the percentage from the text, not the rating (enUS)", function()
 		local text = "Equip: Improves your chance to hit by 1%."
-		assert.are.same({ L("hitRating", "+1% hit rating") }, Replace(text, stats, "enUS"))
+		assert.are.same({ L("hitRating", "+1% hit") }, Replace(text, stats, "enUS"))
 	end)
 end)
 
@@ -388,31 +388,31 @@ describe("percentage ratings", function()
 			"ITEM_MOD_CRIT_RATING_SHORT",
 			"Equip: Improves your chance to get a critical strike by 1%.",
 			"critRating",
-			"+1% crit rating",
+			"+1% critical strike",
 		},
 		{
 			"ITEM_MOD_CRIT_SPELL_RATING_SHORT",
 			"Equip: Improves your chance to get a critical strike with spells by 1%.",
 			"spellCritRating",
-			"+1% spell crit rating",
+			"+1% critical strike (spell)",
 		},
 		{
 			"ITEM_MOD_HIT_SPELL_RATING_SHORT",
 			"Equip: Improves your chance to hit with spells by 1%.",
 			"spellHitRating",
-			"+1% spell hit rating",
+			"+1% hit (spell)",
 		},
 		{
 			"ITEM_MOD_DODGE_RATING_SHORT",
 			"Equip: Increases your chance to dodge an attack by 1%.",
 			"dodgeRating",
-			"+1% dodge rating",
+			"+1% dodge",
 		},
 		{
 			"ITEM_MOD_PARRY_RATING_SHORT",
 			"Equip: Increases your chance to parry an attack by 2%.",
 			"parryRating",
-			"+2% parry rating",
+			"+2% parry",
 		},
 	}
 	for _, case in ipairs(cases) do
@@ -443,7 +443,7 @@ describe("point stats", function()
 			60,
 			"Equip: +60 Attack Power in Cat, Bear, and Dire Bear forms only.",
 			"feralAttackPower",
-			"+60 feral attack power",
+			"+60 attack power in forms",
 		},
 		{
 			"ITEM_MOD_BLOCK_VALUE_SHORT",
@@ -457,7 +457,7 @@ describe("point stats", function()
 			10,
 			"Equip: Decreases the magical resistances of your spell targets by 10.",
 			"spellPenetration",
-			"+10 spell penetration",
+			"+10 spell piercing",
 		},
 	}
 	for _, case in ipairs(cases) do
@@ -574,7 +574,7 @@ describe("percentages", function()
 		local hit = "Equip: Improves your chance to hit by 1%."
 		local struck = "Equip: When struck in combat has a 5% chance to stun the attacker for 3 sec."
 		local itemLines = Lines(hit, struck)
-		assert.are.same({ L("hitRating", "+1% hit rating") }, Replace(hit, stats, "enUS", itemLines))
+		assert.are.same({ L("hitRating", "+1% hit") }, Replace(hit, stats, "enUS", itemLines))
 		assert.is_nil(Replace(struck, stats, "enUS", itemLines))
 	end)
 

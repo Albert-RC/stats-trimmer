@@ -77,7 +77,7 @@ local function RowLabel(kind, language)
 		local stem = name and name:match("^(.-%S)%s+%S+$")
 		return ns.ToLower(stem and stem .. " …" or kind.label)
 	elseif kind.stat then
-		return ns.ToLower(Text(kind.stat, kind.label, language))
+		return ns.ToLower(Text(kind.stat, ns.ENGLISH_NAMES[kind.stat] or kind.label, language))
 	end
 	return kind.label
 end

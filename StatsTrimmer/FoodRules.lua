@@ -11,22 +11,22 @@
 -- players see. Anything else keeps its original text.
 local _, ns = ...
 
-local Line = ns.CompactLine
+local StatLine = ns.StatLine
 
--- The stat keys FoodData.lua uses: line kind and English name
-local FOOD_STATS = {
-	HEALTH = { kind = "health", name = "health" },
-	MANA = { kind = "mana", name = "mana" },
-	ITEM_MOD_STAMINA_SHORT = { kind = "stamina", name = "stamina" },
-	ITEM_MOD_INTELLECT_SHORT = { kind = "intellect", name = "intellect" },
-	ITEM_MOD_STRENGTH_SHORT = { kind = "strength", name = "strength" },
-	ITEM_MOD_AGILITY_SHORT = { kind = "agility", name = "agility" },
-	ITEM_MOD_SPIRIT_SHORT = { kind = "spirit", name = "spirit" },
-	ARMOR = { kind = "armor", name = "armor" },
-	ITEM_MOD_ATTACK_POWER_SHORT = { kind = "attackPower", name = "attack power" },
-	ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = { kind = "spellDamage", name = "spell damage" },
-	ITEM_MOD_SPELL_HEALING_DONE_SHORT = { kind = "spellHealing", name = "spell healing" },
-	ITEM_MOD_CRIT_RATING_SHORT = { kind = "critRating", name = "crit rating" },
+-- The stat keys FoodData.lua uses -> line kind. Their English names are ns.ENGLISH_NAMES'.
+local FOOD_KINDS = {
+	HEALTH = "health",
+	MANA = "mana",
+	ITEM_MOD_STAMINA_SHORT = "stamina",
+	ITEM_MOD_INTELLECT_SHORT = "intellect",
+	ITEM_MOD_STRENGTH_SHORT = "strength",
+	ITEM_MOD_AGILITY_SHORT = "agility",
+	ITEM_MOD_SPIRIT_SHORT = "spirit",
+	ARMOR = "armor",
+	ITEM_MOD_ATTACK_POWER_SHORT = "attackPower",
+	ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "spellDamage",
+	ITEM_MOD_SPELL_HEALING_DONE_SHORT = "spellHealing",
+	ITEM_MOD_CRIT_RATING_SHORT = "critRating",
 }
 
 -- Foods share a 1 second cooldown, which the client adds at the end of the line. Any other is worth knowing,
@@ -166,18 +166,17 @@ function ns.GetFoodReplacement(text, food, context)
 
 	local lines = {}
 	for _, line in ipairs(food.lines) do
-		local stat = FOOD_STATS[line.stat]
-		if not stat then
+		local kind = FOOD_KINDS[line.stat]
+		if not kind then
 			return nil
 		end
 		-- The data line holds the details: perSecond, seconds and wellFedMinutes
 		local value = line.amount and amounts[line] or line.value
-		table.insert(lines, Line(stat.kind, value, stat.name, { line.stat }, line.percent, line))
+		table.insert(lines, StatLine(kind, value, line.stat, line.percent, line))
 	end
 	-- The bonus only counts for kills, which its name says: Blizzard's words from the bonus buff
 	if showsExperience then
-		local name = "experience gained from kills"
-		table.insert(lines, Line("experience", food.experience, name, { "KILL_EXPERIENCE" }, true))
+		table.insert(lines, StatLine("experience", food.experience, "KILL_EXPERIENCE", true))
 	end
 	return lines
 end

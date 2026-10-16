@@ -452,6 +452,26 @@ describe("Food Use lines", function()
 	end)
 end)
 
+describe("Without any of Blizzard's names", function()
+	it("names the stats with the addon's English, as right after an update, before Locales.lua loads", function()
+		local wow, ns, preCall = Setup(nil, "enUS")
+		-- An enUS client whose strings are only the prefixes, with no bundled language either
+		for locale in pairs(ns.LOCALE_STRINGS) do
+			ns.LOCALE_STRINGS[locale] = nil
+		end
+		wow.items["item:feral"] = { ITEM_MOD_FERAL_ATTACK_POWER_SHORT = 60 }
+		local _, crit = ProcessLine(
+			wow,
+			preCall,
+			"Equip: Improves your chance to get a critical strike by 1%.",
+			{ hyperlink = "item:crit" }
+		)
+		local _, feral =
+			ProcessLine(wow, preCall, "Equip: +60 Attack Power in Cat forms.", { hyperlink = "item:feral" })
+		assert.are.same({ "+1% critical strike", "+60 attack power in forms" }, { crit[1].text, feral[1].text })
+	end)
+end)
+
 describe("On a client whose language isn't bundled (ruRU)", function()
 	local wow, preCall
 

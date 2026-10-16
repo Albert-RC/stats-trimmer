@@ -175,7 +175,7 @@ describe("well fed", function()
 			.. "experience gained from kills is increased by 5%. (1 |4Sec:Sec; Cooldown)"
 		assert.are.same({
 			L("health", "+1650 health (30 sec)"),
-			L("critRating", "+1% crit rating (well fed, 15 min)"),
+			L("critRating", "+1% critical strike (well fed, 15 min)"),
 			L("experience", "+5% experience gained from kills"),
 		}, Replace(text, 1249522))
 	end)

@@ -103,6 +103,21 @@ describe("FormatDetails", function()
 	end)
 end)
 
+describe("ENGLISH_NAMES", function()
+	it("are Blizzard's enUS names, lowercased", function()
+		local fakes = require("spec.fakes")
+		local english = fakes.LocaleStrings("enUS")
+		for key, name in pairs(ns.ENGLISH_NAMES) do
+			assert.are.same({ key, english[key] and english[key]:lower() }, { key, name })
+		end
+	end)
+
+	it("name ratings without the word rating", function()
+		assert.are.equal("+1% hit", ns.StatLine("hitRating", 1, "ITEM_MOD_HIT_RATING_SHORT", true).text)
+		assert.are.equal("+1% critical strike", ns.StatLine("critRating", 1, "ITEM_MOD_CRIT_RATING_SHORT", true).text)
+	end)
+end)
+
 describe("CompactLine", function()
 	it("writes the English line, with a food line's details", function()
 		assert.are.equal("+4 attack power", ns.CompactLine("attackPower", 4, "attack power").text)

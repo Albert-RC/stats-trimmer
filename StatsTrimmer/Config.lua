@@ -90,18 +90,18 @@ function ns.IsCollapsible(groupKey)
 end
 
 -- Every kind of replacement line, in settings order, grouped by section (`group`, a COLOR_GROUPS key).
--- `stat` is the key of Blizzard's name for the row label (in the chosen language), with `label` as the
--- English fallback; a kind without `stat` or `typeStat` always shows `label`. `sample` is the line the
--- preview tooltip shows: { value, English name, percent = ..., stat = ..., details = ... }, where its own
--- `stat` overrides the kind's and `details` are a food line's (ns.FormatDetails). Food lines also use the
--- attack power, spell damage, spell healing and crit kinds, for those Well Fed buffs.
+-- `stat` is the key of Blizzard's name for the row label (in the chosen language), with ns.ENGLISH_NAMES' as
+-- the English fallback, or `label` for a kind Blizzard has no single name for; a kind without `stat` or
+-- `typeStat` always shows `label`. `sample` is the line the preview tooltip shows: { value[, English name],
+-- percent = ..., stat = ..., details = ... }, where its own `stat` overrides the kind's, the name is
+-- ns.ENGLISH_NAMES' for its stat unless given, and `details` are a food line's (ns.FormatDetails). Food lines
+-- also use the attack power, spell damage, spell healing and crit kinds, for those Well Fed buffs.
 ns.COLOR_KINDS = {
 	{
 		key = "attackPower",
 		group = "attack",
-		label = "Attack power",
 		stat = "ITEM_MOD_ATTACK_POWER_SHORT",
-		sample = { 4, "attack power" },
+		sample = { 4 },
 	},
 	{
 		-- Blizzard only names this per creature type: the label is typeStat's name without its last word,
@@ -115,30 +115,26 @@ ns.COLOR_KINDS = {
 	{
 		key = "rangedAttackPower",
 		group = "attack",
-		label = "Ranged attack power",
 		stat = "ITEM_MOD_RANGED_ATTACK_POWER_SHORT",
-		sample = { 12, "ranged attack power" },
+		sample = { 12 },
 	},
 	{
 		key = "feralAttackPower",
 		group = "attack",
-		label = "Feral attack power",
 		stat = "ITEM_MOD_FERAL_ATTACK_POWER_SHORT",
-		sample = { 30, "feral attack power" },
+		sample = { 30 },
 	},
 	{
 		key = "hitRating",
 		group = "attack",
-		label = "Hit",
 		stat = "ITEM_MOD_HIT_RATING_SHORT",
-		sample = { 1, "hit rating", percent = true },
+		sample = { 1, percent = true },
 	},
 	{
 		key = "critRating",
 		group = "attack",
-		label = "Crit",
 		stat = "ITEM_MOD_CRIT_RATING_SHORT",
-		sample = { 1, "crit rating", percent = true },
+		sample = { 1, percent = true },
 	},
 	{
 		-- One row for every weapon skill, under Blizzard's name for them all
@@ -151,37 +147,32 @@ ns.COLOR_KINDS = {
 	{
 		key = "defense",
 		group = "defense",
-		label = "Defense",
 		stat = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT",
-		sample = { 3, "defense" },
+		sample = { 3 },
 	},
 	{
 		key = "dodgeRating",
 		group = "defense",
-		label = "Dodge",
 		stat = "ITEM_MOD_DODGE_RATING_SHORT",
-		sample = { 1, "dodge rating", percent = true },
+		sample = { 1, percent = true },
 	},
 	{
 		key = "parryRating",
 		group = "defense",
-		label = "Parry",
 		stat = "ITEM_MOD_PARRY_RATING_SHORT",
-		sample = { 1, "parry rating", percent = true },
+		sample = { 1, percent = true },
 	},
 	{
 		key = "blockRating",
 		group = "defense",
-		label = "Block",
 		stat = "ITEM_MOD_BLOCK_RATING_SHORT",
-		sample = { 1, "block rating", percent = true },
+		sample = { 1, percent = true },
 	},
 	{
 		key = "blockValue",
 		group = "defense",
-		label = "Block value",
 		stat = "ITEM_MOD_BLOCK_VALUE_SHORT",
-		sample = { 15, "block value" },
+		sample = { 15 },
 	},
 	{
 		-- MP5 and HP5 read the same in every language
@@ -194,23 +185,20 @@ ns.COLOR_KINDS = {
 		-- A single stat that adds damage and healing; split into the next two when splitSpellPower is set
 		key = "spellPower",
 		group = "spell",
-		label = "Spell power",
 		stat = "ITEM_MOD_SPELL_POWER_SHORT",
-		sample = { 26, "spell power" },
+		sample = { 26 },
 	},
 	{
 		key = "spellDamage",
 		group = "spell",
-		label = "Spell damage",
 		stat = "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT",
-		sample = { 10, "spell damage" },
+		sample = { 10 },
 	},
 	{
 		key = "spellHealing",
 		group = "spell",
-		label = "Spell healing",
 		stat = "ITEM_MOD_SPELL_HEALING_DONE_SHORT",
-		sample = { 30, "spell healing" },
+		sample = { 30 },
 	},
 	{
 		-- Like attack power vs type. Undead, because some clients name spell damage vs beasts wrongly.
@@ -223,23 +211,20 @@ ns.COLOR_KINDS = {
 	{
 		key = "spellHitRating",
 		group = "spell",
-		label = "Spell hit",
 		stat = "ITEM_MOD_HIT_SPELL_RATING_SHORT",
-		sample = { 1, "spell hit rating", percent = true },
+		sample = { 1, percent = true },
 	},
 	{
 		key = "spellCritRating",
 		group = "spell",
-		label = "Spell crit",
 		stat = "ITEM_MOD_CRIT_SPELL_RATING_SHORT",
-		sample = { 1, "spell crit rating", percent = true },
+		sample = { 1, percent = true },
 	},
 	{
 		key = "spellPenetration",
 		group = "spell",
-		label = "Spell penetration",
 		stat = "ITEM_MOD_SPELL_PENETRATION_SHORT",
-		sample = { 10, "spell penetration" },
+		sample = { 10 },
 	},
 	{
 		key = "mp5",
@@ -250,58 +235,50 @@ ns.COLOR_KINDS = {
 	{
 		key = "arcaneDamage",
 		group = "school",
-		label = "Arcane damage",
 		stat = "ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT",
-		sample = { 12, "arcane damage" },
+		sample = { 12 },
 	},
 	{
 		key = "fireDamage",
 		group = "school",
-		label = "Fire damage",
 		stat = "ITEM_MOD_FIRE_DAMAGE_DONE_SHORT",
-		sample = { 12, "fire damage" },
+		sample = { 12 },
 	},
 	{
 		key = "frostDamage",
 		group = "school",
-		label = "Frost damage",
 		stat = "ITEM_MOD_FROST_DAMAGE_DONE_SHORT",
-		sample = { 32, "frost damage" },
+		sample = { 32 },
 	},
 	{
 		key = "holyDamage",
 		group = "school",
-		label = "Holy damage",
 		stat = "ITEM_MOD_HOLY_DAMAGE_DONE_SHORT",
-		sample = { 12, "holy damage" },
+		sample = { 12 },
 	},
 	{
 		key = "natureDamage",
 		group = "school",
-		label = "Nature damage",
 		stat = "ITEM_MOD_NATURE_DAMAGE_DONE_SHORT",
-		sample = { 12, "nature damage" },
+		sample = { 12 },
 	},
 	{
 		key = "shadowDamage",
 		group = "school",
-		label = "Shadow damage",
 		stat = "ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT",
-		sample = { 12, "shadow damage" },
+		sample = { 12 },
 	},
 	{
 		key = "health",
 		group = "food",
-		label = "Health",
 		stat = "HEALTH",
-		sample = { 530, "health", details = { seconds = 24 } },
+		sample = { 530, details = { seconds = 24 } },
 	},
 	{
 		key = "mana",
 		group = "food",
-		label = "Mana",
 		stat = "MANA",
-		sample = { 803, "mana", details = { seconds = 24 } },
+		sample = { 803, details = { seconds = 24 } },
 	},
 	{
 		-- The bonus Forever's Well Fed buffs add for some players, to the experience from kills only
@@ -309,50 +286,44 @@ ns.COLOR_KINDS = {
 		group = "food",
 		label = "Experience",
 		stat = "COMBAT_XP_GAIN",
-		sample = { 5, "experience gained from kills", percent = true, stat = "KILL_EXPERIENCE" },
+		sample = { 5, percent = true, stat = "KILL_EXPERIENCE" },
 	},
 	{
 		-- Primary stats and armor only come from Well Fed buffs: on items they are white lines
 		key = "stamina",
 		group = "food",
-		label = "Stamina",
 		stat = "ITEM_MOD_STAMINA_SHORT",
-		sample = { 6, "stamina", details = { wellFedMinutes = 15 } },
+		sample = { 6, details = { wellFedMinutes = 15 } },
 	},
 	{
 		key = "intellect",
 		group = "food",
-		label = "Intellect",
 		stat = "ITEM_MOD_INTELLECT_SHORT",
-		sample = { 6, "intellect", details = { wellFedMinutes = 15 } },
+		sample = { 6, details = { wellFedMinutes = 15 } },
 	},
 	{
 		key = "strength",
 		group = "food",
-		label = "Strength",
 		stat = "ITEM_MOD_STRENGTH_SHORT",
-		sample = { 6, "strength", details = { wellFedMinutes = 15 } },
+		sample = { 6, details = { wellFedMinutes = 15 } },
 	},
 	{
 		key = "agility",
 		group = "food",
-		label = "Agility",
 		stat = "ITEM_MOD_AGILITY_SHORT",
-		sample = { 6, "agility", details = { wellFedMinutes = 15 } },
+		sample = { 6, details = { wellFedMinutes = 15 } },
 	},
 	{
 		key = "spirit",
 		group = "food",
-		label = "Spirit",
 		stat = "ITEM_MOD_SPIRIT_SHORT",
-		sample = { 6, "spirit", details = { wellFedMinutes = 15 } },
+		sample = { 6, details = { wellFedMinutes = 15 } },
 	},
 	{
 		key = "armor",
 		group = "food",
-		label = "Armor",
 		stat = "ARMOR",
-		sample = { 150, "armor", details = { wellFedMinutes = 15 } },
+		sample = { 150, details = { wellFedMinutes = 15 } },
 	},
 }
 
@@ -361,6 +332,7 @@ ns.COLOR_KINDS = {
 function ns.GetSampleLine(kind)
 	local value, name = unpack(kind.sample)
 	local stat = kind.sample.stat or kind.stat
+	name = name or ns.ENGLISH_NAMES[stat]
 	return ns.CompactLine(kind.key, value, name, stat and { stat }, kind.sample.percent, kind.sample.details)
 end
 
