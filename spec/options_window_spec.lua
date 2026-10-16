@@ -456,11 +456,28 @@ describe("Settings window", function()
 			assert.is_true(wow.env.ColorPickerFrame:GetHeight() > BASE_HEIGHT)
 		end)
 
+		it("grows the picker once when another row opens it while it still shows", function()
+			fakes.Fire(Swatch("spellDamage"), "OnClick")
+			assert.is_true(Palette():IsShown())
+			assert.are.equal(238, wow.env.ColorPickerFrame:GetHeight())
+		end)
+
 		it("isn't shown when another addon opens the picker", function()
 			wow.env.ColorPickerFrame:Hide()
 			wow.env.ColorPickerFrame:SetupColorPickerAndShow({ r = 1, g = 1, b = 1, swatchFunc = function() end })
 			assert.is_false(Palette():IsShown())
 			assert.are.equal(BASE_HEIGHT, wow.env.ColorPickerFrame:GetHeight())
+		end)
+
+		it("leaves for another addon's pick made while it shows, and comes back for the next row", function()
+			-- The picker stays shown: no OnHide runs
+			wow.env.ColorPickerFrame:SetupColorPickerAndShow({ r = 1, g = 1, b = 1, swatchFunc = function() end })
+			assert.is_true(wow.env.ColorPickerFrame:IsShown())
+			assert.is_false(Palette():IsShown())
+			assert.are.equal(BASE_HEIGHT, wow.env.ColorPickerFrame:GetHeight())
+			fakes.Fire(Swatch("spellDamage"), "OnClick")
+			assert.is_true(Palette():IsShown())
+			assert.are.equal(238, wow.env.ColorPickerFrame:GetHeight())
 		end)
 
 		it("is made once, however often the picker opens", function()

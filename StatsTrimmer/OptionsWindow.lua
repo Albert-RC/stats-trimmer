@@ -265,7 +265,7 @@ end
 -- game's order, each named in its own color on hover. A click sets the picker's color, which runs swatchFunc
 -- like any other change, so OK and Cancel work as usual. The palette is a child of the picker, which cancels
 -- on any click outside itself. Only Stats Trimmer's picks show it: the picker gets taller for it while it
--- does, and back to its own height when it hides.
+-- does, and back to its own height when the pick ends.
 local classPalette, pickerHeight
 
 local function ShowClassName(swatch)
@@ -282,6 +282,14 @@ end
 local function PickClassColor(swatch)
 	local color = C_ClassColor.GetClassColor(swatch.classFile)
 	ColorPickerFrame.Content.ColorPicker:SetColorRGB(color.r, color.g, color.b)
+end
+
+-- Ends the palette's pick: hides it and gives the picker its own height back
+local function HideClassPalette()
+	if classPalette:IsShown() then
+		classPalette:Hide()
+		ColorPickerFrame:SetHeight(pickerHeight)
+	end
 end
 
 local function CreateClassPalette()
@@ -306,11 +314,13 @@ local function CreateClassPalette()
 	end
 	-- Only when the pick ends: the picker also hides with UIParent (Alt+Z), still shown and serving the pick
 	ColorPickerFrame:HookScript("OnHide", function()
-		if classPalette:IsShown() and not ColorPickerFrame:IsShown() then
-			classPalette:Hide()
-			ColorPickerFrame:SetHeight(pickerHeight)
+		if not ColorPickerFrame:IsShown() then
+			HideClassPalette()
 		end
 	end)
+	-- Every new pick ends it too: another addon can set up the picker while it is still shown, which runs no
+	-- OnHide. OpenColorPicker shows it again for Stats Trimmer's own picks, right after.
+	hooksecurefunc(ColorPickerFrame, "SetupColorPickerAndShow", HideClassPalette)
 end
 
 local function ShowClassPalette()
