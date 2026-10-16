@@ -41,8 +41,8 @@ becomes
 ## Repository layout
 
 - `StatsTrimmer/`: the addon. Only this folder reaches the game. Its name, the `.toc` base name and the folder name in `Interface\AddOns` must match exactly.
-- `spec/`: unit tests (`*_spec.lua`), the test runner, helpers and the fake WoW API.
-- `scripts/`: `test.ps1`, `coverage.ps1`, `package.ps1`, `update-locales.ps1` and `update-foods.ps1`.
+- `spec/`: unit tests (`*_spec.lua`), the test runner, helpers and the fake WoW API. `spec/generators/` has the generators' specs and `spec/fixtures/` their CSV fixtures and the fake ruRU client's strings.
+- `scripts/`: `test.ps1`, `coverage.ps1`, `test-generators.ps1`, `test-release.sh`, `package.ps1`, `publish-release.sh`, `update-locales.ps1` and `update-foods.ps1`.
 - `docs/`: this guide and the CurseForge description (`docs/curseforge/StatsTrimmer.md`).
 - `.github/workflows/`: CI and releases (see [CI and releases](#ci-and-releases)).
 - Root tooling: `.luacheckrc`, `.luacov`, `stylua.toml`, `.vscode/`.
@@ -70,7 +70,9 @@ becomes
 stylua --check .        # format check (stylua . to fix)
 luacheck .              # static analysis; luacheck <file> for one file
 ./scripts/test.ps1      # unit tests (spec/*_spec.lua)
-./scripts/coverage.ps1  # tests under LuaCov; fails if StatsTrimmer/ line coverage < 85%
+./scripts/coverage.ps1  # tests under LuaCov; fails if hand-written StatsTrimmer/ line coverage < 95%
+./scripts/test-generators.ps1  # the generators on spec/fixtures, no network
+bash scripts/test-release.sh   # publish-release.sh against stand-ins for git and gh
 ./scripts/package.ps1   # release zip and notes for the .toc version, in .release/
 luajit spec/runner.lua spec/rules_spec.lua   # a single spec file
 ```
@@ -91,12 +93,13 @@ The `.toc` loads these files in order:
   - `GetOnlyPercent(text)` reads a lone percentage: the line's only number, and its only percentage.
   - `FormatLine(value, percent, name)` writes a compact line's text (`+10 spell damage`, `+1% golpe`).
   - `FormatDetails(details, GetText)` writes what follows a food line's stat name: `/s` for a rate, then ` (24 sec)` or ` (well fed, 15 min)`, with the words `GetText` gives (see [Food and drink](#food-and-drink)).
-  - `CompactLine(kind, value, name, stats, percent, details)` builds a compact line (see `Rules.lua` below).
+  - `CompactLine(kind, value, name, stats, percent, details)` builds a compact line (see `Rules.lua` below), and `StatLine(kind, value, key, percent, details)` one for a single stat, named with `ns.ENGLISH_NAMES`.
+  - `ns.ENGLISH_NAMES`: the addon's own English for each stat it shows, by the key of Blizzard's name: Blizzard's enUS name, lowercased (`+1% hit`, `+1% critical strike`, `+60 attack power in forms`). The compact lines show it when no language has Blizzard's name, as right after an update. Rules, food rules, samples and row labels take their English from here; groups of weapon skills and creature types build theirs.
 - `Config.lua`: pure settings model.
   - `ns.SETTINGS_TABS`: the window's tabs, in order, each `{ key, labelGlobal, label, spellPowerSplit }`: combat (`COMBAT`, "Combate") and food and drink (`MINIMAP_TRACKING_VENDOR_FOOD`, "Comida y bebida"). `spellPowerSplit` marks the tab with the spell power split.
   - `ns.COLOR_GROUPS`: the window's five color sections, in order, each `{ key, tab, labelGlobal, label, labelSuffix }`: attack (`STAT_CATEGORY_ATTACK`), defense (`STAT_CATEGORY_DEFENSE`), spells (`SPELLS`) and spell schools in the combat tab, and food and drink in its own. Blizzard has no name for spell schools, so that title is `DAMAGE` plus the addon's " extra": "Daño extra", "Damage extra".
   - `ns.IsCollapsible(groupKey)`: a section collapses when it shares its tab with others. The only section of a tab has no header: the tab names it.
-  - `ns.COLOR_KINDS`: 36 line kinds, listed section by section, each `{ key, group, label, stat, sample }`. `group` is its section; `stat` names the client's text for the row label; `sample` describes the preview line, which `ns.GetSampleLine(kind)` builds (`details` for a food line's).
+  - `ns.COLOR_KINDS`: 36 line kinds, listed section by section, each `{ key, group, label, stat, sample }`. `group` is its section; `stat` names the client's text for the row label, with its `ns.ENGLISH_NAMES` name as the English fallback, or `label` for kinds Blizzard has no single name for (vs type, weapon skills, MP5, HP5, experience); `sample` describes the preview line, which `ns.GetSampleLine(kind)` builds (`details` for a food line's), with its stat's English name unless it gives one.
     - Attack: attack power, attack power vs type, ranged attack power, feral attack power, hit, crit and weapon skills.
     - Defense: defense, dodge, parry, block (%), block value and HP5.
     - Spells: spell power, spell damage, spell healing, spell damage vs type, spell hit, spell crit, spell penetration and MP5.
@@ -117,13 +120,15 @@ The `.toc` loads these files in order:
   - `ns.TrustedNames(GetStatName, FoldCase)` makes a stat name getter that leaves out untrusted vs names (see [Creature types](#creature-types)). `context.GetStatName` is one of these, over the client's names.
   - `ns.LocalizeLines(lines, GetStatName)` rebuilds the lines with the names of a `TrustedNames` getter, food lines' details included.
 - `FoodRules.lua`: pure. `ns.GetFoodReplacement(text, food, context)` returns the compact lines of a food's Use line, or `nil` to keep it (see [Food and drink](#food-and-drink)).
-- `Tooltip.lua`: the WoW API side. It registers the line pre-calls, for equip lines and for food's Use lines, and checks their prefix. It reads the item and its stats (or the line's food), builds `context`, applies the language setting and colors each line with `ns.db.colors[kind]`, falling back to the original line color. It skips tooltips other addons only fill to read an item (see [Other addons' tooltips](#other-addons-tooltips)) and handles the "show original text" key.
-  - `ns.GetClientText(name)` reads the client's own strings (for recognition), `ns.GetTextIn(language, name)` a string in a given language (`CLIENT` or a bundled one; `ns.GetLanguage()` is the chosen one) and `ns.GetEnglishText(name)` one in English. `ns.GetClassName(classFile)` is a class's name in the chosen language, then in English.
+- `Localization.lua`: Blizzard's texts in the chosen language, for the tooltips, the window and the palette (see [Localization](#localization)).
+  - `ns.GetClientText(name)` reads the client's own strings (for recognition), `ns.GetTextIn(language, name)` a string in a given language (`CLIENT` or a bundled one) and `ns.GetEnglishText(name)` one in English. `ns.GetClassName(classFile)` is a class's name in the chosen language, then in English.
   - Two of the texts aren't GlobalStrings. `WELL_FED`, the Well Fed buff's name: the client's is `C_Spell.GetSpellName(19705)`, a Well Fed spell. `KILL_EXPERIENCE`, the experience from kills, comes from a buff's description, which no API gives: the client's is the bundled one of its language, if any.
   - `ns.GetLanguage()` is the language the texts are shown in (`ns.ResolveLanguage` for this client).
   - `ns.InLanguage(lines[, language])` gives the compact lines Blizzard's names in the chosen language (or `language`), lowercased. Its name getters are made once per language.
-  - `ns.ToLower(text)` is the display lowercase.
+  - `ns.ToLower(text)` is the display lowercase, `ns.FoldCase(text)` the case fold creature types are searched with, and `ns.GetClientStatName` the `TrustedNames` getter over the client's names that recognition uses.
+- `Tooltip.lua`: the WoW API side. It registers the line pre-calls, for equip lines and for food's Use lines, and checks their prefix. It reads the item and its stats (or the line's food), builds `context`, gives the lines the chosen language's names (`ns.InLanguage`) and colors each line with `ns.db.colors[kind]`, falling back to the original line color. It skips tooltips other addons only fill to read an item (see [Other addons' tooltips](#other-addons-tooltips)) and handles the "show original text" key.
   - `ns.RefreshItemTooltips()` rebuilds the shown item tooltips (see ["Show original text" key](#show-original-text-key)).
+- `ClassPalette.lua`: the class color palette of the color picker (see the settings window below). `ns.ShowClassPalette()` shows it, right after Stats Trimmer sets up the picker.
 - `OptionsWindow.lua`: the settings window. `ns.ShowOptions()` opens it, `ns.ToggleOptions()` toggles it.
   - Rows: the original text key and the language, for both tabs, then the shown tab's colors and preview. Changing the language sets every Blizzard text in the window again, with no `/reload`.
   - Tabs: `PanelTabButtonTemplate` buttons under the window (`$parentTab1`, `$parentTab2`), as in Blizzard's inspect window, with `PanelTemplates_SetNumTabs`, `PanelTemplates_SetTab` and `PanelTemplates_TabResize`, and the tab sound. Combat holds the item sections, the sample item and the spell power split checkbox; food and drink holds its rows and the sample food. The window opens on the tab left open, the first one after a `/reload`.
@@ -149,7 +154,7 @@ UI rule: use Blizzard templates wherever possible; don't hand-roll frames or bac
 
 ### Tooltip mechanism
 
-Verified against the `forever` branch of [wow-ui-source](https://github.com/Gethe/wow-ui-source) (builds 1.60.1.70291 and 1.60.1.70338):
+Verified against the `forever` branch of [wow-ui-source](https://github.com/Gethe/wow-ui-source) (builds 1.60.1.70291, 1.60.1.70338 and 1.60.1.70425):
 
 - Item tooltips are data-driven. `Blizzard_GameTooltip` only ships the Mainline variant, where `GameTooltipTemplate` uses `GameTooltipDataMixin` and `ShoppingTooltipTemplate` uses `TooltipDataHandlerMixin`.
 - `TooltipDataProcessor.AddLinePreCall(lineType, func(tooltip, lineData))`: if `func` returns `true`, the original line is not added (`TooltipDataHandlerMixin:ProcessLineData` in `Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua`). Addon callbacks run insecurely through an attribute delegate, but they can still consume the line.
@@ -261,6 +266,7 @@ Other rules: combined spell power, spell damage and/or healing, MP5, HP5, attack
 Adding a case:
 - Add the table entry or a rule in `ns.Rules`, plus a test in `spec/rules_spec.lua` with the real in-game text and `GetItemStats` output (esES, and enUS when known).
 - A new line kind also needs an entry in `ns.COLOR_KINDS`, in its section. Ask which section when it isn't obvious.
+- A new stat needs its English name in `ns.ENGLISH_NAMES` (`Util.lua`): Blizzard's enUS name, lowercased. `spec/util_spec.lua` checks it against the bundled enUS strings.
 
 ### In-game findings
 
@@ -298,10 +304,11 @@ Retail-only keys (haste, mastery, versatility, `CR_*`, crafting stats, PvP, resi
 ### Known limits
 
 - Lines are matched by numbers only, so a line that more than one stat could own keeps its original text (see above).
-- Creature type recognition outside esES has only been checked with made-up lines in the specs.
+- Creature type recognition outside esES has only been checked in the specs, with made-up lines (and, for ruRU, the client's real strings).
 - A tooltip another addon shows with no owner, or owned by `UIParent` or `WorldFrame` with `ANCHOR_NONE`, keeps the original text, like a scanning tooltip. An addon that builds its shown tooltip by copying lines from a scanning tooltip gets the original text too (GearQuest has such code for random-suffix items, unused in 0.5.5-beta).
 - Replaced lines get no line post-calls or `lineIndex`, and if another addon also consumes equip lines with a line pre-call, the one registered first wins. None of the addons checked on 2026-10-13 uses line callbacks.
 - Text another addon writes itself with `AddLine` isn't rewritten: only lines that come from the game's item data are. GearQuest's window is the case seen so far (see [Other addons' tooltips](#other-addons-tooltips)).
+- Every equip line of a tooltip builds the item's claims and matches all its equip lines again, so the work grows with the square of their number. Measured on 2026-10-16 in LuaJIT's interpreter (faster than the client's Lua, so an order of magnitude only), with a native case fold: 0.04 ms per tooltip with 3 equip lines, 0.19 ms with 6, 0.6 ms with 9. Items rarely have more than 5, so nothing is cached: a cache per `ProcessInfo` would have to be invalidated when `RefreshData` reuses the same info.
 
 ## Food and drink
 
@@ -313,21 +320,28 @@ Checked on 2026-10-15 with a dump of the bag items with a Use spell (`C_TooltipI
 
 - Food and drink are class 0, subclass 5 (Consumable, Food & Drink).
 - The Use line is its spell's description after `ITEM_SPELL_TRIGGER_ONUSE` ("Use:", "Usar:"), and has the spell's ID (see [Tooltip mechanism](#tooltip-mechanism)). Its wording and the order of its numbers vary per language: deDE puts the duration first ("Stellt im Verlauf von 24 Sek. 530 Punkt(e) Gesundheit wieder her").
-- A food with a cooldown has it at the end of the line, from `ITEM_COOLDOWN_TOTAL` with a plural escape: "(1 |4Sec:Sec; Cooldown)". Most foods share a 1 second one. Its duration in seconds is `SECONDS_ABBR` ("%d |4Sec:Sec;", "%d |4s:s;" on esES, "%d |4Sek.:Sek.;" on deDE in the GlobalStrings of build 1.60.1.70338); minutes and hours are `MINUTES_ABBR` and `HOURS_ABBR` ("%d |4Min:Min;", "%d |4Hr:Hr;").
+- A food with a cooldown has it at the end of the line, from `ITEM_COOLDOWN_TOTAL` with a plural escape: "(1 |4Sec:Sec; Cooldown)". Most foods share a 1 second one. Its duration in seconds is `SECONDS_ABBR` ("%d |4Sec:Sec;", "%d |4s:s;" on esES, "%d |4Sek.:Sek.;" on deDE in the GlobalStrings of build 1.60.1.70338, and the esES one checked in game on 2026-10-16); minutes and hours are `MINUTES_ABBR` and `HOURS_ABBR` ("%d |4Min:Min;", "%d |4Hr:Hr;").
 - `C_Spell.GetAuraStatChanges(spellID)` returns 0 and no power changes for food spells: there is no API for what a food restores.
-- The client computes that amount in its own way: Spongy Morel restores 530 health over 24 s, where its 115 base points every 5 s would make 552; Melon Juice restores 803 mana.
+- The client computes that amount in its own way: Spongy Morel restores 530 health over 24 s, where its 115 base points every 5 s would make 552; Melon Juice restored 803 mana on build 1.60.1.70338.
+- Since build 1.60.1.70425, drinks describe theirs as a formula, "Restores ${($s1/5)*$d} mana over $d.": Melon Juice's 174 base points every 5 seconds for 24 seconds make 835.2. The client shows it rounded, 835, so the line becomes `+835 maná (24 s)` (checked in game on 2026-10-16).
 - Forever's well fed foods are new spells. Their description includes the base food's (`$@spelldesc435`) and ends with the experience bonus spell's (1243969), "Additionally, experience gained from kills is increased by 5%.", which only some players see (`$?pc142418[...]`). Some of them aren't translated: esES clients see their well fed part in English.
 
 ### FoodData.lua
 
-`scripts/update-foods.ps1 [-Build <build>]` generates it from Forever's Item, ItemSparse, ItemEffect, ItemXItemEffect, Spell, SpellEffect, SpellMisc and SpellDuration tables on wago.tools. It reads each food's English description to learn which numbers the line shows and what each one is:
+`scripts/update-foods.ps1 [-Build <build>] [-From <folder>] [-Output <file>] [-AcceptRemovals]` generates it from Forever's Item, ItemSparse, ItemEffect, ItemXItemEffect, Spell, SpellEffect, SpellMisc and SpellDuration tables on wago.tools. It reads each food's English description to learn which numbers the line shows and what each one is:
 
-- `$d` is a duration, `$s1` an effect's base points, `$t2` its period, `$o1` its total: a percentage total for health and mana percentage auras (20, 21), and for health and mana regeneration (84, 85) an amount the client computes, which only the line gives.
+- `$d` is a duration, `$s1` an effect's base points, `$t2` its period, `$o1` its total: a percentage total for health and mana percentage auras (20, 21), and for health and mana regeneration (84, 85) an amount the client computes, which only the line gives. A formula (`${($430s1/5)*$430d}`) with one base points variable of a regeneration effect is such an amount too.
 - `ns.FOODS[spellID]` is `{ numbers, lines, experience }`: the numbers the line shows besides the amounts and the experience bonus; the compact lines (a stat key, a `value` or an `amount` with its base points, and their details); and the bonus, when the line can end with it.
 - It understands restores of health and/or mana over time (points, a total percentage or a percentage per second) and Well Fed buffs of stamina, intellect, strength, agility, spirit, armor, attack power, spell damage, healing and crit, one or two stats.
 - It leaves out, with their original text: alcohol and joke foods with no numbers, instant restores, Fishing and Herbalism buffs (professions aren't handled), movement speed in one zone, Enriched Manna Biscuit (its text for inside Naxxramas), Bobbing Apple (a well fed buff with no number) and a few others. The script lists them.
 
-**Run it again when the client build changes**, and commit the new file. On build 1.60.1.70338 it describes 82 food spells and leaves out 35.
+It works in three steps, and writes nothing when one fails:
+
+1. Reads the tables, downloaded for `-Build` or from `-From`, a folder with one `<Table>.csv` each (`spec/fixtures/foods` in the specs). Each must have rows and the columns the script reads, and every food's effects and spells must be in their tables: a partial download would otherwise leave foods out silently.
+2. Converts every food spell, or says why it keeps its original text.
+3. Compares the result with the file it replaces (`-Output`) and lists the food spells added and removed. An empty result is refused, and so are removals unless `-AcceptRemovals` says they are expected. On build 1.60.1.70425 that caught the drinks' new formula, which the script didn't understand yet.
+
+**Run it again when the client build changes**, read what it adds and removes, and commit the new file. On build 1.60.1.70425 it describes the same 82 food spells as on 1.60.1.70338 and leaves out 35. `spec/food_rules_spec.lua` lists the 82, so losing one fails the tests.
 
 ### Matching a Use line
 
@@ -363,14 +377,17 @@ Stats Trimmer has no translations of its own: everything it shows in a language 
 
 The client only loads its own language's strings, so the other languages are bundled:
 - `StatsTrimmer/Locales.lua` holds the strings of **enUS, deDE, esES, esMX, frFR, itIT and ptBR**: every `ITEM_MOD_*_SHORT` stat name, the few interface strings the window uses, the words of food lines (`HEALTH`, `MANA`, `COMBAT_XP_GAIN`, `ARMOR`, `INT_SPELL_DURATION_SEC`, `INT_SPELL_DURATION_MIN`), the Well Fed buff's name as `WELL_FED`, the experience from kills as `KILL_EXPERIENCE`, and the male names of Forever's 9 classes.
-- It is generated by `./scripts/update-locales.ps1 [-Build <build>]` from Forever's `GlobalStrings`, `ChrClasses`, `SpellName` and `Spell` on wago.tools (`https://wago.tools/db2/GlobalStrings/csv?build=<build>&locale=<locale>`, and the same for the others). For build 1.60.1.70338 the GlobalStrings match the client exactly (checked against an in-game dump).
+- It is generated by `./scripts/update-locales.ps1 [-Build <build>] [-LocaleBuilds @{ <locale> = <build> }] [-From <folder>]` from Forever's `GlobalStrings`, `ChrClasses`, `SpellName` and `Spell` on wago.tools (`https://wago.tools/db2/GlobalStrings/csv?build=<build>&locale=<locale>`, and the same for the others). For build 1.60.1.70338 the GlobalStrings match the client exactly (checked against an in-game dump); for 1.60.1.70425, `SECONDS_ABBR`, `ITEM_COOLDOWN_TOTAL`, `STAT_CATEGORY_WEAPON_SKILLS` and `ITEM_MOD_MANA_REGENERATION_SHORT` were checked in game on 2026-10-16.
+  - It writes nothing when a table lacks rows or a column it reads, a language lacks a string the addon shows (or has fewer than `-MinimumStatNames` stat names), a language's texts are all the English ones, or a string the file had would go, unless `-AcceptRemovals` says that is expected.
+  - Since build 1.60.1.70374, wago.tools gives the English texts for itIT. Its texts come from 1.60.1.70338, the last build with Italian ones (`-LocaleBuilds`, which the file's header names).
+  - It also writes `spec/fixtures/ClientStrings-ruRU.lua`, a ruRU client's strings, class names, creature type names (`CreatureType`) and Well Fed name, for the fake ruRU client of the specs.
   - `ChrClasses`' `Name_male_lang` matches `LocalizedClassList(false)`.
   - `WELL_FED` is spell 19705's name, the same spell the client is asked for.
   - `KILL_EXPERIENCE` is the aura description of the experience bonus (spell 1243969) without its number and the two words before it: "Experience gained from kills increased by $w1%." gives "Experience gained from kills", "Experiencia obtenida al matar enemigos aumentada un $w1%." gives "Experiencia obtenida al matar enemigos", and "Durch Siege erhaltene Erfahrung um $w1% erhöht." gives "Durch Siege erhaltene Erfahrung". The bonus only counts for kills, and Blizzard has no shorter string that says so. Check the result in every language when the build changes. itIT's is in English, as its description isn't translated.
 - Forever's itIT data has no class names, so Italian shows the English ones, and a few of its strings are in English too ("Weapon Skills").
 - **Run the script again when the client build changes**, and commit the new file.
 - These are Blizzard's texts, not covered by the addon's MIT license.
-- `/reload` doesn't load a file new in the `.toc`, so right after the update that added `Locales.lua` the addon runs without it until the client restarts. `Config.lua` starts both tables empty: the texts are the client's and the English fallback is the addon's own, with no Lua errors. The same goes for `FoodData.lua` and `FoodRules.lua`: with `ns.FOODS` empty, Use lines keep their text until the restart.
+- `/reload` doesn't load a file new in the `.toc`, so right after the update that added `Locales.lua` the addon runs without it until the client restarts. `Config.lua` starts both tables empty: the texts are the client's and the English fallback is the addon's own (`ns.ENGLISH_NAMES`), with no Lua errors. The same goes for `FoodData.lua` and `FoodRules.lua`: with `ns.FOODS` empty, Use lines keep their text until the restart. `Localization.lua` and `ClassPalette.lua` (0.5.1) have no such fallback: until the restart, tooltips and the color picker give Lua errors.
 
 Which languages the dropdown offers depends on the client's font (`ns.GetOfferedLanguages`):
 - clients with the Latin alphabet: their own language plus every bundled one;
@@ -393,14 +410,13 @@ Text lookup:
 - MP5 and HP5 lines have no stat names, so they read `+4 MP5` and `+5 HP5` in every language.
 - Food lines' details use Blizzard's words too, lowercased like the names: `INT_SPELL_DURATION_SEC` ("%d s"), `INT_SPELL_DURATION_MIN` and `WELL_FED`. A line lacking one of them goes to the English pass whole. `/s` is the same in every language.
 - The experience bonus is named `KILL_EXPERIENCE`, not `COMBAT_XP_GAIN` ("Experience"): it only counts for kills. Its color row is still labelled with `COMBAT_XP_GAIN`.
-- A name is skipped when it is missing or untrusted (see [Creature types](#creature-types)), and the line goes to the next pass. The addon's internal English in `Rules.lua` (`+10 spell damage`) is only the last resort.
+- A name is skipped when it is missing or untrusted (see [Creature types](#creature-types)), and the line goes to the next pass. The addon's own English (`ns.ENGLISH_NAMES`, `+10 spell damage`) is only the last resort.
 
 On esES that gives `+10 daño con hechizos`, `+1% golpe`, `+6 poder de ataque contra bestias`, `+10 poder de ataque (bien alimentado, 15 min)`; in English `+10 spell damage`, `+1% hit`, `+6 attack power vs beasts`, `+10 attack power (well fed, 15 min)`.
 
 Blizzard's data has mistakes that fall back to English:
 - esES spell damage vs beasts says "…contra mecánicos" and vs mechanicals "…contra humanoides";
 - deDE uses two words for beasts ("Wildtiere", "Bestien"), so spell damage vs beasts isn't trusted either;
-- frFR doesn't translate `ITEM_MOD_MANA_REGENERATION_SHORT`, which isn't used anyway.
 
 ### Interface
 
@@ -421,7 +437,7 @@ Each falls back to Blizzard's English, then to the addon's English. The rest are
 Translated text can be longer, so:
 - buttons are sized to their text plus a padding with `SetTextToFit` (`UIButtonFitToTextBehaviorMixin`, part of `UIPanelButtonTemplate`, which lets them get narrower too: `fitTextCanWidthDecrease`);
 - row labels sit between the swatch and the Reset button without wrapping, and `FitWindow` widens the colors panel to the longest one, so none is cut off;
-- the preview's longest line varies too ("+20 dégâts des sorts contre les morts-vivants" in frFR), so the window widens to the preview tooltip. Clients in other languages use their own texts, which can't be measured beforehand.
+- the preview's longest line varies too, so the window widens to the larger of both preview tooltips, which take turns in the same place. In frFR it is the sample food's "+5% expérience gagnée en tuant des adversaires", longer than the sample item's "+20 dégâts des sorts contre les morts-vivants". Clients in other languages use their own texts, which can't be measured beforehand.
 
 ### Testing another language
 
@@ -437,21 +453,23 @@ Unit tests run on LuaJIT 2.1 (Lua 5.1 compatible) through `spec/runner.lua`, a m
 - Each spec file starts with a clean set of `describe` blocks, so a file that fails while loading doesn't affect the next one.
 - `spec/helpers.lua` `LoadAddon(name, files, env)` loads addon files with `(addonName, ns)` like the client does. Without `env`, only pure files can be loaded.
 - Game-facing files are tested against `spec/fakes.lua` (`fakes.NewWoW()`). It is a fake WoW API that records scripts, hooks, events, tooltip lines, colors, positions, the color picker, the radio menus, check button states, Settings registrations, secret texts and `ExecuteFrameScript` calls. Its line pre-calls run for their line type, like the client's (a line without `type` is a None line), and `C_Spell.GetSpellName` reads `wow.spellNames`. Its class colors (`fakes.CLASS_COLORS`) are made exact in hex. Its `ColorPickerFrame` is a frame like Blizzard's: setting it up or changing `Content.ColorPicker`'s color runs `swatchFunc`, and hiding it runs its `OnHide` hooks. Blizzard's tooltips (`EmbeddedItemTooltip` too) have secure global names for `issecurevariable`; frames the addon or the specs create don't.
-  - The default world is an esES client whose globals are the bundled esES strings (`fakes.LocaleStrings("esES")`, which match the client exactly) and the client strings Locales.lua doesn't bundle (`fakes.ES_CLIENT_STRINGS`: the Equip and Use prefixes, `ITEM_COOLDOWN_TOTAL`, `SECONDS_ABBR`). `fakes.NewWoW({ locale = "enUS" })` has only the prefixes, which exercises the fallbacks.
-  - `fakes.FoldCase` stands in for `C_Intl.FoldCase` for the letters the specs use.
+  - The default world is an esES client whose globals are the bundled esES strings (`fakes.LocaleStrings("esES")`, which match the client exactly) and the client strings Locales.lua doesn't bundle (`fakes.ES_CLIENT_STRINGS`: the Equip and Use prefixes, `ITEM_COOLDOWN_TOTAL`, `SECONDS_ABBR`). `fakes.NewWoW({ locale = "enUS" })` has only the prefixes, which exercises the fallbacks. `fakes.NewWoW({ locale = "ruRU" })` is a client whose language isn't bundled, with a ruRU client's real strings, class and creature type names (`fakes.ClientStrings("ruRU")`, from `spec/fixtures/ClientStrings-ruRU.lua`).
+  - `fakes.FoldCase` stands in for `C_Intl.FoldCase` and `C_Intl.ToLower` for the letters the specs use: ASCII, É and the Cyrillic alphabet.
   - Load into it with `helpers.LoadAddon(name, files, wow.env)` or `helpers.StartStatsTrimmer(wow)`, which loads the full `.toc` and fires `ADDON_LOADED`.
   - Drive it with `fakes.Fire(frame, script)`, `fakes.ClickCheckButton(button)` (which toggles the button before `OnClick`, like the client) and `fakes.FireEvent(wow, event, ...)`.
   - Text is measured with `fakes.TEXT_METRICS` (6 per character, 14 per tooltip line, 20 of tooltip padding), which a world can change in `wow.textMetrics`. `UIParent` is 1365×768.
-  - Tooltips: `fakes.ItemTooltip(wow, data)` is another addon's tooltip in the middle of processing, for calling the pre-call directly. `fakes.ShowItem(wow, tooltip, owner, anchorType, data)` fills one like the client: `SetOwner`, then `ProcessInfo`, which runs the registered line pre-calls and shows it.
+  - Tooltips: `fakes.ItemTooltip(wow, data)` is another addon's tooltip in the middle of processing, for calling the pre-call directly. `fakes.ShowItem(wow, tooltip, owner, anchorType, data)` fills one like the client: `SetOwner`, then `ProcessInfo`, which runs the registered line pre-calls and the tooltip post-calls other addons add (`TooltipDataProcessor.AddTooltipPostCall`, `wow.postCalls`), and shows it. `fakes.AppendItem(wow, tooltip, data)` appends an item's data like Blizzard's comparison tooltips. Like Blizzard's, `ProcessInfo` keeps the tooltip's infos and `RefreshData` processes them again (`TooltipDataHandlerMixin:RebuildFromTooltipInfo`), losing lines added with `AddLine` after them; `refreshCount` counts the rebuilds. So the specs check what a rebuilt tooltip shows: the compact text, the original while the key is held, and the compact text again.
   - Frame methods the specs don't care about are listed explicitly as no-ops. Any other missing method fails, so a misspelled WoW method is caught.
 - Every `.toc` file must be loaded by some spec, otherwise LuaCov silently leaves it out. `spec/addon_load_spec.lua` loads the whole `.toc`.
 - Test observable behavior: the lines and colors shown, saved settings, positions, what opens or closes. Don't test calls like `SetSize`; layout isn't asserted, except the window's size contract: the preview and every row label fit, in every language, and the scaled window and tabs fit within the screen bounds.
 - Expected values (labels, names) are written in the spec, not copied from the code's tables, so typos are caught.
 - When adding tests, check that they catch a real bug: change the code on purpose, see the right test fail, restore.
 
-Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. On 2026-10-16 it was 100% of 1709 lines (465 of them the generated `FoodData.lua`) with 348 tests.
+Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. The generated files (`Locales.lua`, `FoodData.lua`: their first line says "Generated by") are mostly data, which any spec that loads them covers whole, so `coverage.ps1` reports them apart and requires 95% of the hand-written code. On 2026-10-16 it was 100% of 1200 hand-written lines and of 497 generated ones, with 359 tests.
 
-The tests cover the logic. Game-facing behavior still has to be checked in game.
+The generators are tested on CSV fixtures, a few real rows of each table (`spec/fixtures/foods`, `spec/fixtures/locales`, from build 1.60.1.70425, and 1.60.1.70338 for itIT), with no network: `test-generators.ps1` runs them, `spec/generators/*_spec.lua` check what they wrote against expected values written in the specs, and it checks what they refuse to write (a missing column or row, tables that don't agree, a language that is all English, removals). `test-release.sh` runs `publish-release.sh` against stand-ins for `git` and `gh`, from every state a failed release can leave.
+
+The tests cover the logic. Game-facing behavior still has to be checked in game, and so do two things the specs only check as numbers: dragging the settings window to the screen's bottom edge (the fake doesn't clamp), and what a scaled window looks like.
 
 ## CI and releases
 
@@ -459,14 +477,14 @@ GitHub Actions, in `.github/workflows/`:
 
 - `ci.yml` runs on every pull request, and by hand from the Actions tab:
   - `stylua --check .` (StyLua 2.5.2) and `luacheck .` (Luacheck 1.2.0);
-  - `test.ps1` and `coverage.ps1` on Ubuntu's LuaJIT 2.1 with LuaCov 0.17.0;
+  - `test.ps1`, `coverage.ps1`, `test-generators.ps1` and `test-release.sh` on Ubuntu's LuaJIT 2.1 with LuaCov 0.17.0;
   - `package.ps1`. The zip it builds is attached to the run as an artifact, to try a pull request in game.
-- `release.yml` runs on every push to `main`, i.e. every merged pull request. It runs the same checks, then publishes a GitHub release if the `.toc` version has no tag yet:
+- `release.yml` runs on every push to `main`, i.e. every merged pull request. It runs the same checks, then `publish-release.sh` publishes the GitHub release of the `.toc` version unless it is already released:
   - the tag `v<version>`, on the merged commit;
   - `StatsTrimmer-v<version>.zip`: the `StatsTrimmer` folder, with `LICENSE` inside it;
   - as notes, that version's CHANGELOG section plus the installation steps.
 
-  A push that doesn't change `## Version` publishes nothing.
+  The tag, the release and its zip are checked one by one. A new version is made as a draft with its zip, checked, then published, which makes the tag. A run that failed halfway is completed by running it again: a draft without a tag is replaced, and a tag on this commit gets whatever its release lacks. A version released from an earlier commit is left alone, so a push that doesn't change `## Version` publishes nothing; if that release is incomplete, the run fails, to be fixed by hand.
 
 To release a version, in its pull request:
 
@@ -476,7 +494,7 @@ To release a version, in its pull request:
 
 The `.toc` version must always have a CHANGELOG section: `package.ps1` fails without one, so the pull request's CI catches it before the merge.
 
-`package.ps1` builds the same files locally, in `.release/` (gitignored), from the committed files: commit first. When StyLua or Luacheck are updated locally, update their versions in `ci.yml` too.
+`package.ps1` builds the same files locally, in `.release/` (gitignored), from the committed files: it refuses changes to `StatsTrimmer/`, `CHANGELOG.md` or `LICENSE` that aren't committed, as the version, the notes and the zip would come from different states. It then checks the zip: only the `StatsTrimmer` folder, whose `.toc` has the version and loads files that are there, and `LICENSE`. When StyLua or Luacheck are updated locally, update their versions in `ci.yml` too.
 
 ## WoW API rules
 
