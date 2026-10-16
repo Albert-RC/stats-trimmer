@@ -72,8 +72,26 @@ function fakes.LocaleStrings(locale)
 	return ns.LOCALE_STRINGS[locale]
 end
 
--- Folded capitals besides ASCII that the specs use; string.lower leaves them as they are
-local FOLDED_CAPITALS = { ["É"] = "é", ["Ж"] = "ж", ["Н"] = "н", ["С"] = "с" }
+-- The strings of a client whose language Stats Trimmer doesn't bundle, which scripts/update-locales.ps1 generates:
+-- { strings, classNames, creatureTypes, wellFed }
+function fakes.ClientStrings(locale)
+	return assert(loadfile("spec/fixtures/ClientStrings-" .. locale .. ".lua"))()
+end
+
+-- A character in UTF-8, for codes under 0x800
+local function Utf8(code)
+	if code < 0x80 then
+		return string.char(code)
+	end
+	return string.char(0xC0 + math.floor(code / 0x40), 0x80 + code % 0x40)
+end
+
+-- Folded capitals besides ASCII that the specs use, which string.lower leaves as they are: É and the Cyrillic
+-- alphabet (А-Я, and Ё)
+local FOLDED_CAPITALS = { ["É"] = "é", [Utf8(0x401)] = Utf8(0x451) }
+for code = 0x410, 0x42F do
+	FOLDED_CAPITALS[Utf8(code)] = Utf8(code + 0x20)
+end
 
 -- Like C_Intl.FoldCase for the letters the specs use
 function fakes.FoldCase(text)
@@ -307,6 +325,14 @@ function Frame:GetScale()
 	return self.scale or 1
 end
 
+function Frame:SetClampRectInsets(left, right, top, bottom)
+	self.clampRectInsets = { left, right, top, bottom }
+end
+
+function Frame:GetClampRectInsets()
+	return unpack(self.clampRectInsets or { 0, 0, 0, 0 })
+end
+
 -- ScrollFrame
 function Frame:SetScrollChild(child)
 	self.scrollChild = child
@@ -348,11 +374,18 @@ function Frame:NumLines()
 end
 
 -- Like TooltipDataHandlerMixin:ProcessInfo, which every SetX method (SetHyperlink, SetBagItem...) calls:
--- builds the tooltip from the info's data, where the line pre-calls for each line's type can consume it, and
--- shows it. Lines without a type are None lines.
+-- builds the tooltip from the info's data, where the line pre-calls for each line's type can consume it, then
+-- runs the tooltip post-calls for the data's type and shows it. Lines without a type are None lines. An info
+-- starts the tooltip again, unless it is appended (info.append, as Blizzard's comparison tooltips do): its
+-- lines then follow the ones there. Either way it joins the tooltip's infos, which RefreshData processes again.
 function Frame:ProcessInfo(info)
-	self.lines = {}
-	self.primaryInfo = info
+	if not info.append then
+		self.infoList = {}
+		self.lines = {}
+	elseif not self.infoList then
+		self.infoList = {}
+	end
+	table.insert(self.infoList, info)
 	self.processingInfo = info
 	for _, lineData in ipairs(info.tooltipData.lines or {}) do
 		local consumed = false
@@ -368,6 +401,11 @@ function Frame:ProcessInfo(info)
 			self:AddLine(lineData.leftText, color:GetRGB())
 		end
 	end
+	for _, postCall in ipairs(self.wow.postCalls) do
+		if postCall.tooltipType == info.tooltipData.type then
+			postCall.handler(self, info.tooltipData)
+		end
+	end
 	self:Show()
 	return true
 end
@@ -376,14 +414,30 @@ function Frame:GetProcessingTooltipInfo()
 	return self.processingInfo
 end
 
--- Like TooltipDataHandlerMixin:IsTooltipType, it checks the primary info, not the one being processed
+-- Like TooltipDataHandlerMixin:IsTooltipType, it checks the primary info, the first one, not the one being
+-- processed
 function Frame:IsTooltipType(tooltipType)
-	local data = self.primaryInfo and self.primaryInfo.tooltipData
+	local primary = self.infoList and self.infoList[1]
+	local data = primary and primary.tooltipData
 	return data ~= nil and data.type == tooltipType
 end
 
+-- Like GameTooltipDataMixin:RefreshData (TooltipDataHandlerMixin:RebuildFromTooltipInfo): processes the tooltip's
+-- infos again, in order, the first one starting it over. Lines added with AddLine after them are lost; the
+-- post-calls' run again. Counts the rebuilds in refreshCount.
 function Frame:RefreshData()
 	self.refreshCount = self.refreshCount + 1
+	local infoList = self.infoList
+	if not (infoList and infoList[1]) then
+		return
+	end
+	self.infoList = {}
+	for index, info in ipairs(infoList) do
+		if index == 1 then
+			info.append = false
+		end
+		self:ProcessInfo(info)
+	end
 end
 
 -- Like CreateFrame: named frames also become globals of the world's environment, and "$parent" in a name is the
@@ -417,7 +471,8 @@ function fakes.NewFrame(wow, frameType, name, parent, template)
 		-- From UIPanelButtonNoTooltipTemplate's KeyValues
 		frame.fitTextCanWidthDecrease = true
 	elseif template == "PanelTabButtonTemplate" then
-		-- The template's parentArray
+		-- The template's height and parentArray
+		frame.height = 32
 		parent.Tabs = parent.Tabs or {}
 		table.insert(parent.Tabs, frame)
 	end
@@ -437,7 +492,7 @@ function fakes.ItemTooltip(wow, data)
 	data.type = data.type or wow.env.Enum.TooltipDataType.Item
 	data.lines = data.lines or {}
 	tooltip.processingInfo = { tooltipData = data }
-	tooltip.primaryInfo = tooltip.processingInfo
+	tooltip.infoList = { tooltip.processingInfo }
 	tooltip.shown = true
 	return tooltip
 end
@@ -449,6 +504,12 @@ function fakes.ShowItem(wow, tooltip, owner, anchorType, data)
 	data.type = data.type or wow.env.Enum.TooltipDataType.Item
 	tooltip:SetOwner(owner, anchorType)
 	tooltip:ProcessInfo({ tooltipData = data })
+end
+
+-- Appends item data to a shown tooltip, after its lines, like Blizzard's comparison tooltips and AppendInfo
+function fakes.AppendItem(wow, tooltip, data)
+	data.type = data.type or wow.env.Enum.TooltipDataType.Item
+	tooltip:ProcessInfo({ tooltipData = data, append = true })
 end
 
 -- Frames created by the addon with a given template or text, in creation order
@@ -471,12 +532,14 @@ fakes.ES_CLIENT_STRINGS = {
 	ITEM_SPELL_TRIGGER_ONEQUIP = "Equipar:",
 	ITEM_SPELL_TRIGGER_ONUSE = "Usar:",
 	ITEM_COOLDOWN_TOTAL = "(%s de tiempo de reutilización).",
+	SECONDS_ABBR = "%d |4s:s;",
 }
 
 -- A fresh fake world.
--- options.locale: "esES" (default) or "enUS", for the "Equip:" and "Use:" prefixes, creature type names and the
--- Well Fed buff's name. Only the esES client has Blizzard's strings as globals (fakes.LocaleStrings and
--- fakes.ES_CLIENT_STRINGS); the enUS one has only the prefixes, which exercises the fallbacks.
+-- options.locale: "esES" (default), "enUS" or "ruRU", for the client's strings, creature type names, class names
+-- and the Well Fed buff's name. The esES client has Blizzard's strings as globals (fakes.LocaleStrings and
+-- fakes.ES_CLIENT_STRINGS), and so does the ruRU one, a client whose language isn't bundled
+-- (fakes.ClientStrings). The enUS one has only the prefixes, which exercises the fallbacks.
 function fakes.NewWoW(options)
 	options = options or {}
 	local env = setmetatable({}, { __index = _G })
@@ -489,6 +552,7 @@ function fakes.NewWoW(options)
 		secretTexts = {}, -- text -> true: issecretvalue reports it as a secret
 		cursor = { 0, 0 },
 		preCalls = {}, -- { lineType, handler }
+		postCalls = {}, -- { tooltipType, handler }: other addons' tooltip post-calls
 		executedScripts = {}, -- ExecuteFrameScript calls: { frame, scriptName }
 		categories = {}, -- Options categories
 		sounds = {},
@@ -497,10 +561,12 @@ function fakes.NewWoW(options)
 		textMetrics = setmetatable({}, { __index = fakes.TEXT_METRICS }),
 	}
 
-	local english = options.locale == "enUS"
+	local locale = options.locale or "esES"
+	local english, russian = locale == "enUS", locale == "ruRU"
+	local client = russian and fakes.ClientStrings("ruRU")
 	-- Addon code reads client strings through _G, which must be this world
 	env._G = env
-	if not english then
+	if locale == "esES" then
 		for name, value in pairs(fakes.LocaleStrings("esES")) do
 			env[name] = value
 		end
@@ -511,21 +577,31 @@ function fakes.NewWoW(options)
 		-- for the second
 		env.WELL_FED = nil
 		env.KILL_EXPERIENCE = nil
+	elseif russian then
+		for name, value in pairs(client.strings) do
+			env[name] = value
+		end
 	end
 	env.GetLocale = function()
-		return english and "enUS" or "esES"
+		return locale
 	end
-	-- The esES client's names are its real LFG_LIST_LANGUAGE_* strings; the enUS ones are made up
-	local localeNames = english
-			and {
-				enUS = "English",
-				deDE = "German",
-				esES = "Spanish",
-				esMX = "Spanish (Mexico)",
-				frFR = "French",
-				itIT = "Italian",
-				ptBR = "Portuguese",
-			}
+	-- The esES client's names are its real LFG_LIST_LANGUAGE_* strings; the enUS ones are made up. The ruRU
+	-- client reads its own, like LocaleUtil.GetLocaleDisplayName.
+	local localeNames = russian
+			and setmetatable({}, {
+				__index = function(_, name)
+					return env["LFG_LIST_LANGUAGE_" .. name:upper()] or name
+				end,
+			})
+		or english and {
+			enUS = "English",
+			deDE = "German",
+			esES = "Spanish",
+			esMX = "Spanish (Mexico)",
+			frFR = "French",
+			itIT = "Italian",
+			ptBR = "Portuguese",
+		}
 		or {
 			enUS = "Inglés",
 			deDE = "Alemán",
@@ -536,8 +612,8 @@ function fakes.NewWoW(options)
 			ptBR = "Portugués",
 		}
 	env.LocaleUtil = {
-		GetLocaleDisplayName = function(locale)
-			return localeNames[locale]
+		GetLocaleDisplayName = function(name)
+			return localeNames[name]
 		end,
 	}
 	-- The specs only use letters for which lowercase and case folding agree
@@ -547,23 +623,23 @@ function fakes.NewWoW(options)
 		env.ITEM_SPELL_TRIGGER_ONUSE = "Use:"
 	end
 	-- Spell names: wow.spellNames[spellID]. 19705 is a Well Fed buff.
-	wow.spellNames = { [19705] = english and "Well Fed" or "Bien alimentado" }
+	wow.spellNames = { [19705] = english and "Well Fed" or russian and client.wellFed or "Bien alimentado" }
 	env.C_Spell = {
 		GetSpellName = function(spellID)
 			return wow.spellNames[spellID]
 		end,
 	}
-	local creatureTypes = english
-			and {
-				[1] = "Beast",
-				[2] = "Dragonkin",
-				[3] = "Demon",
-				[4] = "Elemental",
-				[5] = "Giant",
-				[6] = "Undead",
-				[7] = "Humanoid",
-				[9] = "Mechanical",
-			}
+	local creatureTypes = russian and client.creatureTypes
+		or english and {
+			[1] = "Beast",
+			[2] = "Dragonkin",
+			[3] = "Demon",
+			[4] = "Elemental",
+			[5] = "Giant",
+			[6] = "Undead",
+			[7] = "Humanoid",
+			[9] = "Mechanical",
+		}
 		or {
 			[1] = "Bestia",
 			[2] = "Dragonante",
@@ -643,18 +719,18 @@ function fakes.NewWoW(options)
 
 	-- Forever's classes, in the game's order (CLASS_SORT_ORDER), with their names on this client
 	env.CLASS_SORT_ORDER = { "WARRIOR", "PALADIN", "PRIEST", "SHAMAN", "DRUID", "ROGUE", "MAGE", "WARLOCK", "HUNTER" }
-	local classNames = english
-			and {
-				WARRIOR = "Warrior",
-				PALADIN = "Paladin",
-				PRIEST = "Priest",
-				SHAMAN = "Shaman",
-				DRUID = "Druid",
-				ROGUE = "Rogue",
-				MAGE = "Mage",
-				WARLOCK = "Warlock",
-				HUNTER = "Hunter",
-			}
+	local classNames = russian and client.classNames
+		or english and {
+			WARRIOR = "Warrior",
+			PALADIN = "Paladin",
+			PRIEST = "Priest",
+			SHAMAN = "Shaman",
+			DRUID = "Druid",
+			ROGUE = "Rogue",
+			MAGE = "Mage",
+			WARLOCK = "Warlock",
+			HUNTER = "Hunter",
+		}
 		or {
 			WARRIOR = "Guerrero",
 			PALADIN = "Paladín",
@@ -679,6 +755,10 @@ function fakes.NewWoW(options)
 	env.TooltipDataProcessor = {
 		AddLinePreCall = function(lineType, handler)
 			table.insert(wow.preCalls, { lineType = lineType, handler = handler })
+		end,
+		-- Stats Trimmer adds none: specs add other addons' (GearQuest's score line)
+		AddTooltipPostCall = function(tooltipType, handler)
+			table.insert(wow.postCalls, { tooltipType = tooltipType, handler = handler })
 		end,
 	}
 	env.C_Item = {

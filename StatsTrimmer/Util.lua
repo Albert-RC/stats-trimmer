@@ -34,17 +34,59 @@ function ns.NumbersMatch(text, a, b)
 end
 
 -- The percentage in a line ("1.0%", "1,0 %") as a short string ("1", "1.5").
--- nil unless it is the only number in the line.
+-- nil unless it is the only number in the line. A second percentage, even the same one, is another effect that a
+-- compact line for the first would hide.
 local PERCENT_PATTERN = "%d+[%.,]?%d*%s*%%"
 
 function ns.GetOnlyPercent(text)
-	local percent = text:match(PERCENT_PATTERN)
-	if not percent or text:gsub(PERCENT_PATTERN, ""):find("%d") then
+	local rest, count = text:gsub(PERCENT_PATTERN, "")
+	if count ~= 1 or rest:find("%d") then
 		return nil
 	end
+	local percent = text:match(PERCENT_PATTERN)
 	local value = tonumber((percent:match("[%d%.,]+"):gsub(",", ".")))
 	return value and tostring(value)
 end
+
+-- The addon's own English name for each stat it shows, by the key of Blizzard's name for it: Blizzard's enUS name,
+-- lowercased like the compact lines. They are the last resort, when no language has Blizzard's name (as right
+-- after an update, before the client restarts and loads Locales.lua). Rules.lua, FoodRules.lua and the settings'
+-- samples and row labels take their English from here. Groups of weapon skills and creature types have their
+-- own, made of several stats.
+ns.ENGLISH_NAMES = {
+	ITEM_MOD_ATTACK_POWER_SHORT = "attack power",
+	ITEM_MOD_RANGED_ATTACK_POWER_SHORT = "ranged attack power",
+	ITEM_MOD_FERAL_ATTACK_POWER_SHORT = "attack power in forms",
+	ITEM_MOD_HIT_RATING_SHORT = "hit",
+	ITEM_MOD_CRIT_RATING_SHORT = "critical strike",
+	ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = "defense",
+	ITEM_MOD_DODGE_RATING_SHORT = "dodge",
+	ITEM_MOD_PARRY_RATING_SHORT = "parry",
+	ITEM_MOD_BLOCK_RATING_SHORT = "block",
+	ITEM_MOD_BLOCK_VALUE_SHORT = "block value",
+	ITEM_MOD_SPELL_POWER_SHORT = "spell power",
+	ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "spell damage",
+	ITEM_MOD_SPELL_HEALING_DONE_SHORT = "spell healing",
+	ITEM_MOD_HIT_SPELL_RATING_SHORT = "hit (spell)",
+	ITEM_MOD_CRIT_SPELL_RATING_SHORT = "critical strike (spell)",
+	ITEM_MOD_SPELL_PENETRATION_SHORT = "spell piercing",
+	ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT = "arcane damage",
+	ITEM_MOD_FIRE_DAMAGE_DONE_SHORT = "fire damage",
+	ITEM_MOD_FROST_DAMAGE_DONE_SHORT = "frost damage",
+	ITEM_MOD_HOLY_DAMAGE_DONE_SHORT = "holy damage",
+	ITEM_MOD_NATURE_DAMAGE_DONE_SHORT = "nature damage",
+	ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT = "shadow damage",
+	HEALTH = "health",
+	MANA = "mana",
+	ITEM_MOD_STAMINA_SHORT = "stamina",
+	ITEM_MOD_INTELLECT_SHORT = "intellect",
+	ITEM_MOD_STRENGTH_SHORT = "strength",
+	ITEM_MOD_AGILITY_SHORT = "agility",
+	ITEM_MOD_SPIRIT_SHORT = "spirit",
+	ARMOR = "armor",
+	-- Not a GlobalString: the experience bonus buff's own words (Locales.lua)
+	KILL_EXPERIENCE = "experience gained from kills",
+}
 
 -- A compact line's text, in English or with the client's stat name: "+10 spell damage", "+1% golpe".
 -- Always "+": the line shows what the item adds to the stat, like Blizzard's item comparison. The "up to"
@@ -109,4 +151,9 @@ function ns.CompactLine(kind, value, name, stats, percent, details)
 		stats = stats,
 		details = details,
 	}
+end
+
+-- A compact line for one stat (`key`), named with the addon's English for it (ENGLISH_NAMES)
+function ns.StatLine(kind, value, key, percent, details)
+	return ns.CompactLine(kind, value, ns.ENGLISH_NAMES[key], { key }, percent, details)
 end

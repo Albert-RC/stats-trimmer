@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.5.1 (2026-10-16)
+
+- An equip line with more than one percentage, such as a hit bonus next to a movement speed bonus, keeps its original text instead of losing the second one.
+- Food whose cooldown is a minute or an hour keeps its original text, which shows it. Only the 1 second cooldown foods share is left out.
+- The class colors no longer stay in the color picker, with it taller than usual, when another addon opens the picker while Stats Trimmer's pick is still open.
+- The settings window keeps its tabs on screen at large UI scales, including when dragged to the bottom edge, and adjusts when the UI scale or display size changes.
+- The game's texts are those of its current build, 1.60.1.70425. Italian keeps those of 1.60.1.70338, the last build with Italian texts available.
+- When the game has no name for a stat, the addon's own English matches the game's: `+1% hit`, `+1% critical strike`.
+- After updating, restart the game instead of using `/reload`: the new files are only loaded on a restart.
+
 ## v0.5.0 (2026-10-15)
 
 - Food and drink get compact lines too. `Use: Restores 530 health over 24 sec. Must remain seated while eating.` becomes `+530 health (24 sec)`, and a drink `+803 mana (24 sec)`.

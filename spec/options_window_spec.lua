@@ -57,6 +57,20 @@ describe("Settings window", function()
 		return TooltipTexts(wow.env.StatsTrimmerFoodPreviewTooltip)
 	end
 
+	-- Shows Bastón nudoso de nigromancia, with its combined spell power line, in GameTooltip
+	local function ShowStaff()
+		wow.items["item:staff"] = { ITEM_MOD_SPELL_POWER_SHORT = 26 }
+		fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+			hyperlink = "item:staff",
+			lines = {
+				{
+					leftText = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada con hechizos y "
+						.. "efectos mágicos.",
+				},
+			},
+		})
+	end
+
 	local function HasText(text)
 		return fakes.FindFrames(wow, { text = text })[1] ~= nil
 	end
@@ -456,11 +470,28 @@ describe("Settings window", function()
 			assert.is_true(wow.env.ColorPickerFrame:GetHeight() > BASE_HEIGHT)
 		end)
 
+		it("grows the picker once when another row opens it while it still shows", function()
+			fakes.Fire(Swatch("spellDamage"), "OnClick")
+			assert.is_true(Palette():IsShown())
+			assert.are.equal(238, wow.env.ColorPickerFrame:GetHeight())
+		end)
+
 		it("isn't shown when another addon opens the picker", function()
 			wow.env.ColorPickerFrame:Hide()
 			wow.env.ColorPickerFrame:SetupColorPickerAndShow({ r = 1, g = 1, b = 1, swatchFunc = function() end })
 			assert.is_false(Palette():IsShown())
 			assert.are.equal(BASE_HEIGHT, wow.env.ColorPickerFrame:GetHeight())
+		end)
+
+		it("leaves for another addon's pick made while it shows, and comes back for the next row", function()
+			-- The picker stays shown: no OnHide runs
+			wow.env.ColorPickerFrame:SetupColorPickerAndShow({ r = 1, g = 1, b = 1, swatchFunc = function() end })
+			assert.is_true(wow.env.ColorPickerFrame:IsShown())
+			assert.is_false(Palette():IsShown())
+			assert.are.equal(BASE_HEIGHT, wow.env.ColorPickerFrame:GetHeight())
+			fakes.Fire(Swatch("spellDamage"), "OnClick")
+			assert.is_true(Palette():IsShown())
+			assert.are.equal(238, wow.env.ColorPickerFrame:GetHeight())
 		end)
 
 		it("is made once, however often the picker opens", function()
@@ -597,7 +628,21 @@ describe("Settings window", function()
 			assert.are.equal(height, Window():GetHeight())
 		end)
 
-		it("scales down, whole, on a screen too short for it", function()
+		-- The frame and the tabs below it must both fit, and the screen clamp must cover every tab, which keeps them
+		-- on screen when the window is dragged down. The fake doesn't clamp: the drag itself is checked in game.
+		local function AssertWindowAndTabsFit()
+			local window = Window()
+			local bottomInset = select(4, window:GetClampRectInsets())
+			local tabTop = window.Tabs[1].points[1][5]
+			for _, tab in ipairs(window.Tabs) do
+				assert.is_true(bottomInset <= tabTop - tab:GetHeight())
+			end
+			local scale = window:GetScale()
+			assert.is_true((window:GetHeight() - bottomInset) * scale <= wow.env.UIParent:GetHeight() + 0.001)
+			assert.is_true(window:GetWidth() * scale <= wow.env.UIParent:GetWidth() + 0.001)
+		end
+
+		it("scales down with its tabs on a screen too short for it", function()
 			assert.are.equal(1, Window():GetScale())
 			wow = fakes.NewWoW()
 			-- A large UI scale
@@ -605,7 +650,24 @@ describe("Settings window", function()
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
 			assert.is_true(Window():GetHeight() > 600)
-			assert.is_true(Window():GetHeight() * Window():GetScale() <= 600)
+			AssertWindowAndTabsFit()
+			ShowFoodTab()
+			AssertWindowAndTabsFit()
+		end)
+
+		it("extends its screen clamp below the frame to cover its tabs", function()
+			AssertWindowAndTabsFit()
+		end)
+
+		it("fits again when the UI scale or display size changes while open", function()
+			for _, event in ipairs({ "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED" }) do
+				for _, size in ipairs({ { 1365, 600 }, { 500, 768 }, { 1365, 768 } }) do
+					wow.env.UIParent:SetSize(unpack(size))
+					fakes.FireEvent(wow, event)
+					AssertWindowAndTabsFit()
+				end
+				assert.are.equal(1, Window():GetScale())
+			end
 		end)
 	end)
 
@@ -763,36 +825,45 @@ describe("Settings window", function()
 		end)
 
 		it("rebuilds a shown item tooltip so it switches language right away", function()
-			local tooltip = wow.env.GameTooltip
-			fakes.ShowItem(wow, tooltip, wow.env.UIParent, "ANCHOR_NONE")
+			ShowStaff()
+			assert.are.same({ "+26 poder con hechizos" }, TooltipTexts(wow.env.GameTooltip))
 			LanguageMenu().setSelected("deDE")
-			assert.are.equal(1, tooltip.refreshCount)
+			assert.are.same({ "+26 zaubermacht" }, TooltipTexts(wow.env.GameTooltip))
 		end)
 
 		it("offers only English besides the client's language on a client without the Latin alphabet", function()
-			wow = fakes.NewWoW()
-			wow.env.GetLocale = function()
-				return "ruRU"
-			end
-			wow.env.LocaleUtil.GetLocaleDisplayName = function(locale)
-				return locale
-			end
+			wow = fakes.NewWoW({ locale = "ruRU" })
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
-			assert.are.same({ { "ruRU", "CLIENT" }, { "enUS", "enUS" } }, LanguageMenu().options)
+			assert.are.same(
+				{ { "Русский", "CLIENT" }, { "Английский", "enUS" } },
+				LanguageMenu().options
+			)
 		end)
 
 		it("marks the client's entry for a saved language the client's font can't show", function()
-			-- Saved on another client; the fake client's own strings stay esES
-			wow = fakes.NewWoW()
-			wow.env.GetLocale = function()
-				return "ruRU"
-			end
+			-- Saved on another client
+			wow = fakes.NewWoW({ locale = "ruRU" })
 			wow.env.StatsTrimmerDB = { language = "deDE" }
 			ns = helpers.StartStatsTrimmer(wow)
 			ns.ShowOptions()
 			assert.is_true(LanguageMenu().isSelected("CLIENT"))
-			assert.are.equal("+26 poder con hechizos", PreviewTexts()[3 + KindIndex("spellPower")])
+			assert.are.equal("+26 к силе заклинаний", PreviewTexts()[3 + KindIndex("spellPower")])
+		end)
+
+		it("shows a client's own texts when its language isn't bundled, lowercased like the compact lines", function()
+			wow = fakes.NewWoW({ locale = "ruRU" })
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_true(HasText("Сброс"))
+			assert.is_true(HasText("Цвета"))
+			assert.is_true(HasText("магическое лечение"))
+			assert.is_true(HasText("Бой"))
+			assert.are.equal("+10 урон от заклинаний", PreviewTexts()[3 + KindIndex("spellDamage")])
+			assert.are.same(
+				{ "Sample Food", "+530 здоровье (24 сек)" },
+				{ unpack(FoodPreviewTexts(), 1, 2) }
+			)
 		end)
 	end)
 
@@ -821,15 +892,17 @@ describe("Settings window", function()
 		end)
 
 		it("splits spell power when checked, rebuilding the preview and a shown item tooltip", function()
-			local tooltip = wow.env.GameTooltip
-			fakes.ShowItem(wow, tooltip, wow.env.UIParent, "ANCHOR_NONE")
+			ShowStaff()
 			ns.ShowOptions()
 			fakes.ClickCheckButton(Checkbox())
 			assert.is_true(ns.db.splitSpellPower)
 			assert.is_false(PreviewHas("+26 poder con hechizos"))
 			-- Spell damage takes spell power's place
 			assert.are.equal("+10 daño con hechizos", PreviewTexts()[3 + KindIndex("spellPower")])
-			assert.are.equal(1, tooltip.refreshCount)
+			assert.are.same(
+				{ "+26 daño con hechizos", "+26 sanación con hechizos" },
+				TooltipTexts(wow.env.GameTooltip)
+			)
 		end)
 
 		it("shows spell power as its own line again when unchecked", function()
@@ -933,7 +1006,7 @@ describe("Settings window", function()
 			ns.ShowOptions()
 			assert.is_true(HasText("hit"))
 			assert.is_true(HasText("attack power vs type"))
-			assert.are.equal("+1% hit rating", PreviewTexts()[3 + KindIndex("hitRating")])
+			assert.are.equal("+1% hit", PreviewTexts()[3 + KindIndex("hitRating")])
 		end)
 	end)
 end)

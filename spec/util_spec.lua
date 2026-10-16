@@ -53,6 +53,16 @@ describe("GetOnlyPercent", function()
 	it("returns nil when the line has another number", function()
 		assert.is_nil(ns.GetOnlyPercent("Equip: Increases your chance to block by 1% for 10 sec."))
 	end)
+
+	it("returns nil when the line has another percentage", function()
+		assert.is_nil(ns.GetOnlyPercent("Equip: Improves your chance to hit by 1% and your movement speed by 8%."))
+		assert.is_nil(ns.GetOnlyPercent("Équipé : augmente de 1,5 % vos chances de bloquer et de 2 % de parer."))
+	end)
+
+	it("returns nil when the line has the same percentage twice", function()
+		assert.is_nil(ns.GetOnlyPercent("Equip: Improves your chance to hit by 1% and to dodge by 1%."))
+		assert.is_nil(ns.GetOnlyPercent("Equipar: Aumenta un 1.0% el bloqueo y un 1.0% la parada."))
+	end)
 end)
 
 describe("FormatDetails", function()
@@ -90,6 +100,21 @@ describe("FormatDetails", function()
 		end
 		assert.is_nil(ns.FormatDetails({ wellFedMinutes = 15 }, NoWellFed))
 		assert.is_nil(ns.FormatDetails({ seconds = 24 }, function() end))
+	end)
+end)
+
+describe("ENGLISH_NAMES", function()
+	it("are Blizzard's enUS names, lowercased", function()
+		local fakes = require("spec.fakes")
+		local english = fakes.LocaleStrings("enUS")
+		for key, name in pairs(ns.ENGLISH_NAMES) do
+			assert.are.same({ key, english[key] and english[key]:lower() }, { key, name })
+		end
+	end)
+
+	it("name ratings without the word rating", function()
+		assert.are.equal("+1% hit", ns.StatLine("hitRating", 1, "ITEM_MOD_HIT_RATING_SHORT", true).text)
+		assert.are.equal("+1% critical strike", ns.StatLine("critRating", 1, "ITEM_MOD_CRIT_RATING_SHORT", true).text)
 	end)
 end)
 

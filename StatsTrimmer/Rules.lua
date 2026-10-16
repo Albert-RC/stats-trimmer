@@ -18,6 +18,8 @@ local NumbersMatch = ns.NumbersMatch
 local GetOnlyPercent = ns.GetOnlyPercent
 local FormatLine = ns.FormatLine
 local Line = ns.CompactLine
+local StatLine = ns.StatLine
+local ENGLISH_NAMES = ns.ENGLISH_NAMES
 
 -- Creature types a stat can be restricted to: stat key suffix -> creature type ID and output label.
 -- All of these ITEM_MOD_<STAT>_VS_<TYPE>_SHORT keys exist in the client; BEAST and ELEMENTAL have been
@@ -33,21 +35,21 @@ local VS_CREATURE_TYPES = {
 	MECHANICAL = { id = 9, label = "mechanicals" },
 }
 
--- Stats that can be restricted to a creature type: ITEM_MOD_<stat>_VS_<TYPE>_SHORT -> line kind and
--- English name
+-- Stats that can be restricted to a creature type: ITEM_MOD_<stat>_VS_<TYPE>_SHORT -> line kind and the stat
+-- itself, whose English name the line takes
 local VS_STATS = {
-	ATTACK_POWER = { kind = "attackPowerVs", name = "attack power" },
-	SPELL_DAMAGE = { kind = "spellDamageVs", name = "spell damage" },
+	ATTACK_POWER = { kind = "attackPowerVs", base = "ITEM_MOD_ATTACK_POWER_SHORT" },
+	SPELL_DAMAGE = { kind = "spellDamageVs", base = "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" },
 }
 
 -- Stats whose equip line shows exactly the stat value
 local POINT_STATS = {
 	-- The key says RATING, but defense shows plain skill points ("Increased Defense +3.")
-	{ key = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT", kind = "defense", name = "defense" },
-	{ key = "ITEM_MOD_RANGED_ATTACK_POWER_SHORT", kind = "rangedAttackPower", name = "ranged attack power" },
-	{ key = "ITEM_MOD_FERAL_ATTACK_POWER_SHORT", kind = "feralAttackPower", name = "feral attack power" },
-	{ key = "ITEM_MOD_BLOCK_VALUE_SHORT", kind = "blockValue", name = "block value" },
-	{ key = "ITEM_MOD_SPELL_PENETRATION_SHORT", kind = "spellPenetration", name = "spell penetration" },
+	{ key = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT", kind = "defense" },
+	{ key = "ITEM_MOD_RANGED_ATTACK_POWER_SHORT", kind = "rangedAttackPower" },
+	{ key = "ITEM_MOD_FERAL_ATTACK_POWER_SHORT", kind = "feralAttackPower" },
+	{ key = "ITEM_MOD_BLOCK_VALUE_SHORT", kind = "blockValue" },
+	{ key = "ITEM_MOD_SPELL_PENETRATION_SHORT", kind = "spellPenetration" },
 }
 
 -- Weapon skills, in output order: ITEM_MOD_<key>_SHORT -> label
@@ -69,15 +71,15 @@ local WEAPON_SKILLS = {
 	{ key = "WANDS", label = "wands" },
 }
 
--- Ratings whose equip line shows a percentage: stat key -> line kind and output label
+-- Ratings whose equip line shows a percentage: stat key -> line kind
 local PERCENT_RATINGS = {
-	ITEM_MOD_BLOCK_RATING_SHORT = { kind = "blockRating", label = "block rating" },
-	ITEM_MOD_HIT_RATING_SHORT = { kind = "hitRating", label = "hit rating" },
-	ITEM_MOD_CRIT_RATING_SHORT = { kind = "critRating", label = "crit rating" },
-	ITEM_MOD_HIT_SPELL_RATING_SHORT = { kind = "spellHitRating", label = "spell hit rating" },
-	ITEM_MOD_CRIT_SPELL_RATING_SHORT = { kind = "spellCritRating", label = "spell crit rating" },
-	ITEM_MOD_DODGE_RATING_SHORT = { kind = "dodgeRating", label = "dodge rating" },
-	ITEM_MOD_PARRY_RATING_SHORT = { kind = "parryRating", label = "parry rating" },
+	ITEM_MOD_BLOCK_RATING_SHORT = "blockRating",
+	ITEM_MOD_HIT_RATING_SHORT = "hitRating",
+	ITEM_MOD_CRIT_RATING_SHORT = "critRating",
+	ITEM_MOD_HIT_SPELL_RATING_SHORT = "spellHitRating",
+	ITEM_MOD_CRIT_SPELL_RATING_SHORT = "spellCritRating",
+	ITEM_MOD_DODGE_RATING_SHORT = "dodgeRating",
+	ITEM_MOD_PARRY_RATING_SHORT = "parryRating",
 }
 
 -- A claim is a stat (or a group of stats) that can own equip lines:
@@ -175,11 +177,11 @@ ns.Rules = {
 			end
 			if context.splitSpellPower then
 				Add(Claim({ power }, {
-					Line("spellDamage", power, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" }),
-					Line("spellHealing", power, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" }),
+					StatLine("spellDamage", power, "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT"),
+					StatLine("spellHealing", power, "ITEM_MOD_SPELL_HEALING_DONE_SHORT"),
 				}))
 			else
-				Add(Claim({ power }, { Line("spellPower", power, "spell power", { "ITEM_MOD_SPELL_POWER_SHORT" }) }))
+				Add(Claim({ power }, { StatLine("spellPower", power, "ITEM_MOD_SPELL_POWER_SHORT") }))
 			end
 		end,
 	},
@@ -194,13 +196,10 @@ ns.Rules = {
 			end
 			local lines = {}
 			if damage then
-				table.insert(lines, Line("spellDamage", damage, "spell damage", { "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT" }))
+				table.insert(lines, StatLine("spellDamage", damage, "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT"))
 			end
 			if healing then
-				table.insert(
-					lines,
-					Line("spellHealing", healing, "spell healing", { "ITEM_MOD_SPELL_HEALING_DONE_SHORT" })
-				)
+				table.insert(lines, StatLine("spellHealing", healing, "ITEM_MOD_SPELL_HEALING_DONE_SHORT"))
 			end
 			Add(Claim({ damage, healing }, lines))
 		end,
@@ -231,8 +230,7 @@ ns.Rules = {
 		claims = function(stats, _, Add)
 			local attackPower = stats.ITEM_MOD_ATTACK_POWER_SHORT
 			if attackPower then
-				local line = Line("attackPower", attackPower, "attack power", { "ITEM_MOD_ATTACK_POWER_SHORT" })
-				Add(Claim({ attackPower }, { line }))
+				Add(Claim({ attackPower }, { StatLine("attackPower", attackPower, "ITEM_MOD_ATTACK_POWER_SHORT") }))
 			end
 		end,
 	},
@@ -248,7 +246,7 @@ ns.Rules = {
 				if vs then
 					local creatureType = VS_CREATURE_TYPES[typeKey]
 					if creatureType then
-						local name = vs.name .. " vs " .. creatureType.label
+						local name = ENGLISH_NAMES[vs.base] .. " vs " .. creatureType.label
 						local claim = Claim({ value }, { Line(vs.kind, value, name, { key }) })
 						local terms = CreatureTerms(context, creatureType, key)
 						if #terms > 0 then
@@ -269,7 +267,7 @@ ns.Rules = {
 			for _, stat in ipairs(POINT_STATS) do
 				local value = stats[stat.key]
 				if value then
-					Add(Claim({ value }, { Line(stat.kind, value, stat.name, { stat.key }) }))
+					Add(Claim({ value }, { StatLine(stat.kind, value, stat.key) }))
 				end
 			end
 		end,
@@ -308,11 +306,11 @@ ns.Rules = {
 		claims = function(stats, _, Add)
 			for key in pairs(stats) do
 				if key:find("_RATING_SHORT$") and not key:find("_SKILL_RATING_SHORT$") then
-					local rating = PERCENT_RATINGS[key]
+					local kind = PERCENT_RATINGS[key]
 					local claim = { percent = true, size = 1 }
-					if rating then
+					if kind then
 						claim.Render = function(text)
-							return { Line(rating.kind, GetOnlyPercent(text), rating.label, { key }, true) }
+							return { StatLine(kind, GetOnlyPercent(text), key, true) }
 						end
 					end
 					Add(claim)
@@ -327,8 +325,9 @@ ns.Rules = {
 			for key, value in pairs(stats) do
 				local school = key:match("^ITEM_MOD_(%u+)_DAMAGE_DONE_SHORT$")
 				if school and school ~= "SPELL" then
-					local name = school:lower()
-					Add(Claim({ value }, { Line(name .. "Damage", value, name .. " damage", { key }) }))
+					-- A school ENGLISH_NAMES lacks is still named, after its key
+					local name = ENGLISH_NAMES[key] or school:lower() .. " damage"
+					Add(Claim({ value }, { Line(school:lower() .. "Damage", value, name, { key }) }))
 				end
 			end
 		end,
@@ -451,7 +450,7 @@ local function CombineCreatures(claims, text, FoldCase)
 		table.insert(keys, entry.creature.key)
 	end
 	local vs = VS_STATS[stat]
-	local name = vs.name .. " vs " .. table.concat(labels, "/")
+	local name = ENGLISH_NAMES[vs.base] .. " vs " .. table.concat(labels, "/")
 	return { Line(vs.kind, claims[1].creature.value, name, keys) }
 end
 

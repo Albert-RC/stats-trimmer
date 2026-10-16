@@ -2,7 +2,7 @@
 ## Title: Stats Trimmer
 ## Notes: Rewrites verbose stat lines in item tooltips into compact ones.
 ## Author: Albert-RC
-## Version: 0.5.0
+## Version: 0.5.1
 ## X-License: MIT
 ## IconTexture: Interface\Icons\inv_magicalfishpet
 ## SavedVariables: StatsTrimmerDB
@@ -24,7 +24,9 @@ Locales.lua
 FoodData.lua
 Rules.lua
 FoodRules.lua
+Localization.lua
 Tooltip.lua
+ClassPalette.lua
 OptionsWindow.lua
 MinimapButton.lua
 SettingsCategory.lua

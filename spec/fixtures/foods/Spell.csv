@@ -1,0 +1,11 @@
+ID,Description_lang
+432,Restores ${($s1/5)*$d} mana over $d.  Must remain seated while drinking.
+435,Restores $o1 health over $d.  Must remain seated while eating.
+6615,Makes you immune to Stun and Movement Impairing effects for the next $d.   Does not remove effects already on the imbiber.
+11009,A strong alcoholic beverage.
+24005,Restores $s1% of your health per second for $d.  Must remain seated while eating.
+1243969,"$?pc142418[Additionally, experience gained from kills is increased by $s1%.][]"
+1249506,"$@spelldesc435 If you spend at least 10 sec eating, you will become well fed and gain $s2 Attack Power for $1249519d. $@spelldesc1243969"
+1249508,"$@spelldesc435 If you spend at least 10 sec eating, you will become well fed and gain $s2 Fishing Skill for $1249521d. $@spelldesc1243969"
+1249519,"A nutritious meal has made you Well Fed, increasing your Attack Power."
+1249521,"A nutritious meal has made you Well Fed, increasing your Fishing Skill."

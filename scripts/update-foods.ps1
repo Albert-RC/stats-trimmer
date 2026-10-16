@@ -1,19 +1,45 @@
 # Generates StatsTrimmer/FoodData.lua: what the Use line of each food and drink shows, taken from Forever's item
 # and spell tables on wago.tools. Run it again when the client build changes.
-# Usage: ./scripts/update-foods.ps1 [-Build 1.60.1.70338]
+# Usage: ./scripts/update-foods.ps1 [-Build 1.60.1.70425] [-From <folder>] [-Output <file>] [-AcceptRemovals]
 #
 # A food's Use line is its spell's description, whose numbers the client fills in from the spell data: "Restores
 # $o1 health over $d." The wording and the order of those numbers vary per language, so the addon matches the
 # line by its numbers, like equip lines. This script reads the English description to learn which numbers the
 # line shows and what each one is. The health or mana a food restores over time is the one number the client
 # computes in its own way, so the line itself gives it.
-param([string]$Build = "1.60.1.70338")
+#
+# It works in three steps:
+# 1. Reads the tables: downloads them for -Build, or reads them from -From, a folder with one <Table>.csv each
+#    (spec/fixtures/foods for the specs). Every table must have rows and the columns the script reads, and every
+#    food's effects and spells must be in their tables, or the script stops: a partial download would otherwise
+#    leave foods out silently.
+# 2. Converts every food spell, or lists why it keeps its original text.
+# 3. Compares the result with the file it replaces (-Output, FoodData.lua by default) and writes it. An empty
+#    result is never written, and neither is one without food spells the file had, unless -AcceptRemovals says
+#    that is expected.
+param(
+	[string]$Build = "1.60.1.70425",
+	[string]$From,
+	[string]$Output = (Join-Path (Split-Path -Parent $PSScriptRoot) "StatsTrimmer/FoodData.lua"),
+	[switch]$AcceptRemovals
+)
 
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$output = Join-Path $root "StatsTrimmer/FoodData.lua"
 $downloads = Join-Path ([System.IO.Path]::GetTempPath()) "StatsTrimmer-FoodData"
+
+# The tables the script reads, with the columns it reads from each
+$tableColumns = [ordered]@{
+	Item = @("ID", "ClassID", "SubclassID")
+	ItemSparse = @("ID", "Display_lang")
+	ItemEffect = @("ID", "TriggerType", "SpellID")
+	ItemXItemEffect = @("ItemID", "ItemEffectID")
+	Spell = @("ID", "Description_lang")
+	SpellEffect = @("SpellID", "EffectIndex", "DifficultyID", "EffectBasePointsF", "EffectAura", "EffectAuraPeriod")
+	SpellMisc = @("SpellID", "DifficultyID", "DurationIndex")
+	SpellDuration = @("ID", "Duration")
+}
 
 # Forever's well fed foods end with this spell's description, "Additionally, experience gained from kills is
 # increased by 5%.", which the client only shows to some players
@@ -39,18 +65,35 @@ $statKeys = @{
 $pointAuras = @{ "84" = "HEALTH"; "85" = "MANA" }
 $percentAuras = @{ "20" = "HEALTH"; "21" = "MANA" }
 
-# A number in a description: a spell variable ($435o1, $1249519d) or a literal one
-$value = '(?:\$\d+[sodt]\d*|\d+)'
+# A number in a description: a formula the client works out (${($430s1/5)*$430d}), a spell variable ($435o1,
+# $1249519d) or a literal one
+$formula = '\$\{[^{}]*\}'
+$value = "(?:$formula|\$\d+[sodt]\d*|\d+)"
 
 class SkipFood : System.Exception {
 	SkipFood([string]$message) : base($message) {}
 }
 
-function Get-Table([string]$name, [string]$locale = "enUS") {
-	$file = Join-Path $downloads "$name-$locale.csv"
-	$url = "https://wago.tools/db2/$name/csv?build=$Build&locale=$locale"
-	Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
-	return Import-Csv -Path $file -Encoding utf8
+# A table's rows, downloaded or from -From. Stops when it has no rows or lacks a column the script reads.
+function Read-Table([string]$name) {
+	if ($From) {
+		$file = Join-Path $From "$name.csv"
+	}
+	else {
+		$file = Join-Path $downloads "$name.csv"
+		$url = "https://wago.tools/db2/$name/csv?build=$Build&locale=enUS"
+		Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
+	}
+	$rows = @(Import-Csv -Path $file -Encoding utf8)
+	if ($rows.Count -eq 0) {
+		throw "$name has no rows"
+	}
+	$columns = $rows[0].PSObject.Properties.Name
+	$missing = @($tableColumns[$name] | Where-Object { $columns -notcontains $_ })
+	if ($missing.Count -gt 0) {
+		throw "$name has no $($missing -join ', ') column"
+	}
+	return $rows
 }
 
 function ConvertTo-LuaString([string]$text) {
@@ -58,29 +101,40 @@ function ConvertTo-LuaString([string]$text) {
 	return '"' + $escaped + '"'
 }
 
-New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+# 1. The tables
+if (-not $From) {
+	New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+}
 try {
 	$foodNames = @{}
-	foreach ($row in Get-Table "Item") {
+	foreach ($row in Read-Table "Item") {
 		if ($row.ClassID -eq "0" -and $row.SubclassID -eq "5") {
 			$foodNames[$row.ID] = $null
 		}
 	}
-	foreach ($row in Get-Table "ItemSparse") {
+	foreach ($row in Read-Table "ItemSparse") {
 		if ($foodNames.ContainsKey($row.ID)) {
 			$foodNames[$row.ID] = $row.Display_lang
 		}
 	}
 	$itemEffects = @{}
-	foreach ($row in Get-Table "ItemEffect") {
+	foreach ($row in Read-Table "ItemEffect") {
 		$itemEffects[$row.ID] = $row
 	}
 	# Food spell -> the names of the foods that use it
 	$foods = @{}
-	foreach ($row in Get-Table "ItemXItemEffect") {
+	$missingEffects = [System.Collections.Generic.List[string]]::new()
+	foreach ($row in Read-Table "ItemXItemEffect") {
+		if (-not $foodNames.ContainsKey($row.ItemID)) {
+			continue
+		}
 		$effect = $itemEffects[$row.ItemEffectID]
+		if (-not $effect) {
+			$missingEffects.Add("item $($row.ItemID): effect $($row.ItemEffectID)")
+			continue
+		}
 		# TriggerType 0 is "Use:"
-		if ($foodNames.ContainsKey($row.ItemID) -and $effect -and $effect.TriggerType -eq "0") {
+		if ($effect.TriggerType -eq "0") {
 			if (-not $foods.ContainsKey($effect.SpellID)) {
 				$foods[$effect.SpellID] = [System.Collections.Generic.List[string]]::new()
 			}
@@ -91,11 +145,11 @@ try {
 	}
 
 	$descriptions = @{}
-	foreach ($row in Get-Table "Spell") {
+	foreach ($row in Read-Table "Spell") {
 		$descriptions[$row.ID] = $row.Description_lang
 	}
 	$spellEffects = @{} # spell -> effect index -> row
-	foreach ($row in Get-Table "SpellEffect") {
+	foreach ($row in Read-Table "SpellEffect") {
 		if ($row.DifficultyID -eq "0") {
 			if (-not $spellEffects.ContainsKey($row.SpellID)) {
 				$spellEffects[$row.SpellID] = @{}
@@ -104,18 +158,35 @@ try {
 		}
 	}
 	$durationsByIndex = @{}
-	foreach ($row in Get-Table "SpellDuration") {
+	foreach ($row in Read-Table "SpellDuration") {
 		$durationsByIndex[$row.ID] = [int]$row.Duration
 	}
 	$durations = @{} # spell -> milliseconds
-	foreach ($row in Get-Table "SpellMisc") {
+	foreach ($row in Read-Table "SpellMisc") {
 		if ($row.DifficultyID -eq "0" -and $durationsByIndex.ContainsKey($row.DurationIndex)) {
 			$durations[$row.SpellID] = $durationsByIndex[$row.DurationIndex]
 		}
 	}
 }
 finally {
-	Remove-Item -Recurse -Force $downloads -ErrorAction SilentlyContinue
+	if (-not $From) {
+		Remove-Item -Recurse -Force $downloads -ErrorAction SilentlyContinue
+	}
+}
+
+$missingSpells = @($foods.Keys | Where-Object { -not $descriptions.ContainsKey($_) } | Sort-Object { [int]$_ })
+if ($foods.Count -eq 0 -or $missingEffects.Count -gt 0 -or $missingSpells.Count -gt 0) {
+	$problems = @()
+	if ($foods.Count -eq 0) {
+		$problems += "no food has a Use spell"
+	}
+	if ($missingEffects.Count -gt 0) {
+		$problems += "ItemEffect lacks $($missingEffects -join '; ')"
+	}
+	if ($missingSpells.Count -gt 0) {
+		$problems += "Spell lacks food spells $($missingSpells -join ', ')"
+	}
+	throw "The tables don't agree, so FoodData.lua is left as it is: $($problems -join '. ')"
 }
 
 function Get-Effect([string]$spell, [string]$index) {
@@ -152,11 +223,32 @@ function Expand-Description([string]$spell) {
 	return $text
 }
 
+# A formula the client works out, as the total of a health or mana regeneration: since build 1.60.1.70425 drinks
+# say "Restores ${($430s1/5)*$430d} mana", their base points every 5 seconds for their duration. Like $o1, the line
+# shows the result, which the addon reads from it: the formula only says which effect it is, by its one base
+# points variable.
+function Resolve-Formula([string]$token) {
+	$variables = @([regex]::Matches($token, '\$(\d+)([sodt])(\d*)'))
+	$points = @($variables | Where-Object { $_.Groups[2].Value -in @("s", "o") })
+	$others = @($variables | Where-Object { $_.Groups[2].Value -notin @("s", "o", "d") })
+	if ($points.Count -ne 1 -or $others.Count -gt 0) {
+		throw [SkipFood]::new("formula $token")
+	}
+	$effect = Get-Effect $points[0].Groups[1].Value $points[0].Groups[3].Value
+	if (-not $pointAuras.ContainsKey($effect.EffectAura)) {
+		throw [SkipFood]::new("formula $token on aura $($effect.EffectAura)")
+	}
+	return @{ amount = Get-BasePoints $effect; stat = $pointAuras[$effect.EffectAura] }
+}
+
 # What a number in the description shows: @{ number } for a number the line shows as it is, or @{ amount, stat }
 # for a restore whose total the client computes (amount is its base points, for telling health and mana apart)
 function Resolve-Value([string]$token, [string]$unit = "") {
 	if ($token -match '^\d+$') {
 		return @{ number = [int]$token }
+	}
+	if ($token -match "^$formula$") {
+		return Resolve-Formula $token
 	}
 	if ($token -notmatch '^\$(\d+)([sodt])(\d*)$') {
 		throw [SkipFood]::new("unknown number $token")
@@ -207,7 +299,7 @@ function Convert-Food([string]$spell) {
 		$text = $text.Replace($experienceMark, "")
 	}
 	$text = ($text -replace '\s+', ' ').Trim()
-	if ($text -match '\$[^\d]') {
+	if (($text -replace $formula, '') -match '\$[^\d]') {
 		throw [SkipFood]::new("conditional or unknown text: $text")
 	}
 
@@ -326,6 +418,41 @@ function ConvertTo-LuaTable($entries) {
 	return "{ " + ($fields -join ", ") + " }"
 }
 
+# 2. Every food spell, converted or with why it keeps its text
+$converted = [System.Collections.Generic.List[object]]::new()
+$skipped = [ordered]@{} # spell -> "names: reason"
+foreach ($spell in ($foods.Keys | Sort-Object { [int]$_ })) {
+	$names = @($foods[$spell] | Sort-Object -Unique)
+	try {
+		$converted.Add([ordered]@{ spell = $spell; names = $names; food = Convert-Food $spell })
+	}
+	catch [SkipFood] {
+		$skipped[$spell] = "($($names -join ', ')): $($_.Exception.Message)"
+	}
+}
+
+# 3. Compared with the file it replaces, then written
+if ($converted.Count -eq 0) {
+	throw "No food spell could be converted, so $Output is left as it is"
+}
+$previous = @()
+if (Test-Path $Output) {
+	$previous = @(Select-String -Path $Output -Pattern '^\s*\[(\d+)\] = \{' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+}
+$current = @($converted | ForEach-Object { $_.spell })
+$added = @($current | Where-Object { $previous -notcontains $_ })
+$removed = @($previous | Where-Object { $current -notcontains $_ })
+foreach ($spell in $added) {
+	Write-Output "  added $spell"
+}
+foreach ($spell in $removed) {
+	$reason = if ($skipped.Contains($spell)) { $skipped[$spell] } else { "(no longer a food's Use spell)" }
+	Write-Output "  removed $spell $reason"
+}
+if ($removed.Count -gt 0 -and -not $AcceptRemovals) {
+	throw "$($removed.Count) food spells would be removed, so $Output is left as it is. Run again with -AcceptRemovals if that is expected."
+}
+
 $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add("-- Generated by scripts/update-foods.ps1 from the item and spell tables of build $Build")
 $lines.Add("-- (https://wago.tools/db2). Don't edit it by hand: run the script again.")
@@ -337,16 +464,8 @@ $lines.Add("--   lines       the compact lines, in order. A line with an amount 
 $lines.Add("--               the amount is its base points, which the larger number goes to.")
 $lines.Add("--   experience  the bonus some players see at the end of the line, or nil")
 $lines.Add("ns.FOODS = {")
-$skipped = [System.Collections.Generic.List[string]]::new()
-foreach ($spell in ($foods.Keys | Sort-Object { [int]$_ })) {
-	$names = @($foods[$spell] | Sort-Object -Unique)
-	try {
-		$food = Convert-Food $spell
-	}
-	catch [SkipFood] {
-		$skipped.Add("$spell ($($names -join ', ')): $($_.Exception.Message)")
-		continue
-	}
+foreach ($entry in $converted) {
+	$names, $food = $entry.names, $entry.food
 	$shown = if ($names.Count -gt 3) { ($names[0..2] -join ", ") + ", …" } else { $names -join ", " }
 	if ($shown) {
 		$lines.Add("`t-- $shown")
@@ -357,14 +476,16 @@ foreach ($spell in ($foods.Keys | Sort-Object { [int]$_ })) {
 	if ($null -ne $food.experience) {
 		$fields.Add("experience = $($food.experience)")
 	}
-	$lines.Add("`t[$spell] = { " + ($fields -join ", ") + " },")
+	$lines.Add("`t[$($entry.spell)] = { " + ($fields -join ", ") + " },")
 }
 $lines.Add("}")
 
-[System.IO.File]::WriteAllText($output, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText($Output, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
 if (Get-Command stylua -ErrorAction SilentlyContinue) {
-	stylua $output
+	stylua --config-path (Join-Path $root "stylua.toml") $Output
 }
-Write-Output ("{0} food spells, {1} left with their original text:" -f ($foods.Count - $skipped.Count), $skipped.Count)
-$skipped | ForEach-Object { Write-Output "  $_" }
-Write-Output "Wrote $output"
+Write-Output ("{0} food spells, {1} left with their original text:" -f $converted.Count, $skipped.Count)
+foreach ($spell in $skipped.Keys) {
+	Write-Output "  $spell $($skipped[$spell])"
+}
+Write-Output "Wrote $Output"

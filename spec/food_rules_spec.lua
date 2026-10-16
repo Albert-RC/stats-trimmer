@@ -6,11 +6,15 @@ local helpers = require("spec.helpers")
 local fakes = require("spec.fakes")
 local ns = helpers.LoadAddon("StatsTrimmer", { "Util.lua", "Config.lua", "FoodData.lua", "Rules.lua", "FoodRules.lua" })
 
--- ITEM_SPELL_TRIGGER_ONUSE and ITEM_COOLDOWN_TOTAL per locale
+-- ITEM_SPELL_TRIGGER_ONUSE, ITEM_COOLDOWN_TOTAL and SECONDS_ABBR per locale
 local CONTEXTS = {
-	enUS = { usePrefix = "Use:", cooldownFormat = "(%s Cooldown)" },
-	esES = { usePrefix = "Usar:", cooldownFormat = "(%s de tiempo de reutilización)." },
-	deDE = { usePrefix = "Benutzen:", cooldownFormat = "(%s Abklingzeit)" },
+	enUS = { usePrefix = "Use:", cooldownFormat = "(%s Cooldown)", secondsFormat = "%d |4Sec:Sec;" },
+	esES = {
+		usePrefix = "Usar:",
+		cooldownFormat = "(%s de tiempo de reutilización).",
+		secondsFormat = "%d |4s:s;",
+	},
+	deDE = { usePrefix = "Benutzen:", cooldownFormat = "(%s Abklingzeit)", secondsFormat = "%d |4Sek.:Sek.;" },
 }
 
 -- GetFoodReplacement for a food spell's Use line, as { kind, text } lines
@@ -54,6 +58,19 @@ describe("food and drink", function()
 		local text = "Benutzen: Stellt im Verlauf von 24 Sek. 530 Punkt(e) Gesundheit wieder her. Ihr müsst beim "
 			.. "Essen sitzen bleiben."
 		assert.are.same({ L("health", "+530 health (24 sec)") }, Replace(text, 435, "deDE"))
+	end)
+
+	it("drops the 1 second cooldown foods share, in every language", function()
+		local expected = { L("health", "+530 health (24 sec)") }
+		assert.are.same(expected, Replace(MOREL_EN .. " (1 |4Sec:Sec; Cooldown)", 435))
+		assert.are.same(expected, Replace(MOREL_ES .. " (1 |4s:s; de tiempo de reutilización).", 435, "esES"))
+		local de = "Benutzen: Stellt im Verlauf von 24 Sek. 530 Punkt(e) Gesundheit wieder her. "
+			.. "(1 |4Sek.:Sek.; Abklingzeit)"
+		assert.are.same(expected, Replace(de, 435, "deDE"))
+	end)
+
+	it("drops the shared cooldown with its plural escape already resolved", function()
+		assert.are.same({ L("health", "+530 health (24 sec)") }, Replace(MOREL_EN .. " (1 Sec Cooldown)", 435))
 	end)
 
 	it("reads large amounts with a thousands separator", function()
@@ -158,7 +175,7 @@ describe("well fed", function()
 			.. "experience gained from kills is increased by 5%. (1 |4Sec:Sec; Cooldown)"
 		assert.are.same({
 			L("health", "+1650 health (30 sec)"),
-			L("critRating", "+1% crit rating (well fed, 15 min)"),
+			L("critRating", "+1% critical strike (well fed, 15 min)"),
 			L("experience", "+5% experience gained from kills"),
 		}, Replace(text, 1249522))
 	end)
@@ -184,10 +201,27 @@ describe("food lines that keep their text", function()
 
 	it("when its cooldown is longer than the one foods share", function()
 		assert.is_nil(Replace(MOREL_EN .. " (2 |4Min:Min; Cooldown)", 435))
+		assert.is_nil(Replace(MOREL_EN .. " (2 |4Sec:Sec; Cooldown)", 435))
+	end)
+
+	it("when its cooldown is 1 of a longer unit", function()
+		assert.is_nil(Replace(MOREL_EN .. " (1 |4Min:Min; Cooldown)", 435))
+		assert.is_nil(Replace(MOREL_EN .. " (1 |4Hr:Hr; Cooldown)", 435))
+		assert.is_nil(Replace(MOREL_EN .. " (1 Min Cooldown)", 435))
+		assert.is_nil(Replace(MOREL_ES .. " (1 |4min:min; de tiempo de reutilización).", 435, "esES"))
+	end)
+
+	it("when its cooldown has more than one unit", function()
+		assert.is_nil(Replace(MOREL_EN .. " (1 |4Min:Min; 1 |4Sec:Sec; Cooldown)", 435))
 	end)
 
 	it("when the client's cooldown text is unknown, as its number is then one too many", function()
 		local context = { usePrefix = "Use:" }
+		assert.is_nil(ns.GetFoodReplacement(SNAPPER_EN, ns.FOODS[1249506], context))
+	end)
+
+	it("when the client's text for seconds is unknown, so no cooldown is known to be the shared one", function()
+		local context = { usePrefix = "Use:", cooldownFormat = "(%s Cooldown)" }
 		assert.is_nil(ns.GetFoodReplacement(SNAPPER_EN, ns.FOODS[1249506], context))
 	end)
 
@@ -198,6 +232,100 @@ describe("food lines that keep their text", function()
 end)
 
 describe("food data", function()
+	it("describes every food spell it had, so losing one shows up", function()
+		-- The food spells of build 1.60.1.70425: scripts/update-foods.ps1 lists the ones it adds or removes
+		local expected = {
+			430,
+			431,
+			432,
+			433,
+			434,
+			435,
+			1127,
+			1129,
+			1131,
+			1133,
+			1135,
+			1137,
+			2639,
+			5004,
+			5006,
+			5007,
+			7737,
+			10256,
+			22734,
+			23692,
+			24005,
+			24384,
+			25660,
+			29008,
+			29055,
+			29073,
+			468767,
+			1225771,
+			1248377,
+			1248378,
+			1248379,
+			1248380,
+			1248381,
+			1248382,
+			1248383,
+			1248384,
+			1248386,
+			1248387,
+			1248388,
+			1248389,
+			1248390,
+			1248391,
+			1248392,
+			1248393,
+			1248394,
+			1248395,
+			1248396,
+			1248397,
+			1248398,
+			1248399,
+			1248400,
+			1248401,
+			1249500,
+			1249501,
+			1249503,
+			1249504,
+			1249506,
+			1249507,
+			1249509,
+			1249510,
+			1249512,
+			1249513,
+			1249515,
+			1249516,
+			1249522,
+			1249914,
+			1249915,
+			1249916,
+			1249917,
+			1249918,
+			1249919,
+			1249920,
+			1249921,
+			1249922,
+			1249923,
+			1249924,
+			1249925,
+			1255415,
+			1269354,
+			1302066,
+			1312719,
+			1319311,
+		}
+		local spells = {}
+		for spellID in pairs(ns.FOODS) do
+			table.insert(spells, spellID)
+		end
+		table.sort(spells)
+		assert.are.same(expected, spells)
+	end)
+
 	it("leaves out foods whose line has more than the rules understand", function()
 		-- Alcohol, a Fishing Skill buff, and Enriched Manna Biscuit's text for inside Naxxramas
 		assert.is_nil(ns.FOODS[11009])

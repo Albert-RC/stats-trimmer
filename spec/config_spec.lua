@@ -191,7 +191,7 @@ describe("sample lines", function()
 	it("are compact lines the client's language can rebuild", function()
 		assert.are.same({
 			kind = "hitRating",
-			text = "+1% hit rating",
+			text = "+1% hit",
 			value = 1,
 			percent = true,
 			stats = { "ITEM_MOD_HIT_RATING_SHORT" },
