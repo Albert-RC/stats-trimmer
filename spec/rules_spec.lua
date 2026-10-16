@@ -578,6 +578,13 @@ describe("percentages", function()
 		assert.is_nil(Replace(struck, stats, "enUS", itemLines))
 	end)
 
+	it("keep a line with two of them, whose second the compact line would hide", function()
+		local stats = { ITEM_MOD_HIT_RATING_SHORT = 10 }
+		assert.is_nil(Replace("Equip: Improves your chance to hit by 1% and your movement speed by 8%.", stats, "enUS"))
+		assert.is_nil(Replace("Equip: Improves your chance to hit by 1% and to dodge by 1%.", stats, "enUS"))
+		assert.is_nil(Replace("Equipar: Mejora tu probabilidad de golpear un 1% y de esquivar un 1,5 %.", stats))
+	end)
+
 	it("stay as they are for a rating no rule knows", function()
 		local text = "Equip: Improves your chance to hit by 1%."
 		assert.is_nil(Replace(text, { ITEM_MOD_EXPERTISE_RATING_SHORT = 10 }, "enUS"))

@@ -34,14 +34,16 @@ function ns.NumbersMatch(text, a, b)
 end
 
 -- The percentage in a line ("1.0%", "1,0 %") as a short string ("1", "1.5").
--- nil unless it is the only number in the line.
+-- nil unless it is the only number in the line. A second percentage, even the same one, is another effect that a
+-- compact line for the first would hide.
 local PERCENT_PATTERN = "%d+[%.,]?%d*%s*%%"
 
 function ns.GetOnlyPercent(text)
-	local percent = text:match(PERCENT_PATTERN)
-	if not percent or text:gsub(PERCENT_PATTERN, ""):find("%d") then
+	local rest, count = text:gsub(PERCENT_PATTERN, "")
+	if count ~= 1 or rest:find("%d") then
 		return nil
 	end
+	local percent = text:match(PERCENT_PATTERN)
 	local value = tonumber((percent:match("[%d%.,]+"):gsub(",", ".")))
 	return value and tostring(value)
 end

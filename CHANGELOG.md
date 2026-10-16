@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- An equip line with more than one percentage, such as a hit bonus next to a movement speed bonus, keeps its original text instead of losing the second one.
 - The settings window keeps its tabs on screen at large UI scales, including when dragged to the bottom edge, and adjusts when the UI scale or display size changes.
 
 ## v0.5.0 (2026-10-15)

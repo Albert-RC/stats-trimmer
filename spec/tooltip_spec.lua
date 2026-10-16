@@ -261,6 +261,12 @@ describe("Tooltip line pre-call", function()
 			AssertUntouched(ProcessLine(wow, preCall, COSEDORA_LINE))
 		end)
 
+		it("when it shows more than one percentage", function()
+			local text = "Equipar: Mejora tu probabilidad de conseguir un golpe crítico un 1% y tu velocidad de "
+				.. "movimiento un 8%."
+			AssertUntouched(ProcessLine(wow, preCall, text, { hyperlink = "item:crit" }))
+		end)
+
 		it("when more than one stat could own it", function()
 			wow.items["item:regen"] = { ITEM_MOD_MANA_REGENERATION_SHORT = 4, ITEM_MOD_HEALTH_REGEN_SHORT = 4 }
 			local lines = {

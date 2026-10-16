@@ -53,6 +53,16 @@ describe("GetOnlyPercent", function()
 	it("returns nil when the line has another number", function()
 		assert.is_nil(ns.GetOnlyPercent("Equip: Increases your chance to block by 1% for 10 sec."))
 	end)
+
+	it("returns nil when the line has another percentage", function()
+		assert.is_nil(ns.GetOnlyPercent("Equip: Improves your chance to hit by 1% and your movement speed by 8%."))
+		assert.is_nil(ns.GetOnlyPercent("Équipé : augmente de 1,5 % vos chances de bloquer et de 2 % de parer."))
+	end)
+
+	it("returns nil when the line has the same percentage twice", function()
+		assert.is_nil(ns.GetOnlyPercent("Equip: Improves your chance to hit by 1% and to dodge by 1%."))
+		assert.is_nil(ns.GetOnlyPercent("Equipar: Aumenta un 1.0% el bloqueo y un 1.0% la parada."))
+	end)
 end)
 
 describe("FormatDetails", function()

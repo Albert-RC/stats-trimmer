@@ -88,7 +88,7 @@ The `.toc` loads these files in order:
 
 - `Util.lua`: pure text helpers.
   - `NumbersMatch(text, a, b)` checks that a line's numbers are exactly `{a, b}` and that the line has no percentage.
-  - `GetOnlyPercent(text)` reads a lone percentage.
+  - `GetOnlyPercent(text)` reads a lone percentage: the line's only number, and its only percentage.
   - `FormatLine(value, percent, name)` writes a compact line's text (`+10 spell damage`, `+1% golpe`).
   - `FormatDetails(details, GetText)` writes what follows a food line's stat name: `/s` for a rate, then ` (24 sec)` or ` (well fed, 15 min)`, with the words `GetText` gives (see [Food and drink](#food-and-drink)).
   - `CompactLine(kind, value, name, stats, percent, details)` builds a compact line (see `Rules.lua` below).
@@ -218,6 +218,7 @@ Consequences, all pinned by tests in `spec/rules_spec.lua`:
 - A stat whose number also appears in an unrelated equip line ("stealth level by 1" next to +1 attack power) leaves both untouched.
 - `NumbersMatch` uses sets: MP5 expects `{value, 5}`, so MP5 5 is `{5}`, and MP5 5 next to attack power 5 leaves both untouched.
 - A line with a percentage never matches a point stat ("resist Silence by 10%" next to 10 spell damage).
+- A line with more than one percentage ("hit by 1% and movement speed by 8%"), even the same one twice, is left untouched: a compact line for the first would hide the second.
 
 ### Creature types
 
