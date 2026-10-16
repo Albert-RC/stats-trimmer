@@ -57,6 +57,20 @@ describe("Settings window", function()
 		return TooltipTexts(wow.env.StatsTrimmerFoodPreviewTooltip)
 	end
 
+	-- Shows Bastón nudoso de nigromancia, with its combined spell power line, in GameTooltip
+	local function ShowStaff()
+		wow.items["item:staff"] = { ITEM_MOD_SPELL_POWER_SHORT = 26 }
+		fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+			hyperlink = "item:staff",
+			lines = {
+				{
+					leftText = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada con hechizos y "
+						.. "efectos mágicos.",
+				},
+			},
+		})
+	end
+
 	local function HasText(text)
 		return fakes.FindFrames(wow, { text = text })[1] ~= nil
 	end
@@ -811,10 +825,10 @@ describe("Settings window", function()
 		end)
 
 		it("rebuilds a shown item tooltip so it switches language right away", function()
-			local tooltip = wow.env.GameTooltip
-			fakes.ShowItem(wow, tooltip, wow.env.UIParent, "ANCHOR_NONE")
+			ShowStaff()
+			assert.are.same({ "+26 poder con hechizos" }, TooltipTexts(wow.env.GameTooltip))
 			LanguageMenu().setSelected("deDE")
-			assert.are.equal(1, tooltip.refreshCount)
+			assert.are.same({ "+26 zaubermacht" }, TooltipTexts(wow.env.GameTooltip))
 		end)
 
 		it("offers only English besides the client's language on a client without the Latin alphabet", function()
@@ -869,15 +883,17 @@ describe("Settings window", function()
 		end)
 
 		it("splits spell power when checked, rebuilding the preview and a shown item tooltip", function()
-			local tooltip = wow.env.GameTooltip
-			fakes.ShowItem(wow, tooltip, wow.env.UIParent, "ANCHOR_NONE")
+			ShowStaff()
 			ns.ShowOptions()
 			fakes.ClickCheckButton(Checkbox())
 			assert.is_true(ns.db.splitSpellPower)
 			assert.is_false(PreviewHas("+26 poder con hechizos"))
 			-- Spell damage takes spell power's place
 			assert.are.equal("+10 daño con hechizos", PreviewTexts()[3 + KindIndex("spellPower")])
-			assert.are.equal(1, tooltip.refreshCount)
+			assert.are.same(
+				{ "+26 daño con hechizos", "+26 sanación con hechizos" },
+				TooltipTexts(wow.env.GameTooltip)
+			)
 		end)
 
 		it("shows spell power as its own line again when unchecked", function()

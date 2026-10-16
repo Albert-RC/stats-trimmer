@@ -356,11 +356,18 @@ function Frame:NumLines()
 end
 
 -- Like TooltipDataHandlerMixin:ProcessInfo, which every SetX method (SetHyperlink, SetBagItem...) calls:
--- builds the tooltip from the info's data, where the line pre-calls for each line's type can consume it, and
--- shows it. Lines without a type are None lines.
+-- builds the tooltip from the info's data, where the line pre-calls for each line's type can consume it, then
+-- runs the tooltip post-calls for the data's type and shows it. Lines without a type are None lines. An info
+-- starts the tooltip again, unless it is appended (info.append, as Blizzard's comparison tooltips do): its
+-- lines then follow the ones there. Either way it joins the tooltip's infos, which RefreshData processes again.
 function Frame:ProcessInfo(info)
-	self.lines = {}
-	self.primaryInfo = info
+	if not info.append then
+		self.infoList = {}
+		self.lines = {}
+	elseif not self.infoList then
+		self.infoList = {}
+	end
+	table.insert(self.infoList, info)
 	self.processingInfo = info
 	for _, lineData in ipairs(info.tooltipData.lines or {}) do
 		local consumed = false
@@ -376,6 +383,11 @@ function Frame:ProcessInfo(info)
 			self:AddLine(lineData.leftText, color:GetRGB())
 		end
 	end
+	for _, postCall in ipairs(self.wow.postCalls) do
+		if postCall.tooltipType == info.tooltipData.type then
+			postCall.handler(self, info.tooltipData)
+		end
+	end
 	self:Show()
 	return true
 end
@@ -384,14 +396,30 @@ function Frame:GetProcessingTooltipInfo()
 	return self.processingInfo
 end
 
--- Like TooltipDataHandlerMixin:IsTooltipType, it checks the primary info, not the one being processed
+-- Like TooltipDataHandlerMixin:IsTooltipType, it checks the primary info, the first one, not the one being
+-- processed
 function Frame:IsTooltipType(tooltipType)
-	local data = self.primaryInfo and self.primaryInfo.tooltipData
+	local primary = self.infoList and self.infoList[1]
+	local data = primary and primary.tooltipData
 	return data ~= nil and data.type == tooltipType
 end
 
+-- Like GameTooltipDataMixin:RefreshData (TooltipDataHandlerMixin:RebuildFromTooltipInfo): processes the tooltip's
+-- infos again, in order, the first one starting it over. Lines added with AddLine after them are lost; the
+-- post-calls' run again. Counts the rebuilds in refreshCount.
 function Frame:RefreshData()
 	self.refreshCount = self.refreshCount + 1
+	local infoList = self.infoList
+	if not (infoList and infoList[1]) then
+		return
+	end
+	self.infoList = {}
+	for index, info in ipairs(infoList) do
+		if index == 1 then
+			info.append = false
+		end
+		self:ProcessInfo(info)
+	end
 end
 
 -- Like CreateFrame: named frames also become globals of the world's environment, and "$parent" in a name is the
@@ -446,7 +474,7 @@ function fakes.ItemTooltip(wow, data)
 	data.type = data.type or wow.env.Enum.TooltipDataType.Item
 	data.lines = data.lines or {}
 	tooltip.processingInfo = { tooltipData = data }
-	tooltip.primaryInfo = tooltip.processingInfo
+	tooltip.infoList = { tooltip.processingInfo }
 	tooltip.shown = true
 	return tooltip
 end
@@ -458,6 +486,12 @@ function fakes.ShowItem(wow, tooltip, owner, anchorType, data)
 	data.type = data.type or wow.env.Enum.TooltipDataType.Item
 	tooltip:SetOwner(owner, anchorType)
 	tooltip:ProcessInfo({ tooltipData = data })
+end
+
+-- Appends item data to a shown tooltip, after its lines, like Blizzard's comparison tooltips and AppendInfo
+function fakes.AppendItem(wow, tooltip, data)
+	data.type = data.type or wow.env.Enum.TooltipDataType.Item
+	tooltip:ProcessInfo({ tooltipData = data, append = true })
 end
 
 -- Frames created by the addon with a given template or text, in creation order
@@ -499,6 +533,7 @@ function fakes.NewWoW(options)
 		secretTexts = {}, -- text -> true: issecretvalue reports it as a secret
 		cursor = { 0, 0 },
 		preCalls = {}, -- { lineType, handler }
+		postCalls = {}, -- { tooltipType, handler }: other addons' tooltip post-calls
 		executedScripts = {}, -- ExecuteFrameScript calls: { frame, scriptName }
 		categories = {}, -- Options categories
 		sounds = {},
@@ -689,6 +724,10 @@ function fakes.NewWoW(options)
 	env.TooltipDataProcessor = {
 		AddLinePreCall = function(lineType, handler)
 			table.insert(wow.preCalls, { lineType = lineType, handler = handler })
+		end,
+		-- Stats Trimmer adds none: specs add other addons' (GearQuest's score line)
+		AddTooltipPostCall = function(tooltipType, handler)
+			table.insert(wow.postCalls, { tooltipType = tooltipType, handler = handler })
 		end,
 	}
 	env.C_Item = {

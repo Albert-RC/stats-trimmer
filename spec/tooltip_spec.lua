@@ -705,6 +705,63 @@ describe("Tooltip refresh on modifier changes", function()
 		end)
 	end)
 
+	describe("built only from the item's data", function()
+		local COMPACT = { "+10 daño con hechizos", "+30 sanación con hechizos" }
+
+		local function Texts()
+			local texts = {}
+			for _, line in ipairs(wow.env.GameTooltip.lines) do
+				table.insert(texts, line.text)
+			end
+			return texts
+		end
+
+		local function ShowCosedora()
+			fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+				hyperlink = "item:cosedora",
+				lines = { { leftText = COSEDORA_LINE } },
+			})
+		end
+
+		-- Holds the chosen key, then releases it, checking the texts shown at each step
+		local function AssertSwitches(compact, original)
+			assert.are.same(compact, Texts())
+			wow.keysDown.CTRL = true
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.same(original, Texts())
+			wow.keysDown.CTRL = nil
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 0)
+			assert.are.same(compact, Texts())
+		end
+
+		it("shows the original text while the key is held, and the compact lines again once released", function()
+			ShowCosedora()
+			AssertSwitches(COMPACT, { COSEDORA_LINE })
+		end)
+
+		it("switches the item data appended after it too", function()
+			ShowCosedora()
+			fakes.AppendItem(
+				wow,
+				wow.env.GameTooltip,
+				{ hyperlink = "item:crit", lines = { { leftText = CRIT_LINE } } }
+			)
+			AssertSwitches({ COMPACT[1], COMPACT[2], "+1% golpe crítico" }, { COSEDORA_LINE, CRIT_LINE })
+		end)
+
+		it("keeps the lines another addon's tooltip post-call adds (GearQuest's score)", function()
+			wow.env.TooltipDataProcessor.AddTooltipPostCall(wow.env.Enum.TooltipDataType.Item, function(tooltip)
+				tooltip:AddLine("Puntuación de GearQuest: 42")
+			end)
+			ShowCosedora()
+			AssertSwitches(
+				{ COMPACT[1], COMPACT[2], "Puntuación de GearQuest: 42" },
+				{ COSEDORA_LINE, "Puntuación de GearQuest: 42" }
+			)
+			assert.are.same({}, wow.executedScripts)
+		end)
+	end)
+
 	it("ignores other modifiers", function()
 		fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LSHIFT", 1)
 		assert.are.equal(0, wow.env.GameTooltip.refreshCount)
