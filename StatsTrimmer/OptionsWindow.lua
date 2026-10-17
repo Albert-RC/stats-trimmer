@@ -1,7 +1,7 @@
 -- Settings window, built from Blizzard templates: original-text key and language, then a tab for items' lines
--- (combat) and one for food's (SETTINGS_TABS). Each tab has a color per line kind, in collapsible sections, and a
--- live preview that is a real GameTooltip: a sample item, or a sample food. The combat tab also has the spell
--- power split. The color picker it opens gets a palette of Blizzard's class colors (ClassPalette.lua). Blizzard's
+-- (combat), one for food's and one for potions', elixirs' and flasks' (alchemy, SETTINGS_TABS). Each tab has a color
+-- per line kind, in collapsible sections, and a live preview that is a real GameTooltip: a sample item, food or
+-- potion. The combat tab also has the spell power split. The color picker it opens gets a palette of Blizzard's class colors (ClassPalette.lua). Blizzard's
 -- own texts (key names, RESET, COLORS, tab, stat and class names...) follow the language setting and switch on the
 -- spot; the addon's own phrases are in English.
 local _, ns = ...
@@ -36,7 +36,7 @@ local RESET_HEIGHT = 20
 local SCROLL_BAR_SPACE = 26
 -- Room around a button's text when it is sized to fit a translated label
 local BUTTON_TEXT_PADDING = 24
-local frame, previewTooltip, foodTooltip, keyDropdown, splitCheckbox, colorsPanel, colorRows
+local frame, previewTooltip, foodTooltip, alchemyTooltip, keyDropdown, splitCheckbox, colorsPanel, colorRows
 local swatches = {} -- kind key -> ColorSwatchTemplate button
 local rowParts = {} -- { kind, label, reset } of every color row, to size the colors panel
 local topRows = {} -- the labels and dropdown of the rows above the panels, to size the window
@@ -132,10 +132,10 @@ local function GetSampleLines(language)
 end
 
 -- Fills the preview tooltips, in the chosen language or `language`: the sample item's, with the combat tab's
--- lines, and the sample food's, with the food tab's. Only the shown tab's preview shows. Unless `everything`,
--- they leave out collapsed sections, and split spell power, which looks like the spell damage and healing
--- samples already there. Returns the room the preview takes: the largest of both tooltips, which take turns in
--- the same place, so switching tabs doesn't resize the window.
+-- lines, the sample food's, with the food tab's, and the sample potion's, with the alchemy tab's. Only the shown
+-- tab's preview shows. Unless `everything`, they leave out collapsed sections, and split spell power, which looks
+-- like the spell damage and healing samples already there. Returns the room the preview takes: the largest of the
+-- tooltips, which take turns in the same place, so switching tabs doesn't resize the window.
 local function FillPreview(language, everything)
 	local panel = previewTooltip:GetParent()
 	for _, tooltip in pairs(previewTooltips) do
@@ -147,6 +147,7 @@ local function FillPreview(language, everything)
 	previewTooltip:AddLine(Text("ITEM_BIND_ON_EQUIP", "Binds when equipped", language), 1, 1, 1)
 	previewTooltip:AddLine(ns.FormatLine(5, false, Text("ITEM_MOD_STAMINA_SHORT", "Stamina", language)), 1, 1, 1)
 	foodTooltip:AddLine("Sample Food", 1, 1, 1)
+	alchemyTooltip:AddLine("Sample Potion", 1, 1, 1)
 
 	for _, line in ipairs(GetSampleLines(language or ns.GetLanguage())) do
 		local hidden = (ns.db.splitSpellPower and line.kind == "spellPower") or IsCollapsed(kindGroups[line.kind])
@@ -192,7 +193,7 @@ local function MeasureReference()
 	}
 end
 
--- Sizes the window to what it shows: the colors panel to its longest row in either tab, so no stat name is cut
+-- Sizes the window to what it shows: the colors panel to its longest row in any tab, so no stat name is cut
 -- off, and the window to that panel, the preview (`tooltipsWidth` and `tooltipsHeight`, from FillPreview), the
 -- rows above them and the preview's height. The panels keep at least their reference size.
 local function FitWindow(tooltipsWidth, tooltipsHeight)
@@ -513,7 +514,8 @@ local function CreatePreviewPanel()
 	-- Kept in the window's strata so the color picker (DIALOG) stays on top of them
 	previewTooltip = CreateFrame("GameTooltip", "StatsTrimmerPreviewTooltip", panel, "GameTooltipTemplate")
 	foodTooltip = CreateFrame("GameTooltip", "StatsTrimmerFoodPreviewTooltip", panel, "GameTooltipTemplate")
-	previewTooltips = { combat = previewTooltip, food = foodTooltip }
+	alchemyTooltip = CreateFrame("GameTooltip", "StatsTrimmerAlchemyPreviewTooltip", panel, "GameTooltipTemplate")
+	previewTooltips = { combat = previewTooltip, food = foodTooltip, alchemy = alchemyTooltip }
 	for _, tooltip in pairs(previewTooltips) do
 		tooltip:SetFrameStrata(frame:GetFrameStrata())
 		tooltip:SetFrameLevel(panel:GetFrameLevel() + 10)
@@ -589,8 +591,9 @@ local function CreateWindow()
 	end)
 	frame:SetScript("OnHide", function()
 		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
-		previewTooltip:Hide()
-		foodTooltip:Hide()
+		for _, tooltip in pairs(previewTooltips) do
+			tooltip:Hide()
+		end
 	end)
 	frame:RegisterEvent("UI_SCALE_CHANGED")
 	frame:RegisterEvent("DISPLAY_SIZE_CHANGED")

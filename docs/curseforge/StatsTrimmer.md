@@ -1,6 +1,6 @@
 # Stats Trimmer
 
-Item tooltips spell out their bonuses as full sentences. Stats Trimmer trims those green **Equip:** lines down to short stat lines, so you can compare gear at a glance, and does the same for the **Use:** lines of food and drink.
+Item tooltips spell out their bonuses as full sentences. Stats Trimmer trims those green **Equip:** lines down to short stat lines, so you can compare gear at a glance, and does the same for the **Use:** lines of food and drink, flasks, elixirs and potions.
 
 ```
 Equip: Increases damage and healing done by magical spells and effects by up to 2.
@@ -18,6 +18,7 @@ Each line shows what the item adds, as in the game's own item comparison. The or
 
 - **Compact stat lines** in item tooltips: bags, character pane, chat links and comparison tooltips.
 - **Compact food and drink lines:** what a food restores and how long it takes, its Well Fed buff, and the experience bonus.
+- **Compact flask, elixir and potion lines:** what each one adds and how long it lasts.
 - **Any client language.** Lines are recognized through the game's own data, not English text. The compact lines use the game's own stat names, in your client's language or another one you pick.
 - **Original text on demand.** Hold **Ctrl** over an item to see the original lines. You can switch the key to Alt or Shift.
 - **Your colors.** Pick a color for each kind of line, or one of the game's class colors, and see it live in a preview tooltip. Everything starts in the usual equip green, so nothing changes until you want it to.
@@ -45,6 +46,13 @@ And for food and drink:
 - Its Well Fed buff: `+10 attack power (well fed, 15 min)`, and the bonus to the experience from kills when the game shows it: `+5% experience gained from kills`
 - Foods whose text says something else keep it as it is: alcohol, fishing and herbalism buffs, buffs that only work in one zone, and a few special foods.
 
+And for flasks, elixirs and potions:
+
+- What it adds and how long it lasts: `+1200 health (2 hrs)`, `+150 spell damage (2 hrs)`, `+25 agility (30 min)` and `+2% critical strike (30 min)`, `+12 HP5 (1 hour)`, `+80 attack power (30 sec)`, `+180 attack power vs beasts (5 min)`, `+25 spell resistance (3 min)`
+- Primary stats, health, mana, armor, spell resistance, attack power, crit, spell damage, a spell school's damage, healing, and health and mana every 5 seconds
+- The cooldown every elixir and flask (3 seconds) or every potion (2 minutes) shares is left out.
+- Healing and mana potions, bandages, and anything whose text says something else (invisibility, water breathing, the Natural flasks' bonus in Hyjal's zones, rage) keep it as it is.
+
 ## Settings
 
 Click the minimap button, or go to **Options > AddOns > Stats Trimmer**.
@@ -52,15 +60,15 @@ Click the minimap button, or go to **Options > AddOns > Stats Trimmer**.
 - **Show original text while holding:** Ctrl (default), Alt or Shift. Keep in mind that Shift also compares items.
 - **Language:** your client's language (default), or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese, without restarting the game. Russian, Korean and Chinese clients offer only English besides their own, since their fonts may lack accented letters. It changes the compact lines (`+10 spell damage`, `+10 daño con hechizos`…) and the game's texts in this window. MP5 and HP5 read the same in every language.
 
-The rest is in two tabs, **Combat** for items' lines and **Food & Drink** for food's:
+The rest is in three tabs, **Combat** for items' lines, **Food & Drink** for food's and **Alchemy** for flasks', elixirs' and potions':
 
 - **Split spell power into spell damage and spell healing when both values are the same** (Combat): off by default. Spell power that adds damage and healing shows as one line, `+26 spell power`, like the game's item comparison; with this on, it shows as `+26 spell damage` and `+26 spell healing`.
-- **Colors:** a row for each kind of line. In Combat they are grouped in Attack, Defense, Spells and Damage extra (the spell schools) sections that you can collapse (a warrior can hide the spell ones, for example). Each row has a color swatch and a Reset button; "Reset these colors" resets the tab's. The color picker shows the game's class colors under the color wheel: hover one to see its class, click it to use it.
-- **Preview:** a sample item, or a sample food, that updates as you pick colors.
+- **Colors:** a row for each kind of line. In Combat they are grouped in Attack, Defense, Spells and Damage extra (the spell schools) sections that you can collapse (a warrior can hide the spell ones, for example), and in Alchemy in Attributes, Attack, Defense, Spells and Damage extra. Each row has a color swatch and a Reset button; "Reset these colors" resets the tab's. The color picker shows the game's class colors under the color wheel: hover one to see its class, click it to use it.
+- **Preview:** a sample item, food or potion, that updates as you pick colors.
 
 ## When in doubt, it leaves the line alone
 
-Stats Trimmer only rewrites a line when its numbers match one of the item's real stat values and no other stat could own that line. A food's line is only rewritten when it shows exactly the numbers the game's data gives for that food. When two stats could, it keeps the original text instead of guessing. For example, an item with the same amount of attack power and ranged attack power, or with two percentage bonuses (say, hit and crit), keeps those lines as they are. So does a line whose number also shows up in another equip effect of the item.
+Stats Trimmer only rewrites a line when its numbers match one of the item's real stat values and no other stat could own that line. A food's, flask's, elixir's or potion's line is only rewritten when it shows exactly the numbers the game's data gives for it. When two stats could, it keeps the original text instead of guessing. For example, an item with the same amount of attack power and ranged attack power, or with two percentage bonuses (say, hit and crit), keeps those lines as they are. So does a line whose number also shows up in another equip effect of the item.
 
 Hold Ctrl to check the original text at any time.
 

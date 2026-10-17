@@ -93,55 +93,100 @@ describe("color sections", function()
 		return sections
 	end
 
-	it("are attack, defense, spells, spell schools and food, with MP5 among spells and HP5 in defense", function()
-		assert.are.same({
-			{
-				"attack",
+	it(
+		"are attack, defense, spells, spell schools, food, and alchemy's, with MP5 among spells and HP5 in defense",
+		function()
+			assert.are.same({
 				{
-					"attackPower",
-					"attackPowerVs",
-					"rangedAttackPower",
-					"feralAttackPower",
-					"hitRating",
-					"critRating",
-					"weaponSkill",
+					"attack",
+					{
+						"attackPower",
+						"attackPowerVs",
+						"rangedAttackPower",
+						"feralAttackPower",
+						"hitRating",
+						"critRating",
+						"weaponSkill",
+					},
 				},
-			},
-			{ "defense", { "defense", "dodgeRating", "parryRating", "blockRating", "blockValue", "hp5" } },
-			{
-				"spell",
+				{ "defense", { "defense", "dodgeRating", "parryRating", "blockRating", "blockValue", "hp5" } },
 				{
-					"spellPower",
-					"spellDamage",
-					"spellHealing",
-					"spellDamageVs",
-					"spellHitRating",
-					"spellCritRating",
-					"spellPenetration",
-					"mp5",
+					"spell",
+					{
+						"spellPower",
+						"spellDamage",
+						"spellHealing",
+						"spellDamageVs",
+						"spellHitRating",
+						"spellCritRating",
+						"spellPenetration",
+						"mp5",
+					},
 				},
-			},
-			{
-				"school",
-				{ "arcaneDamage", "fireDamage", "frostDamage", "holyDamage", "natureDamage", "shadowDamage" },
-			},
-			{
-				"food",
-				{ "health", "mana", "experience", "stamina", "intellect", "strength", "agility", "spirit", "armor" },
-			},
-		}, Sections())
-	end)
+				{
+					"school",
+					{ "arcaneDamage", "fireDamage", "frostDamage", "holyDamage", "natureDamage", "shadowDamage" },
+				},
+				{
+					"food",
+					{
+						"health",
+						"mana",
+						"experience",
+						"stamina",
+						"intellect",
+						"strength",
+						"agility",
+						"spirit",
+						"armor",
+					},
+				},
+				{
+					"alchemyAttributes",
+					{ "alchemyStrength", "alchemyAgility", "alchemyStamina", "alchemyIntellect", "alchemySpirit" },
+				},
+				{ "alchemyAttack", { "alchemyAttackPower", "alchemyAttackPowerVs", "alchemyCritRating" } },
+				{ "alchemyDefense", { "alchemyHealth", "alchemyArmor", "alchemySpellResistance", "alchemyHp5" } },
+				{
+					"alchemySpell",
+					{
+						"alchemyMana",
+						"alchemySpellDamage",
+						"alchemySpellHealing",
+						"alchemySpellDamageVs",
+						"alchemyMp5",
+					},
+				},
+				{
+					"alchemySchool",
+					{
+						"alchemyFireDamage",
+						"alchemyFrostDamage",
+						"alchemyHolyDamage",
+						"alchemyNatureDamage",
+						"alchemyShadowDamage",
+					},
+				},
+			}, Sections())
+		end
+	)
 
-	it("are in the combat tab but food and drink, which has a tab of its own", function()
+	it("are in the combat tab, but food and drink and alchemy's, which have tabs of their own", function()
 		local tabs = {}
 		for _, group in ipairs(ns.COLOR_GROUPS) do
 			table.insert(tabs, group.tab)
 		end
-		assert.are.same({ "combat", "combat", "combat", "combat", "food" }, tabs)
+		assert.are.same(
+			{ "combat", "combat", "combat", "combat", "food", "alchemy", "alchemy", "alchemy", "alchemy", "alchemy" },
+			tabs
+		)
 	end)
 
 	it("collapse only when they share their tab", function()
 		for _, key in ipairs({ "attack", "defense", "spell", "school" }) do
+			assert.is_true(ns.IsCollapsible(key))
+		end
+		for _, key in ipairs({ "alchemyAttributes", "alchemyAttack", "alchemyDefense", "alchemySpell", "alchemySchool" }) do
 			assert.is_true(ns.IsCollapsible(key))
 		end
 		assert.is_false(ns.IsCollapsible("food"))
@@ -162,7 +207,7 @@ describe("color sections", function()
 		assert.are.same(keys, ordered)
 	end)
 
-	it("are titled with Blizzard's names, spell schools as its damage plus extra", function()
+	it("are titled with Blizzard's names, spell schools as its damage plus extra, alchemy's like combat's", function()
 		local titles = {}
 		for _, group in ipairs(ns.COLOR_GROUPS) do
 			table.insert(titles, { group.labelGlobal, group.labelSuffix })
@@ -173,6 +218,11 @@ describe("color sections", function()
 			{ "SPELLS" },
 			{ "DAMAGE", " extra" },
 			{ "MINIMAP_TRACKING_VENDOR_FOOD" },
+			{ "STAT_CATEGORY_ATTRIBUTES" },
+			{ "STAT_CATEGORY_ATTACK" },
+			{ "STAT_CATEGORY_DEFENSE" },
+			{ "SPELLS" },
+			{ "DAMAGE", " extra" },
 		}, titles)
 	end)
 end)
@@ -194,6 +244,7 @@ describe("sample lines", function()
 			text = "+1% hit",
 			value = 1,
 			percent = true,
+			name = "hit",
 			stats = { "ITEM_MOD_HIT_RATING_SHORT" },
 		}, ns.GetSampleLine(Kind("hitRating")))
 	end)
@@ -370,13 +421,19 @@ end)
 describe("settings tabs", function()
 	local ns = LoadConfig()
 
-	it("are combat and food and drink, named with Blizzard's texts, the spell power split in combat", function()
-		local tabs = {}
-		for _, tab in ipairs(ns.SETTINGS_TABS) do
-			table.insert(tabs, { tab.key, tab.labelGlobal, tab.spellPowerSplit })
+	it(
+		"are combat, food and drink and alchemy, named with Blizzard's texts, the spell power split in combat",
+		function()
+			local tabs = {}
+			for _, tab in ipairs(ns.SETTINGS_TABS) do
+				table.insert(tabs, { tab.key, tab.labelGlobal, tab.spellPowerSplit })
+			end
+			assert.are.same(
+				{ { "combat", "COMBAT", true }, { "food", "MINIMAP_TRACKING_VENDOR_FOOD" }, { "alchemy", "ALCHEMY" } },
+				tabs
+			)
 		end
-		assert.are.same({ { "combat", "COMBAT", true }, { "food", "MINIMAP_TRACKING_VENDOR_FOOD" } }, tabs)
-	end)
+	)
 
 	it("each hold some section", function()
 		for _, tab in ipairs(ns.SETTINGS_TABS) do

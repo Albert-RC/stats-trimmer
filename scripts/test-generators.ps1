@@ -79,64 +79,98 @@ try {
 	Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 	New-Item -ItemType Directory -Force -Path $work | Out-Null
 	$foods = Join-Path $work "FoodData.lua"
+	$alchemy = Join-Path $work "AlchemyData.lua"
 	$locales = Join-Path $work "Locales.lua"
 	$client = Join-Path $work "ClientStrings-ruRU.lua"
 	# The fixtures have a few stat names per language, not the client's hundred
 	$localeParameters = @{ Output = $locales; Fixture = $client; MinimumStatNames = 3 }
+	# update-consumables.ps1's two files for a case, in the work folder
+	function Outputs([string]$name) {
+		return @{ FoodOutput = (Join-Path $work "$name-Food.lua"); AlchemyOutput = (Join-Path $work "$name-Alchemy.lua") }
+	}
+	# The potions', elixirs' and flasks' spells in the fixtures
+	$alchemySpells = @("4941", "6612", "6615", "17535", "17538", "17626", "24361", "1251940", "1252559")
 
-	Test-Case "update-foods.ps1 writes the fixtures' foods" {
-		Assert-Written (Invoke-Generator "update-foods.ps1" @{ From = "spec/fixtures/foods"; Output = $foods })
+	Test-Case "update-consumables.ps1 writes the fixtures' foods, and their potions, elixirs and flasks" {
+		Assert-Written (Invoke-Generator "update-consumables.ps1" @{ From = "spec/fixtures/consumables"; FoodOutput = $foods; AlchemyOutput = $alchemy })
 	}
 	Test-Case "update-locales.ps1 writes the fixtures' languages and the ruRU client's strings" {
 		Assert-Written (Invoke-Generator "update-locales.ps1" (With $localeParameters @{ From = "spec/fixtures/locales" }))
 	}
 	# What they wrote
 	$env:STATS_TRIMMER_GENERATED = $work
-	luajit spec/runner.lua spec/generators/foods_spec.lua spec/generators/locales_spec.lua
+	luajit spec/runner.lua spec/generators/consumables_spec.lua spec/generators/locales_spec.lua
 	if ($LASTEXITCODE -ne 0) {
 		$failures++
 	}
 
-	Test-Case "update-foods.ps1 refuses a table without a column it reads" {
-		$from = Copy-Fixtures "foods"
+	Test-Case "update-consumables.ps1 refuses a table without a column it reads" {
+		$from = Copy-Fixtures "consumables"
 		Edit-Csv "$from/SpellEffect.csv" { param($rows) $rows | Select-Object * -ExcludeProperty EffectAura }
-		$output = Join-Path $work "NoColumn.lua"
-		Assert-Refused (Invoke-Generator "update-foods.ps1" @{ From = $from; Output = $output }) "SpellEffect has no EffectAura column"
-		if (Test-Path $output) {
-			throw "it wrote $output"
+		$outputs = Outputs "NoColumn"
+		Assert-Refused (Invoke-Generator "update-consumables.ps1" (With $outputs @{ From = $from })) "SpellEffect has no EffectAura column"
+		foreach ($output in $outputs.Values) {
+			if (Test-Path $output) {
+				throw "it wrote $output"
+			}
 		}
 	}
-	Test-Case "update-foods.ps1 refuses an empty table" {
-		$from = Copy-Fixtures "foods"
+	Test-Case "update-consumables.ps1 refuses an empty table" {
+		$from = Copy-Fixtures "consumables"
 		Edit-Csv "$from/Spell.csv" { param($rows) @() }
-		Assert-Refused (Invoke-Generator "update-foods.ps1" @{ From = $from; Output = (Join-Path $work "Empty.lua") }) "Spell has no rows"
+		Assert-Refused (Invoke-Generator "update-consumables.ps1" (With (Outputs "Empty") @{ From = $from })) "Spell has no rows"
 	}
-	Test-Case "update-foods.ps1 refuses tables that don't agree, such as a food spell missing from Spell" {
-		$from = Copy-Fixtures "foods"
+	Test-Case "update-consumables.ps1 refuses tables that don't agree, such as a food spell missing from Spell" {
+		$from = Copy-Fixtures "consumables"
 		Edit-Csv "$from/Spell.csv" { param($rows) $rows | Where-Object { $_.ID -ne "435" } }
-		$output = Join-Path $work "Partial.lua"
-		Assert-Refused (Invoke-Generator "update-foods.ps1" @{ From = $from; Output = $output }) "Spell lacks food spells 435"
+		Assert-Refused (Invoke-Generator "update-consumables.ps1" (With (Outputs "Partial") @{ From = $from })) "Spell lacks food spells 435"
 	}
-	Test-Case "update-foods.ps1 refuses a result without any food" {
-		$from = Copy-Fixtures "foods"
+	Test-Case "update-consumables.ps1 leaves out a Use spell missing from both Spell and SpellEffect, as not in the build" {
+		$from = Copy-Fixtures "consumables"
+		Edit-Csv "$from/Spell.csv" { param($rows) $rows | Where-Object { $_.ID -ne "17626" } }
+		Edit-Csv "$from/SpellEffect.csv" { param($rows) $rows | Where-Object { $_.SpellID -ne "17626" } }
+		$outputs = Outputs "NotInBuild"
+		Assert-Written (Invoke-Generator "update-consumables.ps1" (With $outputs @{ From = $from }))
+		if (Select-String -Path $outputs.AlchemyOutput -Pattern '\[17626\]' -Quiet) {
+			throw "17626 is there"
+		}
+	}
+	Test-Case "update-consumables.ps1 refuses a result without any food" {
+		$from = Copy-Fixtures "consumables"
 		Edit-Csv "$from/Spell.csv" { param($rows) $rows | ForEach-Object { $_.Description_lang = "Tastes odd."; $_ } }
-		Assert-Refused (Invoke-Generator "update-foods.ps1" @{ From = $from; Output = (Join-Path $work "None.lua") }) "No food spell could be converted"
+		Assert-Refused (Invoke-Generator "update-consumables.ps1" (With (Outputs "None") @{ From = $from })) "No food spell could be converted"
 	}
-	Test-Case "update-foods.ps1 keeps the file when a food it had would go, unless told it is expected" {
-		$from = Copy-Fixtures "foods"
+	Test-Case "update-consumables.ps1 refuses a result without any potion, elixir or flask" {
+		$from = Copy-Fixtures "consumables"
 		Edit-Csv "$from/Spell.csv" {
-			param($rows) $rows | ForEach-Object { if ($_.ID -eq "432") { $_.Description_lang = "Restores some mana." }; $_ }
+			param($rows) $rows | ForEach-Object { if ($alchemySpells -contains $_.ID) { $_.Description_lang = "Tastes odd." }; $_ }
 		}
-		$output = Join-Path $work "Previous.lua"
-		Copy-Item $foods $output
-		$before = Get-FileHash $output
-		Assert-Refused (Invoke-Generator "update-foods.ps1" @{ From = $from; Output = $output }) "1 food spells would be removed"
-		if ((Get-FileHash $output).Hash -ne $before.Hash) {
-			throw "it changed $output"
+		$outputs = Outputs "NoAlchemy"
+		Assert-Refused (Invoke-Generator "update-consumables.ps1" (With $outputs @{ From = $from })) "No alchemy spell could be converted"
+		if (Test-Path $outputs.FoodOutput) {
+			throw "it wrote $($outputs.FoodOutput)"
 		}
-		Assert-Written (Invoke-Generator "update-foods.ps1" @{ From = $from; Output = $output; AcceptRemovals = $true })
-		if (Select-String -Path $output -Pattern '\[432\]' -Quiet) {
-			throw "432 is still there"
+	}
+	# Spell 432 is a food's, 17626 a flask's
+	foreach ($removal in @(@{ spell = "432"; group = "food"; label = "a food" }, @{ spell = "17626"; group = "alchemy"; label = "an alchemy" })) {
+		Test-Case "update-consumables.ps1 keeps both files when $($removal.label) spell they had would go, unless told it is expected" {
+			$from = Copy-Fixtures "consumables"
+			Edit-Csv "$from/Spell.csv" {
+				param($rows) $rows | ForEach-Object { if ($_.ID -eq $removal.spell) { $_.Description_lang = "Does something else." }; $_ }
+			}
+			$outputs = Outputs "Previous"
+			Copy-Item $foods $outputs.FoodOutput
+			Copy-Item $alchemy $outputs.AlchemyOutput
+			$before = @($outputs.FoodOutput, $outputs.AlchemyOutput | ForEach-Object { (Get-FileHash $_).Hash })
+			Assert-Refused (Invoke-Generator "update-consumables.ps1" (With $outputs @{ From = $from })) "1 $($removal.group) spells would be removed"
+			$after = @($outputs.FoodOutput, $outputs.AlchemyOutput | ForEach-Object { (Get-FileHash $_).Hash })
+			if (($before -join " ") -ne ($after -join " ")) {
+				throw "it changed a file"
+			}
+			Assert-Written (Invoke-Generator "update-consumables.ps1" (With $outputs @{ From = $from; AcceptRemovals = $true }))
+			if (Select-String -Path $outputs.FoodOutput, $outputs.AlchemyOutput -Pattern "\[$($removal.spell)\]" -Quiet) {
+				throw "$($removal.spell) is still there"
+			}
 		}
 	}
 

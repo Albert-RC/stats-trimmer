@@ -33,9 +33,11 @@ end
 ns.LOCALES = {}
 ns.LOCALE_STRINGS = {}
 ns.LOCALE_CLASS_NAMES = {}
--- What each food's Use line shows, filled by FoodData.lua. Without it, as right after the update that added it,
--- every Use line keeps its original text.
+-- What each food's and each potion's, elixir's and flask's Use line shows, filled by FoodData.lua and
+-- AlchemyData.lua. Without them, as right after the update that added them, those Use lines keep their original
+-- text.
 ns.FOODS = {}
+ns.ALCHEMY = {}
 
 -- The bundled languages a client can show, in menu order: all of them on a client with the Latin alphabet,
 -- only English on the others (Cyrillic, Korean and Chinese fonts may lack accented letters)
@@ -57,23 +59,31 @@ function ns.ResolveLanguage(saved, clientLocale)
 	return "CLIENT"
 end
 
--- Tabs of the settings window, in order: items' lines and food's lines. `labelGlobal` names Blizzard's text for
--- the tab, `label` is the fallback. `spellPowerSplit` marks the tab that also holds the spell power split.
+-- Tabs of the settings window, in order: items' lines, food's lines, and potions', elixirs' and flasks' lines.
+-- `labelGlobal` names Blizzard's text for the tab, `label` is the fallback. `spellPowerSplit` marks the tab that
+-- also holds the spell power split.
 ns.SETTINGS_TABS = {
 	{ key = "combat", labelGlobal = "COMBAT", label = "Combat", spellPowerSplit = true },
 	{ key = "food", labelGlobal = "MINIMAP_TRACKING_VENDOR_FOOD", label = "Food & Drink" },
+	{ key = "alchemy", labelGlobal = "ALCHEMY", label = "Alchemy" },
 }
 
 -- Sections of the color rows in the settings window, in order, each in a tab (`tab`, a SETTINGS_TABS key).
 -- `labelGlobal` names Blizzard's text for the section title (its character pane categories, the minimap's
 -- tracking of food vendors), `label` is the fallback and `labelSuffix` is added after either: Blizzard has no
--- name for spell schools, so that section is its "Damage" plus " extra".
+-- name for spell schools, so that section is its "Damage" plus " extra". The alchemy tab has the primary stats'
+-- section, then the combat tab's.
 ns.COLOR_GROUPS = {
 	{ key = "attack", tab = "combat", labelGlobal = "STAT_CATEGORY_ATTACK", label = "Attack" },
 	{ key = "defense", tab = "combat", labelGlobal = "STAT_CATEGORY_DEFENSE", label = "Defense" },
 	{ key = "spell", tab = "combat", labelGlobal = "SPELLS", label = "Spells" },
 	{ key = "school", tab = "combat", labelGlobal = "DAMAGE", label = "Damage", labelSuffix = " extra" },
 	{ key = "food", tab = "food", labelGlobal = "MINIMAP_TRACKING_VENDOR_FOOD", label = "Food & Drink" },
+	{ key = "alchemyAttributes", tab = "alchemy", labelGlobal = "STAT_CATEGORY_ATTRIBUTES", label = "Attributes" },
+	{ key = "alchemyAttack", tab = "alchemy", labelGlobal = "STAT_CATEGORY_ATTACK", label = "Attack" },
+	{ key = "alchemyDefense", tab = "alchemy", labelGlobal = "STAT_CATEGORY_DEFENSE", label = "Defense" },
+	{ key = "alchemySpell", tab = "alchemy", labelGlobal = "SPELLS", label = "Spells" },
+	{ key = "alchemySchool", tab = "alchemy", labelGlobal = "DAMAGE", label = "Damage", labelSuffix = " extra" },
 }
 
 -- True for a section with a header that collapses it: one of several in its tab. The only section of a tab has
@@ -94,8 +104,9 @@ end
 -- the English fallback, or `label` for a kind Blizzard has no single name for; a kind without `stat` or
 -- `typeStat` always shows `label`. `sample` is the line the preview tooltip shows: { value[, English name],
 -- percent = ..., stat = ..., details = ... }, where its own `stat` overrides the kind's, the name is
--- ns.ENGLISH_NAMES' for its stat unless given, and `details` are a food line's (ns.FormatDetails). Food lines
--- also use the attack power, spell damage, spell healing and crit kinds, for those Well Fed buffs.
+-- ns.ENGLISH_NAMES' for its stat unless given, and `details` are a consumable line's (ns.FormatDetails). Food
+-- lines also use the attack power, spell damage, spell healing and crit kinds, for those Well Fed buffs.
+-- Potions', elixirs' and flasks' lines have kinds of their own, in their own tab.
 ns.COLOR_KINDS = {
 	{
 		key = "attackPower",
@@ -325,10 +336,155 @@ ns.COLOR_KINDS = {
 		stat = "ARMOR",
 		sample = { 150, details = { wellFedMinutes = 15 } },
 	},
+	{
+		key = "alchemyStrength",
+		group = "alchemyAttributes",
+		stat = "ITEM_MOD_STRENGTH_SHORT",
+		sample = { 25, details = { hours = 1 } },
+	},
+	{
+		key = "alchemyAgility",
+		group = "alchemyAttributes",
+		stat = "ITEM_MOD_AGILITY_SHORT",
+		sample = { 25, details = { hours = 1 } },
+	},
+	{
+		key = "alchemyStamina",
+		group = "alchemyAttributes",
+		stat = "ITEM_MOD_STAMINA_SHORT",
+		sample = { 18, details = { hours = 1 } },
+	},
+	{
+		key = "alchemyIntellect",
+		group = "alchemyAttributes",
+		stat = "ITEM_MOD_INTELLECT_SHORT",
+		sample = { 25, details = { hours = 1 } },
+	},
+	{
+		key = "alchemySpirit",
+		group = "alchemyAttributes",
+		stat = "ITEM_MOD_SPIRIT_SHORT",
+		sample = { 18, details = { minutes = 30 } },
+	},
+	{
+		key = "alchemyAttackPower",
+		group = "alchemyAttack",
+		stat = "ITEM_MOD_ATTACK_POWER_SHORT",
+		sample = { 40, details = { seconds = 30 } },
+	},
+	{
+		key = "alchemyAttackPowerVs",
+		group = "alchemyAttack",
+		label = "Attack power vs type",
+		typeStat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT",
+		sample = {
+			180,
+			"attack power vs beasts",
+			stat = "ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT",
+			details = { minutes = 5 },
+		},
+	},
+	{
+		key = "alchemyCritRating",
+		group = "alchemyAttack",
+		stat = "ITEM_MOD_CRIT_RATING_SHORT",
+		sample = { 2, percent = true, details = { minutes = 30 } },
+	},
+	{
+		key = "alchemyHealth",
+		group = "alchemyDefense",
+		stat = "HEALTH",
+		sample = { 1200, details = { hours = 2 } },
+	},
+	{
+		key = "alchemyArmor",
+		group = "alchemyDefense",
+		stat = "ARMOR",
+		sample = { 450, details = { hours = 1 } },
+	},
+	{
+		key = "alchemySpellResistance",
+		group = "alchemyDefense",
+		stat = "ITEM_MOD_SPELL_RESISTANCE_ALL_SCHOOLS_SHORT",
+		sample = { 25, details = { hours = 2 } },
+	},
+	{
+		key = "alchemyHp5",
+		group = "alchemyDefense",
+		label = "HP5",
+		sample = { 12, "HP5", details = { hours = 1 } },
+	},
+	{
+		key = "alchemyMana",
+		group = "alchemySpell",
+		stat = "MANA",
+		sample = { 2000, details = { hours = 2 } },
+	},
+	{
+		key = "alchemySpellDamage",
+		group = "alchemySpell",
+		stat = "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT",
+		sample = { 150, details = { hours = 2 } },
+	},
+	{
+		key = "alchemySpellHealing",
+		group = "alchemySpell",
+		stat = "ITEM_MOD_SPELL_HEALING_DONE_SHORT",
+		sample = { 40, details = { minutes = 30 } },
+	},
+	{
+		-- Labelled like the combat tab's row; the sample is Potion of Elemental Purging's
+		key = "alchemySpellDamageVs",
+		group = "alchemySpell",
+		label = "Spell damage vs type",
+		typeStat = "ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT",
+		sample = {
+			105,
+			"spell damage vs elementals",
+			stat = "ITEM_MOD_SPELL_DAMAGE_VS_ELEMENTAL_SHORT",
+			details = { minutes = 5 },
+		},
+	},
+	{
+		key = "alchemyMp5",
+		group = "alchemySpell",
+		label = "MP5",
+		sample = { 12, "MP5", details = { hours = 1 } },
+	},
+	{
+		key = "alchemyFireDamage",
+		group = "alchemySchool",
+		stat = "ITEM_MOD_FIRE_DAMAGE_DONE_SHORT",
+		sample = { 10, details = { minutes = 30 } },
+	},
+	{
+		key = "alchemyFrostDamage",
+		group = "alchemySchool",
+		stat = "ITEM_MOD_FROST_DAMAGE_DONE_SHORT",
+		sample = { 15, details = { minutes = 30 } },
+	},
+	{
+		key = "alchemyHolyDamage",
+		group = "alchemySchool",
+		stat = "ITEM_MOD_HOLY_DAMAGE_DONE_SHORT",
+		sample = { 40, details = { minutes = 30 } },
+	},
+	{
+		key = "alchemyNatureDamage",
+		group = "alchemySchool",
+		stat = "ITEM_MOD_NATURE_DAMAGE_DONE_SHORT",
+		sample = { 40, details = { minutes = 30 } },
+	},
+	{
+		key = "alchemyShadowDamage",
+		group = "alchemySchool",
+		stat = "ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT",
+		sample = { 40, details = { minutes = 30 } },
+	},
 }
 
 -- The preview's compact line for a kind, in the same shape the rules produce, so ns.LocalizeLines can
--- turn it into the chosen language. A kind without a stat (MP5, HP5) is never translated.
+-- turn it into the chosen language. A kind without a stat (MP5, HP5) keeps its name in every language.
 function ns.GetSampleLine(kind)
 	local value, name = unpack(kind.sample)
 	local stat = kind.sample.stat or kind.stat
