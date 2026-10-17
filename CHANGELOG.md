@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.6.0 (2026-10-18)
 
 - Flasks, elixirs and potions get compact lines too. `Use: Increases the player's maximum health by 1,200 for 2 hrs. You can only have the effect of one flask at a time. This effect persists through death.` becomes `+1200 health (2 hrs)`, and Elixir of the Mongoose shows `+25 agility (30 min)` and `+2% critical strike (30 min)`.
 - That covers flasks of health, mana, spell damage and resistances, elixirs of the primary stats, armor, health, spell damage, a spell school, healing, health or mana every 5 seconds (`+12 HP5 (1 hour)`) and crit, and potions of attack power, spell damage, healing, armor, resistances and attack power or spell damage against a creature type. Durations and stat names are the game's own, in the chosen language: `+1200 salud (2 h)`.
