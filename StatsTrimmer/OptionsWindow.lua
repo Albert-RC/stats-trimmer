@@ -1,9 +1,10 @@
 -- Settings window, built from Blizzard templates: original-text key and language, then a tab for items' lines
--- (combat), one for food's and one for potions', elixirs' and flasks' (alchemy, SETTINGS_TABS). Each tab has a color
--- per line kind, in collapsible sections, and a live preview that is a real GameTooltip: a sample item, food or
--- potion. The combat tab also has the spell power split. The color picker it opens gets a palette of Blizzard's class colors (ClassPalette.lua). Blizzard's
--- own texts (key names, RESET, COLORS, tab, stat and class names...) follow the language setting and switch on the
--- spot; the addon's own phrases are in English.
+-- (combat), one for food's and one for potions', elixirs' and flasks' (alchemy, SETTINGS_TABS). Each tab has a
+-- checkbox that turns its lines on and off, a color per line kind, in collapsible sections, and a live preview that
+-- is a real GameTooltip: a sample item, food or potion. The combat tab also has the spell power split. The color
+-- picker it opens gets a palette of Blizzard's class colors (ClassPalette.lua). Blizzard's own texts (key names,
+-- RESET, COLORS, tab, stat and class names...) follow the language setting and switch on the spot; the addon's own
+-- phrases are in English.
 local _, ns = ...
 
 -- The window sizes itself to its texts, which depend on the language and the open sections (FitWindow). Its
@@ -11,9 +12,14 @@ local _, ns = ...
 -- tab open, so switching tabs doesn't resize it. The window never gets smaller than this either.
 local REFERENCE_LANGUAGE = "esES"
 local MIN_WIDTH, MIN_HEIGHT = 600, 690
--- Room above and below the two panels, at the window's sides and between the panels. The rows above the panels
--- start right of the portrait, with their dropdowns this far from their labels.
-local TOP_HEIGHT, BOTTOM_HEIGHT, SIDE_MARGIN, PANEL_GAP = 156, 44, 12, 8
+-- Room above and below the two panels, at the window's sides and between the panels. The window's own rows start
+-- right of the portrait, with their dropdowns this far from their labels.
+local TOP_HEIGHT, BOTTOM_HEIGHT, SIDE_MARGIN, PANEL_GAP = 204, 44, 12, 8
+-- The shown tab's settings, below the window's own and a divider: the tab's name, then its checkboxes,
+-- CHECKBOX_SIZE high and CHECKBOX_GAP apart. They start TAB_SETTINGS_LEFT in from the window's side, like the panels'
+-- headers; a checkbox's box sits CHECKBOX_INSET in from its left.
+local DIVIDER_TOP, TAB_TITLE_TOP, TAB_CHECKBOXES_TOP, TAB_SETTINGS_LEFT = 112, 124, 140, 12
+local CHECKBOX_SIZE, CHECKBOX_GAP, CHECKBOX_INSET = 26, 2, 4
 local TOP_ROWS_LEFT, DROPDOWN_GAP = 70, 10
 -- A color row: the swatch this far from the row's left, the label this far from the swatch and from the Reset
 -- button, and the Reset button this far from the row's right. ROW_LEFT and ROW_RIGHT are the room around the
@@ -36,7 +42,8 @@ local RESET_HEIGHT = 20
 local SCROLL_BAR_SPACE = 26
 -- Room around a button's text when it is sized to fit a translated label
 local BUTTON_TEXT_PADDING = 24
-local frame, previewTooltip, foodTooltip, alchemyTooltip, keyDropdown, splitCheckbox, colorsPanel, colorRows
+local frame, previewTooltip, foodTooltip, alchemyTooltip, keyDropdown, tabTitle, compactCheckbox, splitCheckbox
+local colorsPanel, colorRows
 local swatches = {} -- kind key -> ColorSwatchTemplate button
 local rowParts = {} -- { kind, label, reset } of every color row, to size the colors panel
 local topRows = {} -- the labels and dropdown of the rows above the panels, to size the window
@@ -207,10 +214,18 @@ local function FitWindow(tooltipsWidth, tooltipsHeight)
 	colorRows:SetWidth(rowsWidth)
 	colorsPanel:SetWidth(colorsWidth)
 
+	-- The tab's checkbox with the longest of its labels, so switching tabs doesn't resize the window
+	local compactWidth = 0
+	for _, tab in ipairs(ns.SETTINGS_TABS) do
+		compactCheckbox.Text:SetText(tab.compactLabel)
+		compactWidth = math.max(compactWidth, compactCheckbox.Text:GetUnboundedStringWidth())
+	end
+	compactCheckbox.Text:SetText(ns.SETTINGS_TABS[selectedTab].compactLabel)
 	local widestTopRow = math.max(
 		topRows.keyLabel:GetUnboundedStringWidth() + DROPDOWN_GAP + keyDropdown:GetWidth(),
 		topRows.languageLabel:GetUnboundedStringWidth() + DROPDOWN_GAP + topRows.languageDropdown:GetWidth(),
 		topRows.help:GetUnboundedStringWidth(),
+		compactCheckbox:GetWidth() + compactWidth,
 		splitCheckbox:GetWidth() + splitCheckbox.Text:GetUnboundedStringWidth()
 	)
 	local topRowsWidth = TOP_ROWS_LEFT + widestTopRow + SIDE_MARGIN
@@ -458,14 +473,53 @@ local function CreateLanguageRow(above)
 	return label
 end
 
--- Spell power that adds damage and healing: its own line (the default) or spell damage and healing lines
-local function CreateSplitSpellPowerRow(above)
-	splitCheckbox = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
-	splitCheckbox:SetSize(26, 26)
-	splitCheckbox:SetPoint("TOPLEFT", above, "BOTTOMLEFT", -6, -10)
-	splitCheckbox.Text:SetFontObject("GameFontNormal")
-	splitCheckbox.Text:SetText("Split spell power into spell damage and spell healing when both values are the same")
+-- A checkbox of the tab's settings, with the addon's own English
+local function CreateCheckbox()
+	local checkbox = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+	checkbox:SetSize(CHECKBOX_SIZE, CHECKBOX_SIZE)
+	checkbox.Text:SetFontObject("GameFontNormal")
+	return checkbox
+end
+
+-- Shows the selected tab's settings: its name, its checkbox's label and state, and the spell power split in the
+-- combat tab
+local function ShowTabSettings()
+	local tab = ns.SETTINGS_TABS[selectedTab]
+	tabTitle:SetText(Text(tab.labelGlobal, tab.label))
+	compactCheckbox.Text:SetText(tab.compactLabel)
+	compactCheckbox:SetChecked(ns.IsCompacting(ns.db, tab.key))
+	splitCheckbox:SetChecked(ns.db.splitSpellPower)
+	splitCheckbox:SetShown(tab.spellPowerSplit == true)
+end
+
+-- The shown tab's settings, under the window's own: Blizzard's divider from its Options window across the window,
+-- then the tab's name over its checkboxes. Whether its lines are compacted in the tooltips, and in the combat tab
+-- the spell power split (its own line, the default, or spell damage and healing lines). ShowTabSettings gives
+-- them the tab's name, labels and states.
+local function CreateTabSettings()
+	local divider = frame:CreateTexture(nil, "ARTWORK")
+	divider:SetAtlas("Options_HorizontalDivider", true)
+	divider:SetPoint("TOPLEFT", SIDE_MARGIN, -DIVIDER_TOP)
+	divider:SetPoint("TOPRIGHT", -SIDE_MARGIN, -DIVIDER_TOP)
+
+	tabTitle = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	tabTitle:SetPoint("TOPLEFT", SIDE_MARGIN + TAB_SETTINGS_LEFT, -TAB_TITLE_TOP)
+	Translate(tabTitle, function()
+		local tab = ns.SETTINGS_TABS[selectedTab]
+		return Text(tab.labelGlobal, tab.label)
+	end)
+
+	compactCheckbox = CreateCheckbox()
+	compactCheckbox:SetPoint("TOPLEFT", SIDE_MARGIN + TAB_SETTINGS_LEFT - CHECKBOX_INSET, -TAB_CHECKBOXES_TOP)
 	-- The click has already toggled the box
+	compactCheckbox:SetScript("OnClick", function(checkbox)
+		ns.db.disabledTabs[ns.SETTINGS_TABS[selectedTab].key] = not checkbox:GetChecked() or nil
+		ns.RefreshItemTooltips()
+	end)
+
+	splitCheckbox = CreateCheckbox()
+	splitCheckbox:SetPoint("TOPLEFT", compactCheckbox, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
+	splitCheckbox.Text:SetText("Split spell power into spell damage and spell healing when both values are the same")
 	splitCheckbox:SetScript("OnClick", function(checkbox)
 		ns.db.splitSpellPower = checkbox:GetChecked()
 		RefreshPreview()
@@ -522,11 +576,10 @@ local function CreatePreviewPanel()
 	end
 end
 
--- Shows the selected tab: its tab button, its sections, its preview and, in the combat tab, the spell power
--- split
+-- Shows the selected tab: its tab button, its settings, its sections and its preview
 local function ShowSelectedTab()
 	PanelTemplates_SetTab(frame, selectedTab)
-	splitCheckbox:SetShown(ns.SETTINGS_TABS[selectedTab].spellPowerSplit == true)
+	ShowTabSettings()
 	LayoutSections()
 	RefreshPreview()
 end
@@ -574,9 +627,10 @@ local function CreateWindow()
 	end)
 	tinsert(UISpecialFrames, frame:GetName())
 
-	CreateSplitSpellPowerRow(CreateLanguageRow(CreateOriginalTextRow()))
+	CreateLanguageRow(CreateOriginalTextRow())
 	CreateColorsPanel()
 	CreatePreviewPanel()
+	CreateTabSettings()
 	CreateTabs()
 	for _, entry in ipairs(translated) do
 		ApplyText(entry)
@@ -585,7 +639,6 @@ local function CreateWindow()
 
 	frame:SetScript("OnShow", function()
 		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
-		splitCheckbox:SetChecked(ns.db.splitSpellPower)
 		RefreshSwatches()
 		ShowSelectedTab()
 	end)

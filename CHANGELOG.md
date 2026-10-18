@@ -7,6 +7,7 @@
 - The cooldown every elixir and flask shares (3 seconds) and every potion shares (2 minutes) is left out. Any other cooldown keeps the original text.
 - Healing and mana potions, bandages, and anything whose text says something else (invisibility, water breathing, the Natural flasks' bonus in Hyjal's zones, rage) keep their original text.
 - Holding Ctrl switches recipe tooltips at once too, such as AtlasLoot's alchemy and cooking recipes, which show the crafted item's lines. Before, they only switched when the mouse moved to another recipe.
+- Each tab of the settings window has a checkbox to turn its lines on and off: "Compact equip lines", "Compact food and drink lines" and "Compact flask, elixir and potion lines". A cleared one leaves those lines in the game's own text; its colors stay as they are. The tab's settings sit under a divider and the tab's name, apart from the settings of the whole window.
 - The settings window has a third tab, Alchemy, with its own color rows in collapsible Attributes, Attack, Defense, Spells and Damage extra sections, and a sample potion.
 - After updating, restart the game instead of using `/reload`: the new files are only loaded on a restart.
 

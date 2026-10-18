@@ -62,6 +62,7 @@ Click the minimap button, or go to **Options > AddOns > Stats Trimmer**.
 
 The rest is in three tabs, **Combat** for items' lines, **Food & Drink** for food's and **Alchemy** for flasks', elixirs' and potions':
 
+- **Compact equip lines**, **Compact food and drink lines**, **Compact flask, elixir and potion lines:** on by default, one in each tab. Clear one to keep those lines in the game's own text, for example if you only want the food lines compacted.
 - **Split spell power into spell damage and spell healing when both values are the same** (Combat): off by default. Spell power that adds damage and healing shows as one line, `+26 spell power`, like the game's item comparison; with this on, it shows as `+26 spell damage` and `+26 spell healing`.
 - **Colors:** a row for each kind of line. In Combat they are grouped in Attack, Defense, Spells and Damage extra (the spell schools) sections that you can collapse (a warrior can hide the spell ones, for example), and in Alchemy in Attributes, Attack, Defense, Spells and Damage extra. Each row has a color swatch and a Reset button; "Reset these colors" resets the tab's. The color picker shows the game's class colors under the color wheel: hover one to see its class, click it to use it.
 - **Preview:** a sample item, food or potion, that updates as you pick colors.

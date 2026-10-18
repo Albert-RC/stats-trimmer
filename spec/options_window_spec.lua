@@ -96,6 +96,15 @@ describe("Settings window", function()
 		return fakes.FindFrames(wow, { template = "PanelTabButtonTemplate", text = title })[1]
 	end
 
+	-- The checkboxes above the panels, in creation order: the shown tab's, then the spell power split
+	local function CompactCheckbox()
+		return fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]
+	end
+
+	local function SplitCheckbox()
+		return fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[2]
+	end
+
 	-- Clicks the second tab, food and drink, whatever the language
 	local function ShowFoodTab()
 		fakes.Fire(wow.env.StatsTrimmerOptionsFrame.Tabs[2], "OnClick", "LeftButton")
@@ -272,7 +281,7 @@ describe("Settings window", function()
 			assert.is_false(RowShown("health"))
 			assert.is_true(wow.env.StatsTrimmerPreviewTooltip:IsShown())
 			assert.is_false(wow.env.StatsTrimmerFoodPreviewTooltip:IsShown())
-			assert.is_true(fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]:IsShown())
+			assert.is_true(SplitCheckbox():IsShown())
 		end)
 
 		it("show food and drink's rows and the sample food, without the checkbox, with a click", function()
@@ -283,7 +292,7 @@ describe("Settings window", function()
 			assert.is_true(RowShown("health"))
 			assert.is_false(wow.env.StatsTrimmerPreviewTooltip:IsShown())
 			assert.is_true(wow.env.StatsTrimmerFoodPreviewTooltip:IsShown())
-			assert.is_false(fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]:IsShown())
+			assert.is_false(SplitCheckbox():IsShown())
 			assert.are.equal(wow.env.SOUNDKIT.IG_CHARACTER_INFO_TAB, wow.sounds[#wow.sounds])
 		end)
 
@@ -296,7 +305,7 @@ describe("Settings window", function()
 			assert.is_true(RowShown("alchemyFrostDamage"))
 			assert.is_false(wow.env.StatsTrimmerFoodPreviewTooltip:IsShown())
 			assert.is_true(wow.env.StatsTrimmerAlchemyPreviewTooltip:IsShown())
-			assert.is_false(fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]:IsShown())
+			assert.is_false(SplitCheckbox():IsShown())
 		end)
 
 		it("keep the window's size", function()
@@ -952,10 +961,91 @@ describe("Settings window", function()
 		end)
 	end)
 
-	describe("spell power checkbox", function()
-		local function Checkbox()
-			return fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]
+	describe("tab checkbox", function()
+		local MOREL_LINE = "Usar: Restaura 530 p. de salud durante 24 s. Debes permanecer sentado mientras comes."
+
+		-- Shows Spongy Morel in GameTooltip; returns its lines' texts
+		local function ShowMorel()
+			fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+				lines = {
+					{
+						leftText = MOREL_LINE,
+						type = wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse,
+						spellID = 435,
+					},
+				},
+			})
 		end
+
+		it("sits under Blizzard's divider and the tab's name, which follow the tab and the language", function()
+			ns.ShowOptions()
+			local dividers = {}
+			for _, region in ipairs(wow.frames) do
+				if region.frameType == "Texture" and region.parent == wow.env.StatsTrimmerOptionsFrame then
+					table.insert(dividers, region.atlas)
+				end
+			end
+			assert.are.same({ "Options_HorizontalDivider" }, dividers)
+			assert.is_true(HasText("Combate"))
+			ShowAlchemyTab()
+			local titles = fakes.FindFrames(wow, { text = "Alquimia" })
+			-- The tab and the title above the checkbox
+			assert.are.equal(2, #titles)
+			LanguageMenu().setSelected("enUS")
+			assert.are.equal(2, #fakes.FindFrames(wow, { text = "Alchemy" }))
+		end)
+
+		it("names each tab's lines, checked by default, in every tab", function()
+			ns.ShowOptions()
+			local labels = {}
+			for _, Show in ipairs({ function() end, ShowFoodTab, ShowAlchemyTab }) do
+				Show()
+				assert.is_true(CompactCheckbox():IsShown())
+				assert.is_true(CompactCheckbox():GetChecked())
+				table.insert(labels, CompactCheckbox().Text.text)
+			end
+			assert.are.same(
+				{ "Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines" },
+				labels
+			)
+		end)
+
+		it("keeps the tab's lines in their original text when cleared, rebuilding a shown tooltip", function()
+			ShowMorel()
+			ns.ShowOptions()
+			ShowFoodTab()
+			fakes.ClickCheckButton(CompactCheckbox())
+			assert.are.same({ food = true }, ns.db.disabledTabs)
+			assert.are.same({ MOREL_LINE }, TooltipTexts(wow.env.GameTooltip))
+			-- The preview and the colors stay as they are
+			assert.are.equal("+530 salud (24 s)", FoodPreviewTexts()[2])
+
+			fakes.ClickCheckButton(CompactCheckbox())
+			assert.are.same({}, ns.db.disabledTabs)
+			assert.are.same({ "+530 salud (24 s)" }, TooltipTexts(wow.env.GameTooltip))
+		end)
+
+		it("shows each tab's own state", function()
+			ns.ShowOptions()
+			ShowFoodTab()
+			fakes.ClickCheckButton(CompactCheckbox())
+			ShowAlchemyTab()
+			assert.is_true(CompactCheckbox():GetChecked())
+			ShowFoodTab()
+			assert.is_false(CompactCheckbox():GetChecked())
+		end)
+
+		it("opens with the saved state", function()
+			wow = fakes.NewWoW()
+			wow.env.StatsTrimmerDB = { disabledTabs = { combat = true } }
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_false(CompactCheckbox():GetChecked())
+		end)
+	end)
+
+	describe("spell power checkbox", function()
+		local Checkbox = SplitCheckbox
 
 		local function PreviewHas(text)
 			for _, shown in ipairs(PreviewTexts()) do

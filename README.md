@@ -35,6 +35,7 @@ Click the minimap button, or go to **Options > AddOns > Stats Trimmer**:
 
 - **Show original text while holding:** Ctrl (default), Alt or Shift. Shift also compares items.
 - **Language:** your client's (default), or English, German, Spanish, Mexican Spanish, French, Italian or Portuguese. Russian, Korean and Chinese clients offer only English besides their own, since their fonts may lack accented letters. It changes at once, with no restart.
+- **Compact equip lines**, **Compact food and drink lines**, **Compact flask, elixir and potion lines:** on by default, one in each tab. Clear one to keep those lines in the game's own text.
 - **Split spell power into spell damage and spell healing when both values are the same:** off by default. Spell power that adds damage and healing shows as one line, `+26 spell power`, like the game's item comparison; with this on, it shows as `+26 spell damage` and `+26 spell healing`.
 - **Tabs:** Combat, for items' lines and the spell power setting, Food & Drink, for food's lines, and Alchemy, for flasks', elixirs' and potions' lines.
 - **Colors:** a row for each kind of line, in collapsible Attack, Defense, Spells and Damage extra (spell schools) sections in Combat, and Attributes, Attack, Defense, Spells and Damage extra in Alchemy, each with a swatch and a Reset button, plus "Reset these colors" for the tab. The color picker offers the game's class colors.

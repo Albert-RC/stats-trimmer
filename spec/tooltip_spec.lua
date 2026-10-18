@@ -69,6 +69,13 @@ describe("Tooltip line pre-call", function()
 		}, lines)
 	end)
 
+	it("leaves equip lines alone while the combat tab's checkbox is cleared", function()
+		ns.db.disabledTabs.combat = true
+		local consumed, lines = ProcessLine(wow, preCall, COSEDORA_LINE)
+		assert.is_false(consumed)
+		assert.are.same({}, lines)
+	end)
+
 	describe("combined spell power (Bastón nudoso de nigromancia)", function()
 		local text = "Equipar: Aumenta hasta 26 p. el daño infligido y la sanación realizada "
 			.. "con hechizos y efectos mágicos."
@@ -496,6 +503,15 @@ describe("Potion, elixir and flask Use lines", function()
 		assert.are.equal("+80 poder de ataque (30 s)", select(2, Process(FRENZY_LINE, 1251940))[1].text)
 		ns.db.language = "enUS"
 		assert.are.equal("+1200 health (2 hrs)", select(2, Process(TITANS_LINE, 17626))[1].text)
+	end)
+
+	it("leaves the line alone while the alchemy tab's checkbox is cleared, but not food's", function()
+		ns.db.disabledTabs.alchemy = true
+		local consumed, lines = Process(TITANS_LINE, 17626)
+		assert.is_false(consumed)
+		assert.are.same({}, lines)
+		ns.db.disabledTabs = { food = true }
+		assert.is_true((Process(TITANS_LINE, 17626)))
 	end)
 
 	it("leaves a potion's line alone when the client has no text for minutes", function()

@@ -435,6 +435,33 @@ describe("settings tabs", function()
 		end
 	)
 
+	it("each compact their lines by default, and keep their original text when disabled", function()
+		local settings = ns.LoadSettings(nil)
+		for _, tab in ipairs(ns.SETTINGS_TABS) do
+			assert.is_true(ns.IsCompacting(settings, tab.key))
+		end
+		settings.disabledTabs.food = true
+		assert.is_false(ns.IsCompacting(settings, "food"))
+		assert.is_true(ns.IsCompacting(settings, "alchemy"))
+	end)
+
+	it("keep only known tabs marked disabled when the settings load", function()
+		local settings = ns.LoadSettings({ disabledTabs = { food = true, alchemy = 1, removed = true } })
+		assert.are.same({ food = true }, settings.disabledTabs)
+		assert.are.same({}, ns.LoadSettings({ disabledTabs = "food" }).disabledTabs)
+	end)
+
+	it("name what their checkbox turns on and off", function()
+		local labels = {}
+		for _, tab in ipairs(ns.SETTINGS_TABS) do
+			table.insert(labels, tab.compactLabel)
+		end
+		assert.are.same(
+			{ "Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines" },
+			labels
+		)
+	end)
+
 	it("each hold some section", function()
 		for _, tab in ipairs(ns.SETTINGS_TABS) do
 			local count = 0

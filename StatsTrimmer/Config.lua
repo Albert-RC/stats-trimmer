@@ -60,13 +60,35 @@ function ns.ResolveLanguage(saved, clientLocale)
 end
 
 -- Tabs of the settings window, in order: items' lines, food's lines, and potions', elixirs' and flasks' lines.
--- `labelGlobal` names Blizzard's text for the tab, `label` is the fallback. `spellPowerSplit` marks the tab that
--- also holds the spell power split.
+-- `labelGlobal` names Blizzard's text for the tab, `label` is the fallback. `compactLabel` is the addon's text for the
+-- checkbox that turns the tab's lines on and off. `spellPowerSplit` marks the tab that also holds the spell power
+-- split.
 ns.SETTINGS_TABS = {
-	{ key = "combat", labelGlobal = "COMBAT", label = "Combat", spellPowerSplit = true },
-	{ key = "food", labelGlobal = "MINIMAP_TRACKING_VENDOR_FOOD", label = "Food & Drink" },
-	{ key = "alchemy", labelGlobal = "ALCHEMY", label = "Alchemy" },
+	{
+		key = "combat",
+		labelGlobal = "COMBAT",
+		label = "Combat",
+		compactLabel = "Compact equip lines",
+		spellPowerSplit = true,
+	},
+	{
+		key = "food",
+		labelGlobal = "MINIMAP_TRACKING_VENDOR_FOOD",
+		label = "Food & Drink",
+		compactLabel = "Compact food and drink lines",
+	},
+	{
+		key = "alchemy",
+		labelGlobal = "ALCHEMY",
+		label = "Alchemy",
+		compactLabel = "Compact flask, elixir and potion lines",
+	},
 }
+
+-- True when a tab's lines are compacted in the tooltips, as they are unless its checkbox was cleared
+function ns.IsCompacting(settings, tabKey)
+	return not settings.disabledTabs[tabKey]
+end
 
 -- Sections of the color rows in the settings window, in order, each in a tab (`tab`, a SETTINGS_TABS key).
 -- `labelGlobal` names Blizzard's text for the section title (its character pane categories, the minimap's
@@ -504,6 +526,8 @@ ns.DEFAULTS = {
 	colors = {},
 	-- Color sections collapsed in the settings window: COLOR_GROUPS key -> true
 	collapsedSections = {},
+	-- Tabs whose lines keep their original text in the tooltips: SETTINGS_TABS key -> true
+	disabledTabs = {},
 	minimap = { angle = 200 },
 }
 for _, kind in ipairs(ns.COLOR_KINDS) do
@@ -533,7 +557,7 @@ local function IsLanguage(value)
 	return value == "CLIENT" or (type(value) == "string" and ns.LOCALE_STRINGS[value] ~= nil)
 end
 
--- True when an entry of the list (ORIGINAL_TEXT_KEYS) has this key
+-- True when an entry of the list (ORIGINAL_TEXT_KEYS, SETTINGS_TABS) has this key
 local function HasKey(list, value)
 	for _, entry in ipairs(list) do
 		if entry.key == value then
@@ -571,6 +595,16 @@ function ns.LoadSettings(saved)
 	for key, value in pairs(settings.collapsedSections) do
 		if value ~= true or not ns.IsCollapsible(key) then
 			settings.collapsedSections[key] = nil
+		end
+	end
+
+	-- Only tabs that exist, marked true
+	if type(settings.disabledTabs) ~= "table" then
+		settings.disabledTabs = {}
+	end
+	for key, value in pairs(settings.disabledTabs) do
+		if value ~= true or not HasKey(ns.SETTINGS_TABS, key) then
+			settings.disabledTabs[key] = nil
 		end
 	end
 

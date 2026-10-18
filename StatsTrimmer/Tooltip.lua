@@ -95,10 +95,10 @@ local function IsBlizzardTooltip(tooltip)
 	return name ~= nil and issecurevariable(name)
 end
 
--- True when a line with this prefix may be replaced: its text can be read and the player sees the tooltip.
--- Remembers the tooltips that show such lines, and what in, which the original-text key rebuilds; while it is
--- held, nothing is replaced.
-local function CanReplace(tooltip, text, prefix)
+-- True when a line with this prefix, of a settings tab's kind (`tabKey`), may be replaced: its text can be read
+-- and the player sees the tooltip. Remembers the tooltips that show such lines, and what in, which the
+-- original-text key rebuilds; while it is held, or while the tab's checkbox is cleared, nothing is replaced.
+local function CanReplace(tooltip, text, prefix, tabKey)
 	if not IsReadable(text) or text:sub(1, #prefix) ~= prefix or IsScanningTooltip(tooltip) then
 		return false
 	end
@@ -106,7 +106,7 @@ local function CanReplace(tooltip, text, prefix)
 	if not PLAYER_TOOLTIPS[tooltip] and not IsBlizzardTooltip(tooltip) then
 		addonTooltips[tooltip] = true
 	end
-	return not IsShowingOriginal()
+	return not IsShowingOriginal() and (ns.db == nil or ns.IsCompacting(ns.db, tabKey))
 end
 
 -- Adds the compact lines in the chosen language. Each line uses the color the user picked for its kind; the
@@ -127,7 +127,7 @@ end
 -- Line pre-calls: returning true keeps the original line out of the tooltip
 local function ReplaceEquipLine(tooltip, lineData)
 	local text = lineData.leftText
-	if not CanReplace(tooltip, text, EQUIP_PREFIX) then
+	if not CanReplace(tooltip, text, EQUIP_PREFIX, "combat") then
 		return false
 	end
 
@@ -162,7 +162,8 @@ local function ReplaceUseLine(tooltip, lineData)
 	local text = lineData.leftText
 	-- ConsumableRules.lua is new in the .toc (it was FoodRules.lua): right after the update, /reload runs with
 	-- FoodData.lua but without it until the client restarts
-	if not (food or alchemy) or not ns.GetFoodReplacement or not CanReplace(tooltip, text, USE_PREFIX) then
+	local tabKey = food and "food" or "alchemy"
+	if not (food or alchemy) or not ns.GetFoodReplacement or not CanReplace(tooltip, text, USE_PREFIX, tabKey) then
 		return false
 	end
 

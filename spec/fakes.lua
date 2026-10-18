@@ -346,6 +346,11 @@ function Frame:CreateTexture()
 	return fakes.NewFrame(self.wow, "Texture", nil, self)
 end
 
+-- Texture methods: the atlas is recorded
+function Frame:SetAtlas(atlas)
+	self.atlas = atlas
+end
+
 -- GameTooltip methods: lines are recorded as { text, r, g, b }
 function Frame:SetOwner(owner, anchorType)
 	self.owner = owner
