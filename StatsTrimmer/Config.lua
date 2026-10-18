@@ -59,10 +59,12 @@ function ns.ResolveLanguage(saved, clientLocale)
 	return "CLIENT"
 end
 
--- Tabs of the settings window, in order: items' lines, food's lines, and potions', elixirs' and flasks' lines.
--- `labelGlobal` names Blizzard's text for the tab, `label` is the fallback. `compactLabel` is the addon's text for the
--- checkbox that turns the tab's lines on and off. `spellPowerSplit` marks the tab that also holds the spell power
--- split.
+-- Tabs of the settings window, in order: items' lines, food's lines, potions', elixirs' and flasks' lines, and the
+-- rest (misc: unit frames' names). `labelGlobal` names Blizzard's text for the tab, `label` is the fallback.
+-- `compactLabel` is the addon's text for the checkbox that turns the tab's changes on and off. `spellPowerSplit` marks
+-- the tab that also holds the spell power split. `example`, the addon's text under the checkbox, shows what it does.
+-- A tab without color sections (COLOR_GROUPS) has no colors or
+-- preview.
 ns.SETTINGS_TABS = {
 	{
 		key = "combat",
@@ -83,9 +85,17 @@ ns.SETTINGS_TABS = {
 		label = "Alchemy",
 		compactLabel = "Compact flask, elixir and potion lines",
 	},
+	{
+		key = "misc",
+		labelGlobal = "MISCELLANEOUS",
+		label = "Miscellaneous",
+		compactLabel = "Abbreviate names that don't fit in unit frames",
+		example = 'Example: "Defias Cutp..." becomes "Defias Cu."',
+	},
 }
 
--- True when a tab's lines are compacted in the tooltips, as they are unless its checkbox was cleared
+-- True when a tab's lines are compacted in the tooltips (or, in the misc tab, unit frames' names abbreviated), as
+-- they are unless its checkbox was cleared
 function ns.IsCompacting(settings, tabKey)
 	return not settings.disabledTabs[tabKey]
 end
