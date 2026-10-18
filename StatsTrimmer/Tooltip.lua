@@ -1,5 +1,5 @@
--- Game-facing glue: reads the item behind a tooltip line and swaps equip lines and food's Use lines for compact
--- ones, in the chosen language (Localization.lua)
+-- Game-facing glue: reads the item behind a tooltip line and swaps equip lines, and the Use lines of food and of
+-- potions, elixirs and flasks, for compact ones, in the chosen language (Localization.lua)
 local _, ns = ...
 
 -- Localized "Equip:" and "Use:" prefixes, provided by the client in every locale
@@ -79,9 +79,14 @@ local function IsScanningTooltip(tooltip)
 	return not owner or ((owner == UIParent or owner == WorldFrame) and tooltip:GetAnchorType() == "ANCHOR_NONE")
 end
 
--- Other addons' own tooltips that showed equip or food lines (AtlasLoot's, with its useGameTooltip setting off),
--- so the original-text key rebuilds them too. Blizzard's comparison tooltips follow their main tooltip instead.
+-- Other addons' own tooltips that showed equip or consumable lines (AtlasLoot's, with its useGameTooltip setting
+-- off), so the original-text key rebuilds them too. Blizzard's comparison tooltips follow their main tooltip instead.
 local addonTooltips = setmetatable({}, { __mode = "k" })
+
+-- The content (primary info) each tooltip showed such lines in. Not only items show them: a recipe's spell
+-- tooltip has the crafted item's lines too (AtlasLoot's SetSpellByID). RefreshData rebuilds the same info, and
+-- SetX makes a new one, so a tooltip still shows those lines while its primary info is the one remembered.
+local replaceableInfos = setmetatable({}, { __mode = "k" })
 
 -- True for a tooltip of Blizzard's own UI (EmbeddedItemTooltip, the UI widgets' item tooltips): Blizzard's
 -- secure code set its global name. Running its owner's OnEnter from addon code would taint it.
@@ -90,17 +95,18 @@ local function IsBlizzardTooltip(tooltip)
 	return name ~= nil and issecurevariable(name)
 end
 
--- True when a line with this prefix may be replaced: its text can be read and the player sees the tooltip.
--- Remembers other addons' tooltips that show such lines, which the original-text key rebuilds; while it is
--- held, nothing is replaced.
-local function CanReplace(tooltip, text, prefix)
+-- True when a line with this prefix, of a settings tab's kind (`tabKey`), may be replaced: its text can be read
+-- and the player sees the tooltip. Remembers the tooltips that show such lines, and what in, which the
+-- original-text key rebuilds; while it is held, or while the tab's checkbox is cleared, nothing is replaced.
+local function CanReplace(tooltip, text, prefix, tabKey)
 	if not IsReadable(text) or text:sub(1, #prefix) ~= prefix or IsScanningTooltip(tooltip) then
 		return false
 	end
+	replaceableInfos[tooltip] = tooltip:GetPrimaryTooltipInfo()
 	if not PLAYER_TOOLTIPS[tooltip] and not IsBlizzardTooltip(tooltip) then
 		addonTooltips[tooltip] = true
 	end
-	return not IsShowingOriginal()
+	return not IsShowingOriginal() and (ns.db == nil or ns.IsCompacting(ns.db, tabKey))
 end
 
 -- Adds the compact lines in the chosen language. Each line uses the color the user picked for its kind; the
@@ -121,7 +127,7 @@ end
 -- Line pre-calls: returning true keeps the original line out of the tooltip
 local function ReplaceEquipLine(tooltip, lineData)
 	local text = lineData.leftText
-	if not CanReplace(tooltip, text, EQUIP_PREFIX) then
+	if not CanReplace(tooltip, text, EQUIP_PREFIX, "combat") then
 		return false
 	end
 
@@ -146,12 +152,18 @@ local function ReplaceEquipLine(tooltip, lineData)
 	return true
 end
 
--- A food's Use line: its spell's ID says which food it is (ns.FOODS)
+-- A consumable's Use line: its spell's ID says which food (ns.FOODS), or potion, elixir or flask (ns.ALCHEMY),
+-- it is
 local function ReplaceUseLine(tooltip, lineData)
 	local spellID = lineData.spellID
-	local food = type(spellID) == "number" and not issecretvalue(spellID) and ns.FOODS[spellID]
+	local readable = type(spellID) == "number" and not issecretvalue(spellID)
+	local food = readable and ns.FOODS[spellID]
+	local alchemy = readable and ns.ALCHEMY[spellID]
 	local text = lineData.leftText
-	if not food or not CanReplace(tooltip, text, USE_PREFIX) then
+	-- ConsumableRules.lua is new in the .toc (it was FoodRules.lua): right after the update, /reload runs with
+	-- FoodData.lua but without it until the client restarts
+	local tabKey = food and "food" or "alchemy"
+	if not (food or alchemy) or not ns.GetFoodReplacement or not CanReplace(tooltip, text, USE_PREFIX, tabKey) then
 		return false
 	end
 
@@ -159,8 +171,14 @@ local function ReplaceUseLine(tooltip, lineData)
 		usePrefix = USE_PREFIX,
 		cooldownFormat = ns.GetClientText("ITEM_COOLDOWN_TOTAL"),
 		secondsFormat = ns.GetClientText("SECONDS_ABBR"),
+		minutesFormat = ns.GetClientText("MINUTES_ABBR"),
 	}
-	local lines = ns.GetFoodReplacement(text, food, context)
+	local lines
+	if food then
+		lines = ns.GetFoodReplacement(text, food, context)
+	else
+		lines = ns.GetAlchemyReplacement(text, alchemy, context)
+	end
 	if not lines then
 		return false
 	end
@@ -192,7 +210,17 @@ local function CanEnterAgain(owner)
 		and owner:GetScript("OnEnter") ~= nil
 end
 
--- Rebuilds a shown item tooltip so it switches between original and compact text at once:
+-- True for a tooltip of an item, or one still showing the content the pre-calls saw replaceable lines in (a
+-- recipe's spell tooltip)
+local function ShowsItemLines(tooltip)
+	if tooltip:IsTooltipType(Enum.TooltipDataType.Item) then
+		return true
+	end
+	local info = replaceableInfos[tooltip]
+	return info ~= nil and info == tooltip:GetPrimaryTooltipInfo()
+end
+
+-- Rebuilds a shown item or recipe tooltip so it switches between original and compact text at once:
 -- - from its data, when nothing was added after it. That re-runs the line pre-calls on the original data
 --   (they never change it); comparison tooltips follow their main tooltip.
 -- - by its owner, as when the mouse enters it again, when another addon added lines after the data
@@ -200,7 +228,7 @@ end
 -- Otherwise it is left as it is, and switches the next time it is built. `entered` holds the owners already
 -- run: an addon's main and comparison tooltips can share one, which rebuilds both.
 local function RefreshItemTooltip(tooltip, entered)
-	if not (tooltip:IsShown() and tooltip:IsTooltipType(Enum.TooltipDataType.Item)) then
+	if not (tooltip:IsShown() and ShowsItemLines(tooltip)) then
 		return
 	end
 	if tooltip:NumLines() == processedLineCounts[tooltip] then
@@ -214,7 +242,7 @@ local function RefreshItemTooltip(tooltip, entered)
 	end
 end
 
--- Rebuilds the shown item tooltips, e.g. after a setting changed what their lines look like
+-- Rebuilds the shown item and recipe tooltips, e.g. after a setting changed what their lines look like
 function ns.RefreshItemTooltips()
 	local entered = {}
 	RefreshItemTooltip(GameTooltip, entered)

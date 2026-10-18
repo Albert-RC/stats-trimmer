@@ -85,6 +85,7 @@ describe("FormatDetails", function()
 
 	it("marks a rate with /s, the same in every language", function()
 		assert.are.equal("/s (25 s)", ns.FormatDetails({ perSecond = true, seconds = 25 }, Spanish))
+		assert.are.equal("/s", ns.FormatDetails({ perSecond = true }, Spanish))
 	end)
 
 	it("fills in the number wherever the language puts it", function()
@@ -100,6 +101,29 @@ describe("FormatDetails", function()
 		end
 		assert.is_nil(ns.FormatDetails({ wellFedMinutes = 15 }, NoWellFed))
 		assert.is_nil(ns.FormatDetails({ seconds = 24 }, function() end))
+		assert.is_nil(ns.FormatDetails({ hours = 2 }, Spanish))
+	end)
+
+	it("adds how long a potion, elixir or flask lasts, in its unit, with the plural for more than one", function()
+		-- Blizzard's enUS words
+		local function English(name)
+			return ({ INT_SPELL_DURATION_MIN = "%d min", INT_SPELL_DURATION_HOURS = "%d |4hour:hrs;" })[name]
+		end
+		assert.are.equal(" (30 min)", ns.FormatDetails({ minutes = 30 }, English))
+		assert.are.equal(" (1 hour)", ns.FormatDetails({ hours = 1 }, English))
+		assert.are.equal(" (2 hrs)", ns.FormatDetails({ hours = 2 }, English))
+	end)
+end)
+
+describe("ResolvePlural", function()
+	it("takes the singular for one and the plural otherwise", function()
+		assert.are.equal("1 Stunde", ns.ResolvePlural("1 |4Stunde:Stunden;", 1))
+		assert.are.equal("2 Stunden", ns.ResolvePlural("2 |4Stunde:Stunden;", 2))
+		assert.are.equal("0 Stunden", ns.ResolvePlural("0 |4Stunde:Stunden;", 0))
+	end)
+
+	it("leaves a text without escapes as it is", function()
+		assert.are.equal("2 h", ns.ResolvePlural("2 h", 2))
 	end)
 end)
 
@@ -129,5 +153,6 @@ describe("CompactLine", function()
 		assert.are.equal("+6 stamina (well fed, 15 min)", wellFed.text)
 		local rate = ns.CompactLine("health", 2, "health", nil, true, { perSecond = true, seconds = 25 })
 		assert.are.equal("+2% health/s (25 sec)", rate.text)
+		assert.are.equal("+1200 health (2 hrs)", ns.CompactLine("health", 1200, "health", nil, nil, { hours = 2 }).text)
 	end)
 end)

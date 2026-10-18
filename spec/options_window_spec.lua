@@ -25,17 +25,29 @@ describe("Settings window", function()
 		return fakes.FindFrames(wow, { template = "UIPanelButtonTemplate", text = "Reiniciar" })[KindIndex(key)]
 	end
 
-	-- The color of a kind's sample line in the preview: one line per kind, after the item's three lines, or for
-	-- the food section's kinds after the food's name, in the food's tooltip
+	-- The tab of a kind's section
+	local function KindTab(kind)
+		for _, group in ipairs(ns.COLOR_GROUPS) do
+			if group.key == kind.group then
+				return group.tab
+			end
+		end
+	end
+
+	-- The color of a kind's sample line in the preview: one line per kind, in its tab's tooltip, after the item's
+	-- three lines, the food's name or the potion's name
 	local function PreviewColor(key)
-		local itemIndex, foodIndex = 3, 1
+		local tooltips = {
+			combat = wow.env.StatsTrimmerPreviewTooltip,
+			food = wow.env.StatsTrimmerFoodPreviewTooltip,
+			alchemy = wow.env.StatsTrimmerAlchemyPreviewTooltip,
+		}
+		local indexes = { combat = 3, food = 1, alchemy = 1 }
 		for _, kind in ipairs(ns.COLOR_KINDS) do
-			local food = kind.group == "food"
-			itemIndex = itemIndex + (food and 0 or 1)
-			foodIndex = foodIndex + (food and 1 or 0)
+			local tab = KindTab(kind)
+			indexes[tab] = indexes[tab] + 1
 			if kind.key == key then
-				local line = food and wow.env.StatsTrimmerFoodPreviewTooltip.lines[foodIndex]
-					or wow.env.StatsTrimmerPreviewTooltip.lines[itemIndex]
+				local line = tooltips[tab].lines[indexes[tab]]
 				return { r = line.r, g = line.g, b = line.b }
 			end
 		end
@@ -55,6 +67,10 @@ describe("Settings window", function()
 
 	local function FoodPreviewTexts()
 		return TooltipTexts(wow.env.StatsTrimmerFoodPreviewTooltip)
+	end
+
+	local function AlchemyPreviewTexts()
+		return TooltipTexts(wow.env.StatsTrimmerAlchemyPreviewTooltip)
 	end
 
 	-- Shows Bastón nudoso de nigromancia, with its combined spell power line, in GameTooltip
@@ -80,9 +96,23 @@ describe("Settings window", function()
 		return fakes.FindFrames(wow, { template = "PanelTabButtonTemplate", text = title })[1]
 	end
 
+	-- The checkboxes above the panels, in creation order: the shown tab's, then the spell power split
+	local function CompactCheckbox()
+		return fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]
+	end
+
+	local function SplitCheckbox()
+		return fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[2]
+	end
+
 	-- Clicks the second tab, food and drink, whatever the language
 	local function ShowFoodTab()
 		fakes.Fire(wow.env.StatsTrimmerOptionsFrame.Tabs[2], "OnClick", "LeftButton")
+	end
+
+	-- Clicks the third tab, alchemy, whatever the language
+	local function ShowAlchemyTab()
+		fakes.Fire(wow.env.StatsTrimmerOptionsFrame.Tabs[3], "OnClick", "LeftButton")
 	end
 
 	-- Whether a kind's row is shown: rows sit in their section's body
@@ -158,9 +188,10 @@ describe("Settings window", function()
 			assert.are.same(GREEN, Swatch("spellDamage").color)
 		end)
 
-		it("previews every line kind in its color, in a sample item or a sample food", function()
+		it("previews every line kind in its color, in a sample item, food or potion", function()
 			assert.are.equal("Sample Item", wow.env.StatsTrimmerPreviewTooltip.lines[1].text)
 			assert.are.equal("Sample Food", wow.env.StatsTrimmerFoodPreviewTooltip.lines[1].text)
+			assert.are.equal("Sample Potion", wow.env.StatsTrimmerAlchemyPreviewTooltip.lines[1].text)
 			for _, kind in ipairs(ns.COLOR_KINDS) do
 				assert.are.same(ns.db.colors[kind.key], PreviewColor(kind.key))
 			end
@@ -186,6 +217,47 @@ describe("Settings window", function()
 			assert.are.same({ "TOPLEFT", "TOPLEFT", 12, -34 }, { item.points[1][1], unpack(item.points[1], 3) })
 			assert.are.equal("+12 daño de las sombras", PreviewTexts()[#PreviewTexts()])
 		end)
+
+		it("shows the alchemy tab's lines in a sample potion, with how long each lasts in Blizzard's words", function()
+			ShowAlchemyTab()
+			assert.are.same({
+				"Sample Potion",
+				"+25 fuerza (1 h)",
+				"+25 agilidad (1 h)",
+				"+18 aguante (1 h)",
+				"+25 intelecto (1 h)",
+				"+18 espíritu (30 min)",
+				"+40 poder de ataque (30 s)",
+				"+180 poder de ataque contra bestias (5 min)",
+				"+2% golpe crítico (30 min)",
+				"+1200 salud (2 h)",
+				"+450 armadura (1 h)",
+				"+25 resistencia a hechizos (2 h)",
+				"+12 HP5 (1 h)",
+				"+2000 maná (2 h)",
+				"+150 daño con hechizos (2 h)",
+				"+40 sanación con hechizos (30 min)",
+				"+105 daño con hechizos contra elementales (5 min)",
+				"+12 MP5 (1 h)",
+				"+10 daño de fuego (30 min)",
+				"+15 daño de escarcha (30 min)",
+				"+40 daño sagrado (30 min)",
+				"+40 daño de naturaleza (30 min)",
+				"+40 daño de las sombras (30 min)",
+			}, AlchemyPreviewTexts())
+			local item, alchemy = wow.env.StatsTrimmerPreviewTooltip, wow.env.StatsTrimmerAlchemyPreviewTooltip
+			assert.is_true(alchemy.points[1][2] == item.points[1][2])
+			assert.is_true(alchemy:IsShown())
+			assert.is_false(item:IsShown())
+		end)
+
+		it("writes an hour in the singular and more in the plural, in English", function()
+			LanguageMenu().setSelected("enUS")
+			ShowAlchemyTab()
+			local texts = AlchemyPreviewTexts()
+			assert.are.equal("+25 strength (1 hour)", texts[2])
+			assert.are.equal("+1200 health (2 hrs)", texts[10])
+		end)
 	end)
 
 	describe("tabs", function()
@@ -193,10 +265,10 @@ describe("Settings window", function()
 			ns.ShowOptions()
 		end)
 
-		it("are combat and food and drink, under the window, with Blizzard's names", function()
+		it("are combat, food and drink and alchemy, under the window, with Blizzard's names", function()
 			local tabs = wow.env.StatsTrimmerOptionsFrame.Tabs
-			assert.are.same({ "Combate", "Comida y bebida" }, { tabs[1].text, tabs[2].text })
-			assert.are.equal(2, wow.env.StatsTrimmerOptionsFrame.numTabs)
+			assert.are.same({ "Combate", "Comida y bebida", "Alquimia" }, { tabs[1].text, tabs[2].text, tabs[3].text })
+			assert.are.equal(3, wow.env.StatsTrimmerOptionsFrame.numTabs)
 			local point, relativeTo, relativePoint, x, y = unpack(tabs[1].points[1])
 			assert.is_true(relativeTo == wow.env.StatsTrimmerOptionsFrame)
 			assert.are.same({ "TOPLEFT", "BOTTOMLEFT", 11, 2 }, { point, relativePoint, x, y })
@@ -209,7 +281,7 @@ describe("Settings window", function()
 			assert.is_false(RowShown("health"))
 			assert.is_true(wow.env.StatsTrimmerPreviewTooltip:IsShown())
 			assert.is_false(wow.env.StatsTrimmerFoodPreviewTooltip:IsShown())
-			assert.is_true(fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]:IsShown())
+			assert.is_true(SplitCheckbox():IsShown())
 		end)
 
 		it("show food and drink's rows and the sample food, without the checkbox, with a click", function()
@@ -220,14 +292,28 @@ describe("Settings window", function()
 			assert.is_true(RowShown("health"))
 			assert.is_false(wow.env.StatsTrimmerPreviewTooltip:IsShown())
 			assert.is_true(wow.env.StatsTrimmerFoodPreviewTooltip:IsShown())
-			assert.is_false(fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]:IsShown())
+			assert.is_false(SplitCheckbox():IsShown())
 			assert.are.equal(wow.env.SOUNDKIT.IG_CHARACTER_INFO_TAB, wow.sounds[#wow.sounds])
+		end)
+
+		it("show alchemy's sections and the sample potion, without the checkbox, with a click", function()
+			ShowAlchemyTab()
+			assert.is_true(Tab("Alquimia").selected)
+			assert.is_false(RowShown("frostDamage"))
+			assert.is_false(RowShown("health"))
+			assert.is_true(RowShown("alchemyHealth"))
+			assert.is_true(RowShown("alchemyFrostDamage"))
+			assert.is_false(wow.env.StatsTrimmerFoodPreviewTooltip:IsShown())
+			assert.is_true(wow.env.StatsTrimmerAlchemyPreviewTooltip:IsShown())
+			assert.is_false(SplitCheckbox():IsShown())
 		end)
 
 		it("keep the window's size", function()
 			local window = wow.env.StatsTrimmerOptionsFrame
 			local width, height = window:GetWidth(), window:GetHeight()
 			ShowFoodTab()
+			assert.are.same({ width, height }, { window:GetWidth(), window:GetHeight() })
+			ShowAlchemyTab()
 			assert.are.same({ width, height }, { window:GetWidth(), window:GetHeight() })
 		end)
 
@@ -242,7 +328,7 @@ describe("Settings window", function()
 		it("follow the language", function()
 			LanguageMenu().setSelected("enUS")
 			local tabs = wow.env.StatsTrimmerOptionsFrame.Tabs
-			assert.are.same({ "Combat", "Food & Drink" }, { tabs[1].text, tabs[2].text })
+			assert.are.same({ "Combat", "Food & Drink", "Alchemy" }, { tabs[1].text, tabs[2].text, tabs[3].text })
 			assert.are.equal(#"Food & Drink" * 6 + 20, tabs[2]:GetWidth())
 		end)
 	end)
@@ -305,18 +391,25 @@ describe("Settings window", function()
 
 		it("resets every kind of the shown tab only", function()
 			ns.db.colors.health = { r = 1, g = 0, b = 0 }
+			ns.db.colors.alchemyHealth = { r = 0, g = 0, b = 1 }
 			local resetShown = fakes.FindFrames(wow, { text = "Reset these colors" })[1]
 			fakes.Fire(resetShown, "OnClick")
 			for _, kind in ipairs(ns.COLOR_KINDS) do
-				if kind.group ~= "food" then
+				if KindTab(kind) == "combat" then
 					assert.are.same(GREEN, ns.db.colors[kind.key])
 				end
 			end
 			assert.are.same({ r = 1, g = 0, b = 0 }, ns.db.colors.health)
+			assert.are.same({ r = 0, g = 0, b = 1 }, ns.db.colors.alchemyHealth)
 
 			ShowFoodTab()
 			fakes.Fire(resetShown, "OnClick")
 			assert.are.same(GREEN, ns.db.colors.health)
+			assert.are.same({ r = 0, g = 0, b = 1 }, ns.db.colors.alchemyHealth)
+
+			ShowAlchemyTab()
+			fakes.Fire(resetShown, "OnClick")
+			assert.are.same(GREEN, ns.db.colors.alchemyHealth)
 		end)
 	end)
 
@@ -515,12 +608,13 @@ describe("Settings window", function()
 		end
 
 		-- The preview panel's width: the window's, without the colors panel, the window's sides (12 each) and
-		-- the gap between the panels (8). The item's and the food's tooltips, which take turns in the same place,
-		-- need it with a margin of 12 on each side.
+		-- the gap between the panels (8). The item's, the food's and the potion's tooltips, which take turns in the
+		-- same place, need it with a margin of 12 on each side.
 		local function PreviewFits()
 			local room = Window():GetWidth() - ColorsPanel():GetWidth() - 2 * 12 - 8
 			local item, food = wow.env.StatsTrimmerPreviewTooltip, wow.env.StatsTrimmerFoodPreviewTooltip
-			return math.max(item:GetWidth(), food:GetWidth()) + 2 * 12 <= room
+			local alchemy = wow.env.StatsTrimmerAlchemyPreviewTooltip
+			return math.max(item:GetWidth(), food:GetWidth(), alchemy:GetWidth()) + 2 * 12 <= room
 		end
 
 		-- A row label's room: the colors panel's width without the scroll frame's inset (6) and scroll bar (26),
@@ -557,8 +651,8 @@ describe("Settings window", function()
 
 		it("grows for longer texts and narrows again when they go", function()
 			local spanish = Window():GetWidth()
-			-- The longest French line, "+5% expérience gagnée en tuant des adversaires", is the sample food's,
-			-- which the window makes room for in either tab
+			-- The longest French line, "+105 dégâts des sorts contre les élémentaires (5 min)", is the sample
+			-- potion's, which the window makes room for in every tab
 			LanguageMenu().setSelected("frFR")
 			local french = Window():GetWidth()
 			assert.is_true(french > spanish)
@@ -867,10 +961,91 @@ describe("Settings window", function()
 		end)
 	end)
 
-	describe("spell power checkbox", function()
-		local function Checkbox()
-			return fakes.FindFrames(wow, { template = "UICheckButtonTemplate" })[1]
+	describe("tab checkbox", function()
+		local MOREL_LINE = "Usar: Restaura 530 p. de salud durante 24 s. Debes permanecer sentado mientras comes."
+
+		-- Shows Spongy Morel in GameTooltip; returns its lines' texts
+		local function ShowMorel()
+			fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+				lines = {
+					{
+						leftText = MOREL_LINE,
+						type = wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse,
+						spellID = 435,
+					},
+				},
+			})
 		end
+
+		it("sits under Blizzard's divider and the tab's name, which follow the tab and the language", function()
+			ns.ShowOptions()
+			local dividers = {}
+			for _, region in ipairs(wow.frames) do
+				if region.frameType == "Texture" and region.parent == wow.env.StatsTrimmerOptionsFrame then
+					table.insert(dividers, region.atlas)
+				end
+			end
+			assert.are.same({ "Options_HorizontalDivider" }, dividers)
+			assert.is_true(HasText("Combate"))
+			ShowAlchemyTab()
+			local titles = fakes.FindFrames(wow, { text = "Alquimia" })
+			-- The tab and the title above the checkbox
+			assert.are.equal(2, #titles)
+			LanguageMenu().setSelected("enUS")
+			assert.are.equal(2, #fakes.FindFrames(wow, { text = "Alchemy" }))
+		end)
+
+		it("names each tab's lines, checked by default, in every tab", function()
+			ns.ShowOptions()
+			local labels = {}
+			for _, Show in ipairs({ function() end, ShowFoodTab, ShowAlchemyTab }) do
+				Show()
+				assert.is_true(CompactCheckbox():IsShown())
+				assert.is_true(CompactCheckbox():GetChecked())
+				table.insert(labels, CompactCheckbox().Text.text)
+			end
+			assert.are.same(
+				{ "Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines" },
+				labels
+			)
+		end)
+
+		it("keeps the tab's lines in their original text when cleared, rebuilding a shown tooltip", function()
+			ShowMorel()
+			ns.ShowOptions()
+			ShowFoodTab()
+			fakes.ClickCheckButton(CompactCheckbox())
+			assert.are.same({ food = true }, ns.db.disabledTabs)
+			assert.are.same({ MOREL_LINE }, TooltipTexts(wow.env.GameTooltip))
+			-- The preview and the colors stay as they are
+			assert.are.equal("+530 salud (24 s)", FoodPreviewTexts()[2])
+
+			fakes.ClickCheckButton(CompactCheckbox())
+			assert.are.same({}, ns.db.disabledTabs)
+			assert.are.same({ "+530 salud (24 s)" }, TooltipTexts(wow.env.GameTooltip))
+		end)
+
+		it("shows each tab's own state", function()
+			ns.ShowOptions()
+			ShowFoodTab()
+			fakes.ClickCheckButton(CompactCheckbox())
+			ShowAlchemyTab()
+			assert.is_true(CompactCheckbox():GetChecked())
+			ShowFoodTab()
+			assert.is_false(CompactCheckbox():GetChecked())
+		end)
+
+		it("opens with the saved state", function()
+			wow = fakes.NewWoW()
+			wow.env.StatsTrimmerDB = { disabledTabs = { combat = true } }
+			ns = helpers.StartStatsTrimmer(wow)
+			ns.ShowOptions()
+			assert.is_false(CompactCheckbox():GetChecked())
+		end)
+	end)
+
+	describe("spell power checkbox", function()
+		local Checkbox = SplitCheckbox
 
 		local function PreviewHas(text)
 			for _, shown in ipairs(PreviewTexts()) do

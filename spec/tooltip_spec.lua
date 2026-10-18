@@ -25,8 +25,9 @@ local function Setup(prepare, locale)
 		"Config.lua",
 		"Locales.lua",
 		"FoodData.lua",
+		"AlchemyData.lua",
 		"Rules.lua",
-		"FoodRules.lua",
+		"ConsumableRules.lua",
 		"Localization.lua",
 		"Tooltip.lua",
 	}, wow.env)
@@ -66,6 +67,13 @@ describe("Tooltip line pre-call", function()
 			{ text = "+10 daño con hechizos", r = 1, g = 0.5, b = 0 },
 			{ text = "+30 sanación con hechizos", r = 0, g = 0.5, b = 1 },
 		}, lines)
+	end)
+
+	it("leaves equip lines alone while the combat tab's checkbox is cleared", function()
+		ns.db.disabledTabs.combat = true
+		local consumed, lines = ProcessLine(wow, preCall, COSEDORA_LINE)
+		assert.is_false(consumed)
+		assert.are.same({}, lines)
 	end)
 
 	describe("combined spell power (Bastón nudoso de nigromancia)", function()
@@ -452,6 +460,74 @@ describe("Food Use lines", function()
 	end)
 end)
 
+describe("Potion, elixir and flask Use lines", function()
+	-- Flask of the Titans, Elixir of the Mongoose and Major Frenzy Potion on the esES client, from their spells'
+	-- esES descriptions, with the cooldowns their kinds share
+	local TITANS_LINE = "Usar: Aumenta la salud máxima 1200 p. durante 2 h. Solo puedes beneficiarte del efecto de un "
+		.. "frasco cada vez. Este efecto persiste en la muerte. (3 |4s:s; de tiempo de reutilización)."
+	local MONGOOSE_LINE = "Usar: Aumenta la agilidad 25 p. la agilidad y un 2% la probabilidad de conseguir un golpe "
+		.. "crítico. Dura 30 min. (3 |4s:s; de tiempo de reutilización)."
+	local FRENZY_LINE =
+		"Usar: Aumenta 80 p. el poder de ataque durante 30 s. (2 |4min:min; de tiempo de reutilización)."
+	local wow, ns, preCall
+
+	local function Process(text, spellID)
+		local tooltip = fakes.ItemTooltip(wow, { hyperlink = "item:potion" })
+		local consumed = preCall(tooltip, {
+			leftText = text,
+			leftColor = fakes.Color(0, 1, 0),
+			type = wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse,
+			spellID = spellID,
+		})
+		return consumed, tooltip.lines
+	end
+
+	before_each(function()
+		wow, ns = Setup()
+		preCall = wow.preCalls[2].handler
+	end)
+
+	it("replaces the line with compact lines in the alchemy tab's colors, without the shared cooldown", function()
+		ns.db.colors.alchemyAgility = { r = 1, g = 0, b = 0 }
+		ns.db.colors.alchemyCritRating = { r = 0, g = 0, b = 1 }
+		local consumed, lines = Process(MONGOOSE_LINE, 17538)
+		assert.is_true(consumed)
+		assert.are.same({
+			{ text = "+25 agilidad (30 min)", r = 1, g = 0, b = 0 },
+			{ text = "+2% golpe crítico (30 min)", r = 0, g = 0, b = 1 },
+		}, lines)
+	end)
+
+	it("shows a flask's hours and a potion's seconds in Blizzard's words, in the language setting", function()
+		assert.are.equal("+1200 salud (2 h)", select(2, Process(TITANS_LINE, 17626))[1].text)
+		assert.are.equal("+80 poder de ataque (30 s)", select(2, Process(FRENZY_LINE, 1251940))[1].text)
+		ns.db.language = "enUS"
+		assert.are.equal("+1200 health (2 hrs)", select(2, Process(TITANS_LINE, 17626))[1].text)
+	end)
+
+	it("leaves the line alone while the alchemy tab's checkbox is cleared, but not food's", function()
+		ns.db.disabledTabs.alchemy = true
+		local consumed, lines = Process(TITANS_LINE, 17626)
+		assert.is_false(consumed)
+		assert.are.same({}, lines)
+		ns.db.disabledTabs = { food = true }
+		assert.is_true((Process(TITANS_LINE, 17626)))
+	end)
+
+	it("leaves a potion's line alone when the client has no text for minutes", function()
+		wow.env.MINUTES_ABBR = nil
+		local consumed, lines = Process(FRENZY_LINE, 1251940)
+		assert.is_false(consumed)
+		assert.are.same({}, lines)
+	end)
+
+	it("leaves the line alone when it doesn't show what its spell does", function()
+		local consumed, lines = Process(TITANS_LINE, 17627)
+		assert.is_false(consumed)
+		assert.are.same({}, lines)
+	end)
+end)
+
 describe("Without any of Blizzard's names", function()
 	it("names the stats with the addon's English, as right after an update, before Locales.lua loads", function()
 		local wow, ns, preCall = Setup(nil, "enUS")
@@ -721,6 +797,76 @@ describe("Tooltip refresh on modifier changes", function()
 			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
 			assert.are.same({ COSEDORA_LINE }, Texts(compareTooltip))
 			assert.are.equal(2, button.enterCount)
+		end)
+	end)
+
+	-- AtlasLoot shows a recipe with SetSpellByID: a spell tooltip with the crafted item's lines, its Use line
+	-- among them (seen in game on 2026-10-18)
+	describe("of a recipe", function()
+		local TITANS_LINE = "Usar: Aumenta la salud máxima 1200 p. durante 2 h. Solo puedes beneficiarte del efecto "
+			.. "de un frasco cada vez. Este efecto persiste en la muerte."
+		local button
+
+		local function Texts(tooltip)
+			local texts = {}
+			for _, line in ipairs(tooltip.lines) do
+				table.insert(texts, line.text)
+			end
+			return texts
+		end
+
+		local function ShowRecipe(tooltip, owner)
+			fakes.ShowItem(wow, tooltip, owner, "ANCHOR_RIGHT", {
+				type = wow.env.Enum.TooltipDataType.Spell,
+				lines = {
+					{ leftText = "Alquimia: Frasco de los titanes" },
+					{
+						leftText = TITANS_LINE,
+						type = wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse,
+						spellID = 17626,
+					},
+				},
+			})
+		end
+
+		-- Like AtlasLoot's recipe buttons: OnEnter fills its tooltip with the recipe's spell
+		local function RecipeButton(tooltip)
+			button = wow.env.CreateFrame("Button")
+			button.mouseOver = true
+			button:SetScript("OnEnter", function(self)
+				ShowRecipe(tooltip, self)
+			end)
+			fakes.Fire(button, "OnEnter")
+		end
+
+		it("switches GameTooltip at once, from its data", function()
+			RecipeButton(wow.env.GameTooltip)
+			assert.are.same({ "Alquimia: Frasco de los titanes", "+1200 salud (2 h)" }, Texts(wow.env.GameTooltip))
+			wow.keysDown.CTRL = true
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.same({ "Alquimia: Frasco de los titanes", TITANS_LINE }, Texts(wow.env.GameTooltip))
+			wow.keysDown.CTRL = nil
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 0)
+			assert.are.same({ "Alquimia: Frasco de los titanes", "+1200 salud (2 h)" }, Texts(wow.env.GameTooltip))
+		end)
+
+		it("switches the addon's own tooltip at once, through its owner", function()
+			local ownTooltip = wow.env.CreateFrame("GameTooltip", "AtlasLootTooltip", wow.env.UIParent)
+			RecipeButton(ownTooltip)
+			wow.keysDown.CTRL = true
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.same({ "Alquimia: Frasco de los titanes", TITANS_LINE }, Texts(ownTooltip))
+		end)
+
+		it("leaves a spell tooltip without such lines alone, even one that showed them before", function()
+			RecipeButton(wow.env.GameTooltip)
+			-- Then a spell of the action bar, in the same tooltip
+			fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+				type = wow.env.Enum.TooltipDataType.Spell,
+				lines = { { leftText = "Descarga de Escarcha" } },
+			})
+			fakes.FireEvent(wow, "MODIFIER_STATE_CHANGED", "LCTRL", 1)
+			assert.are.equal(0, wow.env.GameTooltip.refreshCount)
 		end)
 	end)
 

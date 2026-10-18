@@ -107,6 +107,14 @@ local function VsKey(stat, typeKey)
 	return "ITEM_MOD_" .. stat .. "_VS_" .. typeKey .. "_SHORT"
 end
 
+-- The addon's English for a "<stat> vs <creature type>" stat key ("attack power vs beasts"), or nil for a key that
+-- isn't one of them
+function ns.GetVsEnglishName(key)
+	local stat, typeKey = key:match("^ITEM_MOD_([%u_]-)_VS_(%u+)_SHORT$")
+	local vs, creatureType = VS_STATS[stat], VS_CREATURE_TYPES[typeKey]
+	return vs and creatureType and ENGLISH_NAMES[vs.base] .. " vs " .. creatureType.label or nil
+end
+
 -- A stat name getter like GetStatName that leaves out the names of "<stat> vs <creature type>" stats it
 -- can't trust: the esES client calls spell damage vs beasts "Daño con hechizos contra mecánicos" and vs
 -- mechanicals "…contra humanoides". Attack power, the vs stat seen on items, is the reference: its name is
@@ -246,8 +254,7 @@ ns.Rules = {
 				if vs then
 					local creatureType = VS_CREATURE_TYPES[typeKey]
 					if creatureType then
-						local name = ENGLISH_NAMES[vs.base] .. " vs " .. creatureType.label
-						local claim = Claim({ value }, { Line(vs.kind, value, name, { key }) })
+						local claim = Claim({ value }, { Line(vs.kind, value, ns.GetVsEnglishName(key), { key }) })
 						local terms = CreatureTerms(context, creatureType, key)
 						if #terms > 0 then
 							claim.creature =
@@ -497,11 +504,11 @@ function ns.GetReplacement(text, stats, context)
 	return claim.Render(text)
 end
 
--- The names for a line's stats, or nil if any is missing or the line has no stat names (MP5, HP5, or a line
--- already localized)
+-- The names for a line's stats, or nil if any is missing or the line is already localized. A line without stats
+-- (MP5, HP5) keeps its own name.
 local function GetStatNames(line, GetStatName)
 	if not line.stats then
-		return nil
+		return line.name and { line.name }
 	end
 	local names = {}
 	for i, key in ipairs(line.stats) do
@@ -515,7 +522,7 @@ local function GetStatNames(line, GetStatName)
 end
 
 -- The compact lines with Blizzard's names from GetStatName (a getter made with ns.TrustedNames) instead of
--- English ("+10 Daño con hechizos"), food lines' details included ("(24 s)"). A line naming several stats (a
+-- English ("+10 Daño con hechizos"), consumable lines' details included ("(24 s)"). A line naming several stats (a
 -- group of weapon skills, several creature types) becomes one line per stat. A line stays as it is when one
 -- of its names is missing or untrusted, so a second pass with other names can still translate it.
 function ns.LocalizeLines(lines, GetStatName)

@@ -346,6 +346,11 @@ function Frame:CreateTexture()
 	return fakes.NewFrame(self.wow, "Texture", nil, self)
 end
 
+-- Texture methods: the atlas is recorded
+function Frame:SetAtlas(atlas)
+	self.atlas = atlas
+end
+
 -- GameTooltip methods: lines are recorded as { text, r, g, b }
 function Frame:SetOwner(owner, anchorType)
 	self.owner = owner
@@ -412,6 +417,11 @@ end
 
 function Frame:GetProcessingTooltipInfo()
 	return self.processingInfo
+end
+
+-- Like TooltipDataHandlerMixin:GetPrimaryTooltipInfo: the first info, the same table after RefreshData
+function Frame:GetPrimaryTooltipInfo()
+	return self.infoList and self.infoList[1]
 end
 
 -- Like TooltipDataHandlerMixin:IsTooltipType, it checks the primary info, the first one, not the one being
@@ -533,6 +543,7 @@ fakes.ES_CLIENT_STRINGS = {
 	ITEM_SPELL_TRIGGER_ONUSE = "Usar:",
 	ITEM_COOLDOWN_TOTAL = "(%s de tiempo de reutilización).",
 	SECONDS_ABBR = "%d |4s:s;",
+	MINUTES_ABBR = "%d |4min:min;",
 }
 
 -- A fresh fake world.
@@ -652,7 +663,7 @@ function fakes.NewWoW(options)
 		}
 
 	env.Enum = {
-		TooltipDataType = { Item = 0, Unit = 2 },
+		TooltipDataType = { Item = 0, Spell = 1, Unit = 2 },
 		TooltipDataLineType = { None = 0, ItemSpellTriggerOnUse = 44 },
 	}
 	env.NORMAL_FONT_COLOR = fakes.Color(1, 0.82, 0)

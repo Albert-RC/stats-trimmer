@@ -5,6 +5,7 @@
 return {
 	-- GlobalStrings
 	strings = {
+		ALCHEMY = "Алхимия",
 		ALT_KEY = "ALT",
 		ARMOR = "Броня",
 		COLORS = "Цвета",
@@ -13,6 +14,7 @@ return {
 		CTRL_KEY = "CTRL",
 		DAMAGE = "Урон",
 		HEALTH = "Здоровье",
+		INT_SPELL_DURATION_HOURS = "%d ч",
 		INT_SPELL_DURATION_MIN = "%d мин",
 		INT_SPELL_DURATION_SEC = "%d сек",
 		ITEM_BIND_ON_EQUIP = "Становится персональным при надевании",
@@ -169,12 +171,14 @@ return {
 		LFG_LIST_LANGUAGE_RURU = "Русский",
 		MANA = "Мана",
 		MINIMAP_TRACKING_VENDOR_FOOD = "Еда и напитки",
+		MINUTES_ABBR = "%d мин.",
 		PREVIEW = "Предпросмотр",
 		RESET = "Сброс",
 		SECONDS_ABBR = "%d с.",
 		SHIFT_KEY = "SHIFT",
 		SPELLS = "Заклинания",
 		STAT_CATEGORY_ATTACK = "Атака",
+		STAT_CATEGORY_ATTRIBUTES = "Характеристики",
 		STAT_CATEGORY_DEFENSE = "Защита",
 		STAT_CATEGORY_WEAPON_SKILLS = "Оружейные навыки",
 	},

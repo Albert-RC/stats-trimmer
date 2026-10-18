@@ -9,3 +9,11 @@ ID,Description_lang
 1249508,"$@spelldesc435 If you spend at least 10 sec eating, you will become well fed and gain $s2 Fishing Skill for $1249521d. $@spelldesc1243969"
 1249519,"A nutritious meal has made you Well Fed, increasing your Attack Power."
 1249521,"A nutritious meal has made you Well Fed, increasing your Fishing Skill."
+4941,Increases armor by $s1 for $d.
+6612,Increases Rage by 20 to 40.
+17535,Increases Intellect and Spirit by $s1 for $d.
+17538,Increases Agility by $s1 and chance to get a critical hit by $s2%. Lasts for $d.
+17626,Increases the player's maximum health by $s1 for $d. You can only have the effect of one flask at a time. This effect persists through death.
+1252559,Increases Attack Power by $s1 against Beasts. Lasts $d.
+24361,Regenerate $s1 health every 5 sec for $d.
+1251940,Increases Attack Power by $s1 for $d.

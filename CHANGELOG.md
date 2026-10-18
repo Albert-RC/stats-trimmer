@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.6.0 (2026-10-18)
+
+- Flasks, elixirs and potions get compact lines too. `Use: Increases the player's maximum health by 1,200 for 2 hrs. You can only have the effect of one flask at a time. This effect persists through death.` becomes `+1200 health (2 hrs)`, and Elixir of the Mongoose shows `+25 agility (30 min)` and `+2% critical strike (30 min)`.
+- That covers flasks of health, mana, spell damage and resistances, elixirs of the primary stats, armor, health, spell damage, a spell school, healing, health or mana every 5 seconds (`+12 HP5 (1 hour)`) and crit, and potions of attack power, spell damage, healing, armor, resistances and attack power or spell damage against a creature type. Durations and stat names are the game's own, in the chosen language: `+1200 salud (2 h)`.
+- The cooldown every elixir and flask shares (3 seconds) and every potion shares (2 minutes) is left out. Any other cooldown keeps the original text.
+- Healing and mana potions, bandages, and anything whose text says something else (invisibility, water breathing, the Natural flasks' bonus in Hyjal's zones, rage) keep their original text.
+- Holding Ctrl switches recipe tooltips at once too, such as AtlasLoot's alchemy and cooking recipes, which show the crafted item's lines. Before, they only switched when the mouse moved to another recipe.
+- Each tab of the settings window has a checkbox to turn its lines on and off: "Compact equip lines", "Compact food and drink lines" and "Compact flask, elixir and potion lines". A cleared one leaves those lines in the game's own text; its colors stay as they are. The tab's settings sit under a divider and the tab's name, apart from the settings of the whole window.
+- The settings window has a third tab, Alchemy, with its own color rows in collapsible Attributes, Attack, Defense, Spells and Damage extra sections, and a sample potion.
+- After updating, restart the game instead of using `/reload`: the new files are only loaded on a restart.
+
 ## v0.5.1 (2026-10-16)
 
 - An equip line with more than one percentage, such as a hit bonus next to a movement speed bonus, keeps its original text instead of losing the second one.

@@ -32,12 +32,13 @@ $downloads = Join-Path ([System.IO.Path]::GetTempPath()) "StatsTrimmer-Locales"
 # Languages with the Latin alphabet, which every client's font can show. Other clients get their own
 # language from the game itself.
 $locales = @("enUS", "deDE", "esES", "esMX", "frFR", "itIT", "ptBR")
-# Interface texts and the words of food lines, besides every ITEM_MOD_*_SHORT stat name
+# Interface texts and the words of consumable lines, besides every ITEM_MOD_*_SHORT stat name
 $uiKeys = @(
 	"CTRL_KEY", "ALT_KEY", "SHIFT_KEY", "RESET", "PREVIEW", "COLORS", "ITEM_BIND_ON_EQUIP",
 	"STAT_CATEGORY_ATTACK", "STAT_CATEGORY_DEFENSE", "SPELLS", "STAT_CATEGORY_WEAPON_SKILLS", "DAMAGE", "COMBAT",
 	"MINIMAP_TRACKING_VENDOR_FOOD", "HEALTH", "MANA", "COMBAT_XP_GAIN", "ARMOR",
-	"INT_SPELL_DURATION_SEC", "INT_SPELL_DURATION_MIN"
+	"ALCHEMY", "STAT_CATEGORY_ATTRIBUTES",
+	"INT_SPELL_DURATION_SEC", "INT_SPELL_DURATION_MIN", "INT_SPELL_DURATION_HOURS"
 )
 # The Well Fed buff's name isn't a GlobalString: it is bundled as WELL_FED, from this spell's name (the same
 # spell Tooltip.lua asks the client for)
@@ -53,7 +54,7 @@ $classes = @("WARRIOR", "PALADIN", "PRIEST", "SHAMAN", "DRUID", "ROGUE", "MAGE",
 # The fixture's language, and the strings its client has that the bundled languages don't need: the prefixes and
 # cooldown texts recognition uses, and the language names of the language menu (LocaleUtil.GetLocaleDisplayName)
 $fixtureLocale = "ruRU"
-$clientKeys = @("ITEM_SPELL_TRIGGER_ONEQUIP", "ITEM_SPELL_TRIGGER_ONUSE", "ITEM_COOLDOWN_TOTAL", "SECONDS_ABBR")
+$clientKeys = @("ITEM_SPELL_TRIGGER_ONEQUIP", "ITEM_SPELL_TRIGGER_ONUSE", "ITEM_COOLDOWN_TOTAL", "SECONDS_ABBR", "MINUTES_ABBR")
 $languageKeys = @($locales + $fixtureLocale | ForEach-Object { "LFG_LIST_LANGUAGE_" + $_.ToUpper() })
 # Creature types the rules know (Rules.lua's VS_CREATURE_TYPES), by ID
 $creatureTypes = @(1, 2, 3, 4, 5, 6, 7, 9)

@@ -1,20 +1,41 @@
--- FoodRules.lua over the generated FoodData.lua. The enUS lines of Spongy Morel, Melon Juice and Longjaw Mud
+-- ConsumableRules.lua over the generated FoodData.lua and AlchemyData.lua. The enUS lines of Spongy Morel, Melon
+-- Juice and Longjaw Mud
 -- Snapper were seen in game; the others are Blizzard's description templates of each language with their
 -- numbers filled in. The health or mana a food restores comes from the line: where the game's is unknown, the
 -- number is made up.
 local helpers = require("spec.helpers")
 local fakes = require("spec.fakes")
-local ns = helpers.LoadAddon("StatsTrimmer", { "Util.lua", "Config.lua", "FoodData.lua", "Rules.lua", "FoodRules.lua" })
+local ns = helpers.LoadAddon(
+	"StatsTrimmer",
+	{ "Util.lua", "Config.lua", "FoodData.lua", "AlchemyData.lua", "Rules.lua", "ConsumableRules.lua" }
+)
 
--- ITEM_SPELL_TRIGGER_ONUSE, ITEM_COOLDOWN_TOTAL and SECONDS_ABBR per locale
+-- ITEM_SPELL_TRIGGER_ONUSE, ITEM_COOLDOWN_TOTAL, SECONDS_ABBR and MINUTES_ABBR per locale
 local CONTEXTS = {
-	enUS = { usePrefix = "Use:", cooldownFormat = "(%s Cooldown)", secondsFormat = "%d |4Sec:Sec;" },
+	enUS = {
+		usePrefix = "Use:",
+		cooldownFormat = "(%s Cooldown)",
+		secondsFormat = "%d |4Sec:Sec;",
+		minutesFormat = "%d |4Min:Min;",
+	},
 	esES = {
 		usePrefix = "Usar:",
 		cooldownFormat = "(%s de tiempo de reutilización).",
 		secondsFormat = "%d |4s:s;",
+		minutesFormat = "%d |4min:min;",
 	},
-	deDE = { usePrefix = "Benutzen:", cooldownFormat = "(%s Abklingzeit)", secondsFormat = "%d |4Sek.:Sek.;" },
+	deDE = {
+		usePrefix = "Benutzen:",
+		cooldownFormat = "(%s Abklingzeit)",
+		secondsFormat = "%d |4Sek.:Sek.;",
+		minutesFormat = "%d |4Min.:Min.;",
+	},
+	frFR = {
+		usePrefix = "Utiliser :",
+		cooldownFormat = "(%s de recharge.)",
+		secondsFormat = "%d s",
+		minutesFormat = "%d min",
+	},
 }
 
 -- GetFoodReplacement for a food spell's Use line, as { kind, text } lines
@@ -395,6 +416,300 @@ describe("food lines in the client's language", function()
 		assert.are.same(
 			{ "+530 Salud (24 s)", "+10 Attack Power (Well Fed, 15 min)", "+5% Experiencia obtenida al matar enemigos" },
 			Texts(ns.LocalizeLines(localized, Names(fakes.LocaleStrings("enUS"))))
+		)
+	end)
+end)
+
+-- GetAlchemyReplacement for a potion's, elixir's or flask's Use line, as { kind, text } lines
+local function ReplaceAlchemy(text, spellID, locale, entry)
+	local lines = ns.GetAlchemyReplacement(text, entry or ns.ALCHEMY[spellID], CONTEXTS[locale or "enUS"])
+	if not lines then
+		return nil
+	end
+	local shown = {}
+	for _, line in ipairs(lines) do
+		table.insert(shown, { kind = line.kind, text = line.text })
+	end
+	return shown
+end
+
+-- Flask of the Titans, as the client showed it in an Alchemy recipe; the esES line is its description with its
+-- numbers filled in
+local TITANS_EN = "Use: Increases the player's maximum health by 1,200 for 2 hrs. You can only have the effect of "
+	.. "one flask at a time. This effect persists through death."
+local TITANS_ES = "Usar: Aumenta la salud máxima 1200 p. durante 2 h. Solo puedes beneficiarte del efecto de un "
+	.. "frasco cada vez. Este efecto persiste en la muerte."
+-- Major Frenzy Potion
+local FRENZY_EN = "Use: Increases Attack Power by 80 for 30 sec."
+
+describe("potions, elixirs and flasks", function()
+	it("shows a flask's stat and how long it lasts, without what every flask says (Flask of the Titans)", function()
+		assert.are.same({ L("alchemyHealth", "+1200 health (2 hrs)") }, ReplaceAlchemy(TITANS_EN, 17626))
+		assert.are.same({ L("alchemyHealth", "+1200 health (2 hrs)") }, ReplaceAlchemy(TITANS_ES, 17626, "esES"))
+	end)
+
+	it("shows one hour in the singular", function()
+		local text = "Use: Increases Intellect and Spirit by 18 for 1 hour."
+		assert.are.same(
+			{ L("alchemyIntellect", "+18 intellect (1 hour)"), L("alchemySpirit", "+18 spirit (1 hour)") },
+			ReplaceAlchemy(text, 17535)
+		)
+	end)
+
+	it("shows a stat and a crit chance, each in its line (Elixir of the Mongoose)", function()
+		local text = "Use: Increases Agility by 25 and chance to get a critical hit by 2%. Lasts for 30 min."
+		local expected =
+			{ L("alchemyAgility", "+25 agility (30 min)"), L("alchemyCritRating", "+2% critical strike (30 min)") }
+		assert.are.same(expected, ReplaceAlchemy(text, 17538))
+		-- frFR writes a no-break space before the percentage
+		local french = "Utiliser : Augmente l’Agilité de 25 et vos chances de réaliser un coup critique de 2\194\160%. "
+			.. "Dure 30 min."
+		assert.are.same(expected, ReplaceAlchemy(french, 17538, "frFR"))
+	end)
+
+	it("shows health every 5 seconds as HP5, whatever the order of the numbers (deDE)", function()
+		local text = "Benutzen: Alle 5 Sekunden 20 Punkt(e) Gesundheit regenerieren. Hält 1 Stunde lang an."
+		assert.are.same({ L("alchemyHp5", "+20 HP5 (1 hour)") }, ReplaceAlchemy(text, 24361, "deDE"))
+	end)
+
+	it("shows health and mana every 5 seconds as HP5 and MP5 (Elixir of Wicked Regeneration)", function()
+		local text = "Usar: Bebe esto para restaurar 9 p. de salud y 10 p. de maná cada 5 s. Dura 30 min."
+		assert.are.same(
+			{ L("alchemyHp5", "+9 HP5 (30 min)"), L("alchemyMp5", "+10 MP5 (30 min)") },
+			ReplaceAlchemy(text, 1250932, "esES")
+		)
+	end)
+
+	it("shows a potion's seconds (Major Frenzy Potion)", function()
+		assert.are.same({ L("alchemyAttackPower", "+80 attack power (30 sec)") }, ReplaceAlchemy(FRENZY_EN, 1251940))
+	end)
+
+	it("shows a stat against a creature type (Potion of Beast Slaying, Potion of Elemental Purging)", function()
+		local beasts = "Use: Increases Attack Power by 180 against Beasts. Lasts 5 min."
+		assert.are.same(
+			{ L("alchemyAttackPowerVs", "+180 attack power vs beasts (5 min)") },
+			ReplaceAlchemy(beasts, 1252559)
+		)
+		local elementals = "Usar: Aumenta 105 p. el daño con hechizos contra elementales. Dura 5 min."
+		assert.are.same(
+			{ L("alchemySpellDamageVs", "+105 spell damage vs elementals (5 min)") },
+			ReplaceAlchemy(elementals, 1252558, "esES")
+		)
+	end)
+
+	it("shows resistance to every school as spell resistance (Minor Magic Resistance Potion)", function()
+		local text = "Use: Increases your resistance to all schools of magic by 25 for 3 min."
+		assert.are.same({ L("alchemySpellResistance", "+25 spell resistance (3 min)") }, ReplaceAlchemy(text, 2380))
+	end)
+
+	it("drops the 3 seconds elixirs and flasks share", function()
+		assert.are.same(
+			{ L("alchemyHealth", "+1200 health (2 hrs)") },
+			ReplaceAlchemy(TITANS_EN .. " (3 |4Sec:Sec; Cooldown)", 17626)
+		)
+		assert.are.same(
+			{ L("alchemyHealth", "+1200 health (2 hrs)") },
+			ReplaceAlchemy(TITANS_ES .. " (3 |4s:s; de tiempo de reutilización).", 17626, "esES")
+		)
+	end)
+
+	it("drops the 2 minutes potions share, with or without its plural escape", function()
+		local expected = { L("alchemyAttackPower", "+80 attack power (30 sec)") }
+		assert.are.same(expected, ReplaceAlchemy(FRENZY_EN .. " (2 |4Min:Min; Cooldown)", 1251940))
+		assert.are.same(expected, ReplaceAlchemy(FRENZY_EN .. " (2 Min Cooldown)", 1251940))
+		local french = "Utiliser : Augmente de 80 la puissance d’attaque pendant 30 sec. (2 min de recharge.)"
+		assert.are.same(expected, ReplaceAlchemy(french, 1251940, "frFR"))
+	end)
+end)
+
+describe("potion, elixir and flask lines that keep their text", function()
+	it("when a number the line shows is missing or another one is there", function()
+		assert.is_nil(ReplaceAlchemy("Use: Increases Attack Power by 81 for 30 sec.", 1251940))
+		assert.is_nil(ReplaceAlchemy("Use: Increases Attack Power by 80 for 30 sec and 10 more.", 1251940))
+	end)
+
+	it("when a shared cooldown comes in the other unit, or another cooldown", function()
+		assert.is_nil(ReplaceAlchemy(FRENZY_EN .. " (3 |4Min:Min; Cooldown)", 1251940))
+		assert.is_nil(ReplaceAlchemy(FRENZY_EN .. " (2 |4Sec:Sec; Cooldown)", 1251940))
+		assert.is_nil(ReplaceAlchemy(FRENZY_EN .. " (5 |4Min:Min; Cooldown)", 1251940))
+	end)
+
+	it("when the client's text for minutes is unknown, so no cooldown in minutes is known to be shared", function()
+		local context = setmetatable({ minutesFormat = false }, { __index = CONTEXTS.enUS })
+		local text = FRENZY_EN .. " (2 |4Min:Min; Cooldown)"
+		assert.is_nil(ns.GetAlchemyReplacement(text, ns.ALCHEMY[1251940], context))
+	end)
+
+	it("when a line has a stat no rule knows", function()
+		local entry =
+			{ numbers = { 5, 30 }, lines = { { stat = "ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT", value = 5, minutes = 30 } } }
+		assert.is_nil(ReplaceAlchemy("Use: Increases spell arcane damage by up to 5 for 30 min.", nil, nil, entry))
+		local vs =
+			{ numbers = { 5, 30 }, lines = { { stat = "ITEM_MOD_HEALING_VS_UNDEAD_SHORT", value = 5, minutes = 30 } } }
+		assert.is_nil(ReplaceAlchemy("Use: Increases healing by 5 against Undead for 30 min.", nil, nil, vs))
+	end)
+end)
+
+describe("potion, elixir and flask data", function()
+	it("describes every potion, elixir and flask spell it had, so losing one shows up", function()
+		local spells = {}
+		for spellID in pairs(ns.ALCHEMY) do
+			table.insert(spells, spellID)
+		end
+		table.sort(spells)
+		local expected = {
+			673,
+			2367,
+			2374,
+			2378,
+			2380,
+			3160,
+			3164,
+			3166,
+			3219,
+			3220,
+			3222,
+			3223,
+			3593,
+			7844,
+			11328,
+			11334,
+			11348,
+			11349,
+			11364,
+			11390,
+			11396,
+			11405,
+			11406,
+			11474,
+			17535,
+			17537,
+			17538,
+			17539,
+			17540,
+			17626,
+			17627,
+			17628,
+			17629,
+			21920,
+			24361,
+			24363,
+			439959,
+			1245244,
+			1250918,
+			1250920,
+			1250922,
+			1250924,
+			1250925,
+			1250926,
+			1250928,
+			1250931,
+			1250932,
+			1250940,
+			1250941,
+			1250942,
+			1250944,
+			1250948,
+			1250971,
+			1250972,
+			1250974,
+			1250976,
+			1250978,
+			1250979,
+			1250981,
+			1250984,
+			1250985,
+			1250986,
+			1250988,
+			1250989,
+			1251919,
+			1251922,
+			1251923,
+			1251924,
+			1251931,
+			1251932,
+			1251933,
+			1251935,
+			1251936,
+			1251937,
+			1251938,
+			1251940,
+			1251942,
+			1251944,
+			1251945,
+			1251946,
+			1251947,
+			1251948,
+			1252558,
+			1252559,
+			1310077,
+		}
+		assert.are.same(expected, spells)
+	end)
+
+	it("leaves out what the rules don't understand: instant restores, zone bonuses, effects with no stat", function()
+		-- Major Healing Potion, Flask of Natural Accuracy, Flask of Petrification, Free Action Potion
+		for _, spellID in ipairs({ 17534, 1293740, 17624, 6615 }) do
+			assert.is_nil(ns.ALCHEMY[spellID])
+		end
+	end)
+
+	it("renders every potion, elixir and flask whose line shows its numbers, in kinds of the alchemy tab", function()
+		local kinds = {}
+		for _, kind in ipairs(ns.COLOR_KINDS) do
+			if kind.group:find("^alchemy") then
+				kinds[kind.key] = true
+			end
+		end
+		for spellID, entry in pairs(ns.ALCHEMY) do
+			local lines = ns.GetAlchemyReplacement("Use: " .. table.concat(entry.numbers, " "), entry, CONTEXTS.enUS)
+			assert.are.same({ spellID, true }, { spellID, lines ~= nil })
+			for _, line in ipairs(lines) do
+				assert.are.same({ spellID, line.kind, true }, { spellID, line.kind, kinds[line.kind] })
+			end
+		end
+	end)
+end)
+
+describe("potion, elixir and flask lines in the client's language", function()
+	local function Names(strings)
+		return ns.TrustedNames(function(key)
+			return strings[key]
+		end, fakes.FoldCase)
+	end
+
+	local function Texts(lines)
+		local texts = {}
+		for _, line in ipairs(lines) do
+			table.insert(texts, line.text)
+		end
+		return texts
+	end
+
+	it("use Blizzard's names and words for the duration, in the plural when it is", function()
+		local lines = ns.GetAlchemyReplacement(TITANS_EN, ns.ALCHEMY[17626], CONTEXTS.enUS)
+		assert.are.same({ "+1200 Salud (2 h)" }, Texts(ns.LocalizeLines(lines, Names(fakes.LocaleStrings("esES")))))
+		assert.are.same(
+			{ "+1200 Gesundheit (2 Stunden)" },
+			Texts(ns.LocalizeLines(lines, Names(fakes.LocaleStrings("deDE"))))
+		)
+	end)
+
+	it("keep MP5 and HP5 and translate only how long they last", function()
+		local text = "Use: Drink to restore 9 health and 10 mana every 5 sec. Lasts for 30 min."
+		local lines = ns.GetAlchemyReplacement(text, ns.ALCHEMY[1250932], CONTEXTS.enUS)
+		assert.are.same(
+			{ "+9 HP5 (30 Min.)", "+10 MP5 (30 Min.)" },
+			Texts(ns.LocalizeLines(lines, Names(fakes.LocaleStrings("deDE"))))
+		)
+	end)
+
+	it("name a stat against a creature type with the client's name", function()
+		local text = "Use: Increases Attack Power by 180 against Beasts. Lasts 5 min."
+		local lines = ns.GetAlchemyReplacement(text, ns.ALCHEMY[1252559], CONTEXTS.enUS)
+		assert.are.same(
+			{ "+180 Poder de ataque contra bestias (5 min)" },
+			Texts(ns.LocalizeLines(lines, Names(fakes.LocaleStrings("esES"))))
 		)
 	end)
 end)

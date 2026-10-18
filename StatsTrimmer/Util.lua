@@ -70,6 +70,7 @@ ns.ENGLISH_NAMES = {
 	ITEM_MOD_HIT_SPELL_RATING_SHORT = "hit (spell)",
 	ITEM_MOD_CRIT_SPELL_RATING_SHORT = "critical strike (spell)",
 	ITEM_MOD_SPELL_PENETRATION_SHORT = "spell piercing",
+	ITEM_MOD_SPELL_RESISTANCE_ALL_SCHOOLS_SHORT = "spell resistance",
 	ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT = "arcane damage",
 	ITEM_MOD_FIRE_DAMAGE_DONE_SHORT = "fire damage",
 	ITEM_MOD_FROST_DAMAGE_DONE_SHORT = "frost damage",
@@ -95,11 +96,12 @@ function ns.FormatLine(value, percent, name)
 	return ("+%s%s %s"):format(value, percent and "%" or "", name)
 end
 
--- The words of a food line's details in the addon's own English, by the name of Blizzard's (see FormatDetails).
--- They are the last resort, when a language lacks Blizzard's.
+-- The words of a consumable line's details in the addon's own English, by the name of Blizzard's (see
+-- FormatDetails): Blizzard's enUS ones. They are the last resort, when a language lacks Blizzard's.
 local ENGLISH_DETAILS = {
 	INT_SPELL_DURATION_SEC = "%d sec",
 	INT_SPELL_DURATION_MIN = "%d min",
+	INT_SPELL_DURATION_HOURS = "%d |4hour:hrs;",
 	WELL_FED = "well fed",
 }
 
@@ -107,47 +109,68 @@ local function EnglishDetail(name)
 	return ENGLISH_DETAILS[name]
 end
 
--- A duration in Blizzard's format for it ("%d sec")
-local function FormatDuration(format, amount)
-	return (format:gsub("%%d", tostring(amount), 1))
+-- The text with Blizzard's plural escapes in their form for `amount`: "|4hour:hrs;" is "hour" for 1 and "hrs"
+-- otherwise
+function ns.ResolvePlural(text, amount)
+	local resolved = text:gsub("|4([^:;]*):([^:;]*)[^;]*;", function(singular, plural)
+		return amount == 1 and singular or plural
+	end)
+	return resolved
 end
 
--- What follows a food line's stat name: "/s" for a rate (`perSecond`), then how long a restore takes
--- (`seconds`), " (24 sec)", or how long a Well Fed buff lasts (`wellFedMinutes`), " (well fed, 15 min)".
--- GetText(name) gives the words: Blizzard's INT_SPELL_DURATION_SEC, INT_SPELL_DURATION_MIN and WELL_FED, the
--- buff's name. "" without details, nil when GetText lacks a word they need. "/s" reads the same in every
--- language, like MP5.
+-- A duration in Blizzard's format for it ("%d sec", "%d |4hour:hrs;")
+local function FormatDuration(format, amount)
+	return ns.ResolvePlural((format:gsub("%%d", tostring(amount), 1)), amount)
+end
+
+-- How long a restore or a potion, elixir or flask lasts, by its unit: the detail and Blizzard's format for it
+local DURATIONS = {
+	{ "seconds", "INT_SPELL_DURATION_SEC" },
+	{ "minutes", "INT_SPELL_DURATION_MIN" },
+	{ "hours", "INT_SPELL_DURATION_HOURS" },
+}
+
+-- What follows a consumable line's stat name: "/s" for a rate (`perSecond`), then how long a Well Fed buff lasts
+-- (`wellFedMinutes`), " (well fed, 15 min)", or how long a restore takes or a potion, elixir or flask lasts
+-- (`seconds`, `minutes` or `hours`), " (24 sec)", " (2 hrs)". GetText(name) gives the words: Blizzard's
+-- INT_SPELL_DURATION_SEC, INT_SPELL_DURATION_MIN, INT_SPELL_DURATION_HOURS and WELL_FED, the buff's name. "" without
+-- details, nil when GetText lacks a word they need. "/s" reads the same in every language, like MP5.
 function ns.FormatDetails(details, GetText)
 	if not details then
 		return ""
 	end
 	local text = details.perSecond and "/s" or ""
-	if details.seconds then
-		local seconds = GetText("INT_SPELL_DURATION_SEC")
-		if not seconds then
-			return nil
-		end
-		text = text .. (" (%s)"):format(FormatDuration(seconds, details.seconds))
-	elseif details.wellFedMinutes then
+	if details.wellFedMinutes then
 		local name, minutes = GetText("WELL_FED"), GetText("INT_SPELL_DURATION_MIN")
 		if not (name and minutes) then
 			return nil
 		end
-		text = text .. (" (%s, %s)"):format(name, FormatDuration(minutes, details.wellFedMinutes))
+		return text .. (" (%s, %s)"):format(name, FormatDuration(minutes, details.wellFedMinutes))
+	end
+	for _, duration in ipairs(DURATIONS) do
+		local unit, formatName = unpack(duration)
+		if details[unit] then
+			local format = GetText(formatName)
+			if not format then
+				return nil
+			end
+			return text .. (" (%s)"):format(FormatDuration(format, details[unit]))
+		end
 	end
 	return text
 end
 
 -- A compact line. `text` is the English line; `value`, `percent`, `details` and the stat keys in `stats` let
--- ns.LocalizeLines rebuild it with Blizzard's names, and without `stats` it is never translated. `details`
--- are a food line's (see FormatDetails). `kind` picks its color (ns.COLOR_KINDS); unknown kinds keep the
--- original line color.
+-- ns.LocalizeLines rebuild it with Blizzard's names. Without `stats`, `name` reads the same in every language
+-- (MP5, HP5) and only `details` are translated. `details` are a consumable line's (see FormatDetails). `kind`
+-- picks its color (ns.COLOR_KINDS); unknown kinds keep the original line color.
 function ns.CompactLine(kind, value, name, stats, percent, details)
 	return {
 		kind = kind,
 		text = ns.FormatLine(value, percent, name) .. ns.FormatDetails(details, EnglishDetail),
 		value = value,
 		percent = percent,
+		name = name,
 		stats = stats,
 		details = details,
 	}
