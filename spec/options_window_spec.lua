@@ -115,6 +115,18 @@ describe("Settings window", function()
 		fakes.Fire(wow.env.StatsTrimmerOptionsFrame.Tabs[3], "OnClick", "LeftButton")
 	end
 
+	-- Clicks the fourth tab, misc, whatever the language
+	local function ShowMiscTab()
+		fakes.Fire(wow.env.StatsTrimmerOptionsFrame.Tabs[4], "OnClick", "LeftButton")
+	end
+
+	-- The colors panel, the preview panel and the button that resets the shown tab's colors
+	local function ColorParts()
+		local panels = fakes.FindFrames(wow, { template = "InsetFrameTemplate" })
+		local reset = fakes.FindFrames(wow, { template = "UIPanelButtonTemplate", text = "Reset these colors" })[1]
+		return { panels[1], panels[2], reset }
+	end
+
 	-- Whether a kind's row is shown: rows sit in their section's body
 	local function RowShown(key)
 		return Swatch(key):GetParent():IsShown()
@@ -265,10 +277,13 @@ describe("Settings window", function()
 			ns.ShowOptions()
 		end)
 
-		it("are combat, food and drink and alchemy, under the window, with Blizzard's names", function()
+		it("are combat, food and drink, alchemy and misc, under the window, with Blizzard's names", function()
 			local tabs = wow.env.StatsTrimmerOptionsFrame.Tabs
-			assert.are.same({ "Combate", "Comida y bebida", "Alquimia" }, { tabs[1].text, tabs[2].text, tabs[3].text })
-			assert.are.equal(3, wow.env.StatsTrimmerOptionsFrame.numTabs)
+			assert.are.same(
+				{ "Combate", "Comida y bebida", "Alquimia", "Miscelánea" },
+				{ tabs[1].text, tabs[2].text, tabs[3].text, tabs[4].text }
+			)
+			assert.are.equal(4, wow.env.StatsTrimmerOptionsFrame.numTabs)
 			local point, relativeTo, relativePoint, x, y = unpack(tabs[1].points[1])
 			assert.is_true(relativeTo == wow.env.StatsTrimmerOptionsFrame)
 			assert.are.same({ "TOPLEFT", "BOTTOMLEFT", 11, 2 }, { point, relativePoint, x, y })
@@ -308,12 +323,29 @@ describe("Settings window", function()
 			assert.is_false(SplitCheckbox():IsShown())
 		end)
 
+		it("show misc's checkbox, with no colors or preview, until another tab shows", function()
+			ShowMiscTab()
+			assert.is_true(Tab("Miscelánea").selected)
+			assert.is_true(CompactCheckbox():IsShown())
+			assert.is_false(SplitCheckbox():IsShown())
+			for _, part in ipairs(ColorParts()) do
+				assert.is_false(part:IsShown())
+			end
+			ShowFoodTab()
+			for _, part in ipairs(ColorParts()) do
+				assert.is_true(part:IsShown())
+			end
+			assert.is_true(wow.env.StatsTrimmerFoodPreviewTooltip:IsShown())
+		end)
+
 		it("keep the window's size", function()
 			local window = wow.env.StatsTrimmerOptionsFrame
 			local width, height = window:GetWidth(), window:GetHeight()
 			ShowFoodTab()
 			assert.are.same({ width, height }, { window:GetWidth(), window:GetHeight() })
 			ShowAlchemyTab()
+			assert.are.same({ width, height }, { window:GetWidth(), window:GetHeight() })
+			ShowMiscTab()
 			assert.are.same({ width, height }, { window:GetWidth(), window:GetHeight() })
 		end)
 
@@ -328,7 +360,10 @@ describe("Settings window", function()
 		it("follow the language", function()
 			LanguageMenu().setSelected("enUS")
 			local tabs = wow.env.StatsTrimmerOptionsFrame.Tabs
-			assert.are.same({ "Combat", "Food & Drink", "Alchemy" }, { tabs[1].text, tabs[2].text, tabs[3].text })
+			assert.are.same(
+				{ "Combat", "Food & Drink", "Alchemy", "Miscellaneous" },
+				{ tabs[1].text, tabs[2].text, tabs[3].text, tabs[4].text }
+			)
 			assert.are.equal(#"Food & Drink" * 6 + 20, tabs[2]:GetWidth())
 		end)
 	end)
@@ -998,16 +1033,18 @@ describe("Settings window", function()
 		it("names each tab's lines, checked by default, in every tab", function()
 			ns.ShowOptions()
 			local labels = {}
-			for _, Show in ipairs({ function() end, ShowFoodTab, ShowAlchemyTab }) do
+			for _, Show in ipairs({ function() end, ShowFoodTab, ShowAlchemyTab, ShowMiscTab }) do
 				Show()
 				assert.is_true(CompactCheckbox():IsShown())
 				assert.is_true(CompactCheckbox():GetChecked())
 				table.insert(labels, CompactCheckbox().Text.text)
 			end
-			assert.are.same(
-				{ "Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines" },
-				labels
-			)
+			assert.are.same({
+				"Compact equip lines",
+				"Compact food and drink lines",
+				"Compact flask, elixir and potion lines",
+				"Abbreviate names that don't fit in unit frames",
+			}, labels)
 		end)
 
 		it("keeps the tab's lines in their original text when cleared, rebuilding a shown tooltip", function()
@@ -1023,6 +1060,32 @@ describe("Settings window", function()
 			fakes.ClickCheckButton(CompactCheckbox())
 			assert.are.same({}, ns.db.disabledTabs)
 			assert.are.same({ "+530 salud (24 s)" }, TooltipTexts(wow.env.GameTooltip))
+		end)
+
+		it("shows an example under it in the misc tab only", function()
+			local example = 'Example: "Defias Cutp..." becomes "Defias Cu."'
+			ns.ShowOptions()
+			ShowMiscTab()
+			local shown = fakes.FindFrames(wow, { text = example })
+			assert.are.equal(1, #shown)
+			assert.is_true(shown[1]:IsShown())
+			ShowAlchemyTab()
+			assert.is_false(shown[1]:IsShown())
+		end)
+
+		it("shows unit frames' full names when cleared in the misc tab", function()
+			local target = { unit = "target", name = wow.env.UIParent:CreateFontString() }
+			target.name:SetWidth(60)
+			wow.unitNames.target = "Ladrón Defias"
+			wow.env.UnitFrame_Update(target)
+			ns.ShowOptions()
+			ShowMiscTab()
+			fakes.ClickCheckButton(CompactCheckbox())
+			assert.are.same({ misc = true }, ns.db.disabledTabs)
+			assert.are.equal("Ladrón Defias", target.name:GetText())
+
+			fakes.ClickCheckButton(CompactCheckbox())
+			assert.are.equal("Ladrón De.", target.name:GetText())
 		end)
 
 		it("shows each tab's own state", function()

@@ -27,6 +27,7 @@ Rules.lua
 ConsumableRules.lua
 Localization.lua
 Tooltip.lua
+UnitFrames.lua
 ClassPalette.lua
 OptionsWindow.lua
 MinimapButton.lua

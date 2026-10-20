@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Unit frames' names that don't fit are shortened instead of cut off: `Ladrón Defias` shows as `Ladrón De.` rather than `Ladrón Def…`. Only names of two words are shortened, on the player, target, focus, party and raid frames; the tooltip keeps the full name.
+- The settings window has a fourth tab, Miscellaneous, with the checkbox that turns this on and off ("Abbreviate names that don't fit in unit frames", on by default) and an example under it.
+- After updating, restart the game instead of using `/reload`: the new file is only loaded on a restart.
+
 ## v0.6.0 (2026-10-18)
 
 - Flasks, elixirs and potions get compact lines too. `Use: Increases the player's maximum health by 1,200 for 2 hrs. You can only have the effect of one flask at a time. This effect persists through death.` becomes `+1200 health (2 hrs)`, and Elixir of the Mongoose shows `+25 agility (30 min)` and `+2% critical strike (30 min)`.

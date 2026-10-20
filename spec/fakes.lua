@@ -245,6 +245,12 @@ function Frame:GetUnboundedStringWidth()
 	return Length(self.text) * self.wow.textMetrics.charWidth
 end
 
+-- FontString: true when its text is wider than its own width, and shows cut off with "…". A FontString without a
+-- width is as wide as its text.
+function Frame:IsTruncated()
+	return self.width ~= nil and self:GetUnboundedStringWidth() > self.width
+end
+
 function Frame:SetColorRGB(r, g, b)
 	self.color = { r = r, g = g, b = b }
 end
@@ -561,6 +567,7 @@ function fakes.NewWoW(options)
 		guids = {}, -- guid -> link
 		keysDown = {}, -- "CTRL" / "ALT" / "SHIFT" -> true
 		secretTexts = {}, -- text -> true: issecretvalue reports it as a secret
+		unitNames = {}, -- unit -> name, which the unit frames show
 		cursor = { 0, 0 },
 		preCalls = {}, -- { lineType, handler }
 		postCalls = {}, -- { tooltipType, handler }: other addons' tooltip post-calls
@@ -718,14 +725,29 @@ function fakes.NewWoW(options)
 		table.insert(wow.executedScripts, { frame = frame, scriptName = scriptName })
 		fakes.Fire(frame, scriptName, ...)
 	end
-	-- Like the client: the hook runs after the method, which returns what it returned
+	-- Like the client: the hook runs after the method, which returns what it returned. Without an object, the
+	-- method is a global function.
 	env.hooksecurefunc = function(object, method, hook)
+		if type(object) == "string" then
+			object, method, hook = env, object, method
+		end
 		local original = object[method]
 		object[method] = function(...)
 			local results = { original(...) }
 			hook(...)
 			return unpack(results)
 		end
+	end
+
+	-- Blizzard's unit frames set their names with these: the player, target, party... frames with the first, raid
+	-- frames and nameplates with the second. Their frames are { unit, name }, `name` a FontString.
+	env.UnitFrame_Update = function(frame)
+		if frame.name then
+			frame.name:SetText(wow.unitNames[frame.unit])
+		end
+	end
+	env.CompactUnitFrame_UpdateName = function(frame)
+		frame.name:SetText(wow.unitNames[frame.unit])
 	end
 
 	-- Forever's classes, in the game's order (CLASS_SORT_ORDER), with their names on this client

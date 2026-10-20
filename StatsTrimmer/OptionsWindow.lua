@@ -1,7 +1,8 @@
 -- Settings window, built from Blizzard templates: original-text key and language, then a tab for items' lines
--- (combat), one for food's and one for potions', elixirs' and flasks' (alchemy, SETTINGS_TABS). Each tab has a
--- checkbox that turns its lines on and off, a color per line kind, in collapsible sections, and a live preview that
--- is a real GameTooltip: a sample item, food or potion. The combat tab also has the spell power split. The color
+-- (combat), one for food's, one for potions', elixirs' and flasks' (alchemy) and one for unit frames' names (misc,
+-- SETTINGS_TABS). Each tab has a checkbox that turns its changes on and off. The tooltip tabs also have a color per
+-- line kind, in collapsible sections, and a live preview that is a real GameTooltip: a sample item, food or potion.
+-- The combat tab also has the spell power split. The color
 -- picker it opens gets a palette of Blizzard's class colors (ClassPalette.lua). Blizzard's own texts (key names,
 -- RESET, COLORS, tab, stat and class names...) follow the language setting and switch on the spot; the addon's own
 -- phrases are in English.
@@ -43,7 +44,8 @@ local SCROLL_BAR_SPACE = 26
 -- Room around a button's text when it is sized to fit a translated label
 local BUTTON_TEXT_PADDING = 24
 local frame, previewTooltip, foodTooltip, alchemyTooltip, keyDropdown, tabTitle, compactCheckbox, splitCheckbox
-local colorsPanel, colorRows
+local exampleText
+local colorsPanel, colorRows, previewPanel, resetShown
 local swatches = {} -- kind key -> ColorSwatchTemplate button
 local rowParts = {} -- { kind, label, reset } of every color row, to size the colors panel
 local topRows = {} -- the labels and dropdown of the rows above the panels, to size the window
@@ -54,9 +56,11 @@ local previewTooltips = {} -- SETTINGS_TABS key -> its preview tooltip
 -- The tab shown: the first one when the window opens for the first time, then the one left open
 local selectedTab = 1
 
--- The section and tab of each kind, to leave collapsed sections out of the preview and fill each tab's preview
-local kindGroups, kindTabs = {}, {}
+-- The section and tab of each kind, to leave collapsed sections out of the preview and fill each tab's preview, and
+-- the tabs with colors
+local kindGroups, kindTabs, colorTabs = {}, {}, {}
 for _, group in ipairs(ns.COLOR_GROUPS) do
+	colorTabs[group.tab] = true
 	for _, kind in ipairs(ns.COLOR_KINDS) do
 		if kind.group == group.key then
 			kindGroups[kind.key] = kind.group
@@ -214,13 +218,16 @@ local function FitWindow(tooltipsWidth, tooltipsHeight)
 	colorRows:SetWidth(rowsWidth)
 	colorsPanel:SetWidth(colorsWidth)
 
-	-- The tab's checkbox with the longest of its labels, so switching tabs doesn't resize the window
+	-- The tab's checkbox with the longest of its labels and examples, so switching tabs doesn't resize the window
 	local compactWidth = 0
 	for _, tab in ipairs(ns.SETTINGS_TABS) do
 		compactCheckbox.Text:SetText(tab.compactLabel)
 		compactWidth = math.max(compactWidth, compactCheckbox.Text:GetUnboundedStringWidth())
+		exampleText:SetText(tab.example or "")
+		compactWidth = math.max(compactWidth, exampleText:GetUnboundedStringWidth())
 	end
 	compactCheckbox.Text:SetText(ns.SETTINGS_TABS[selectedTab].compactLabel)
+	exampleText:SetText(ns.SETTINGS_TABS[selectedTab].example or "")
 	local widestTopRow = math.max(
 		topRows.keyLabel:GetUnboundedStringWidth() + DROPDOWN_GAP + keyDropdown:GetWidth(),
 		topRows.languageLabel:GetUnboundedStringWidth() + DROPDOWN_GAP + topRows.languageDropdown:GetWidth(),
@@ -481,12 +488,14 @@ local function CreateCheckbox()
 	return checkbox
 end
 
--- Shows the selected tab's settings: its name, its checkbox's label and state, and the spell power split in the
--- combat tab
+-- Shows the selected tab's settings: its name, its checkbox's label, example and state, and the spell power split in
+-- the combat tab
 local function ShowTabSettings()
 	local tab = ns.SETTINGS_TABS[selectedTab]
 	tabTitle:SetText(Text(tab.labelGlobal, tab.label))
 	compactCheckbox.Text:SetText(tab.compactLabel)
+	exampleText:SetText(tab.example or "")
+	exampleText:SetShown(tab.example ~= nil)
 	compactCheckbox:SetChecked(ns.IsCompacting(ns.db, tab.key))
 	splitCheckbox:SetChecked(ns.db.splitSpellPower)
 	splitCheckbox:SetShown(tab.spellPowerSplit == true)
@@ -515,7 +524,12 @@ local function CreateTabSettings()
 	compactCheckbox:SetScript("OnClick", function(checkbox)
 		ns.db.disabledTabs[ns.SETTINGS_TABS[selectedTab].key] = not checkbox:GetChecked() or nil
 		ns.RefreshItemTooltips()
+		ns.RefreshUnitNames()
 	end)
+
+	-- Under the checkbox's label, in the tabs that have an example
+	exampleText = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	exampleText:SetPoint("TOPLEFT", compactCheckbox.Text, "BOTTOMLEFT", 0, -2)
 
 	splitCheckbox = CreateCheckbox()
 	splitCheckbox:SetPoint("TOPLEFT", compactCheckbox, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
@@ -544,7 +558,7 @@ local function CreateColorsPanel()
 	scrollFrame:SetScrollChild(colorRows)
 
 	-- Only the shown tab's colors
-	local resetShown = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	resetShown = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
 	resetShown:SetHeight(22)
 	resetShown:SetPoint("BOTTOMLEFT", 12, 14)
 	Translate(resetShown, function()
@@ -564,6 +578,7 @@ local function CreatePreviewPanel()
 	panel:SetPoint("TOPLEFT", colorsPanel, "TOPRIGHT", PANEL_GAP, 0)
 	panel:SetPoint("BOTTOMRIGHT", -SIDE_MARGIN, BOTTOM_HEIGHT)
 	CreateHeader(panel, "PREVIEW", "Preview")
+	previewPanel = panel
 
 	-- Kept in the window's strata so the color picker (DIALOG) stays on top of them
 	previewTooltip = CreateFrame("GameTooltip", "StatsTrimmerPreviewTooltip", panel, "GameTooltipTemplate")
@@ -576,10 +591,15 @@ local function CreatePreviewPanel()
 	end
 end
 
--- Shows the selected tab: its tab button, its settings, its sections and its preview
+-- Shows the selected tab: its tab button, its settings, its sections and its preview. A tab without colors shows
+-- neither panel, and the window keeps its size.
 local function ShowSelectedTab()
 	PanelTemplates_SetTab(frame, selectedTab)
 	ShowTabSettings()
+	local hasColors = colorTabs[SelectedTabKey()] == true
+	colorsPanel:SetShown(hasColors)
+	previewPanel:SetShown(hasColors)
+	resetShown:SetShown(hasColors)
 	LayoutSections()
 	RefreshPreview()
 end

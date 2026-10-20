@@ -180,3 +180,22 @@ end
 function ns.StatLine(kind, value, key, percent, details)
 	return ns.CompactLine(kind, value, ns.ENGLISH_NAMES[key], { key }, percent, details)
 end
+
+-- One UTF-8 character: a lead byte and its continuation bytes
+local UTF8_CHAR = "[\1-\127\194-\244][\128-\191]*"
+
+-- A unit frame's name that doesn't fit, shortened: "Primer-nombre Segundo-nombre" is "Primer-nombre Se.", the
+-- second word cut to its first two letters. nil for any other name: one word or more than two, a second word that
+-- doesn't start with a letter ("Name (*)", from another realm), or one too short to get any shorter.
+function ns.AbbreviateName(name)
+	local first, second = name:match("^(%S+) (%S+)$")
+	if not second or second:find("^[%p%d]") then
+		return nil
+	end
+	local start = second:match("^" .. UTF8_CHAR .. UTF8_CHAR)
+	local abbreviated = start and first .. " " .. start .. "."
+	if not abbreviated or #abbreviated >= #name then
+		return nil
+	end
+	return abbreviated
+end

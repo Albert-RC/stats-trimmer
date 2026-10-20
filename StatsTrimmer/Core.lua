@@ -10,6 +10,8 @@ loader:SetScript("OnEvent", function(self, event, name)
 	StatsTrimmerDB = ns.LoadSettings(StatsTrimmerDB)
 	ns.db = StatsTrimmerDB
 
+	-- Names the unit frames showed before the settings were loaded
+	ns.RefreshUnitNames()
 	ns.UpdateMinimapButtonPosition()
 	ns.RegisterSettingsCategory()
 	self:UnregisterEvent(event)

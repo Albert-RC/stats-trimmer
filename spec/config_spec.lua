@@ -422,16 +422,18 @@ describe("settings tabs", function()
 	local ns = LoadConfig()
 
 	it(
-		"are combat, food and drink and alchemy, named with Blizzard's texts, the spell power split in combat",
+		"are combat, food and drink, alchemy and misc, named with Blizzard's texts, the spell power split in combat",
 		function()
 			local tabs = {}
 			for _, tab in ipairs(ns.SETTINGS_TABS) do
 				table.insert(tabs, { tab.key, tab.labelGlobal, tab.spellPowerSplit })
 			end
-			assert.are.same(
-				{ { "combat", "COMBAT", true }, { "food", "MINIMAP_TRACKING_VENDOR_FOOD" }, { "alchemy", "ALCHEMY" } },
-				tabs
-			)
+			assert.are.same({
+				{ "combat", "COMBAT", true },
+				{ "food", "MINIMAP_TRACKING_VENDOR_FOOD" },
+				{ "alchemy", "ALCHEMY" },
+				{ "misc", "MISCELLANEOUS" },
+			}, tabs)
 		end
 	)
 
@@ -456,19 +458,22 @@ describe("settings tabs", function()
 		for _, tab in ipairs(ns.SETTINGS_TABS) do
 			table.insert(labels, tab.compactLabel)
 		end
-		assert.are.same(
-			{ "Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines" },
-			labels
-		)
+		assert.are.same({
+			"Compact equip lines",
+			"Compact food and drink lines",
+			"Compact flask, elixir and potion lines",
+			"Abbreviate names that don't fit in unit frames",
+		}, labels)
 	end)
 
-	it("each hold some section", function()
+	it("hold every section, and only misc has none", function()
+		local counts = {}
 		for _, tab in ipairs(ns.SETTINGS_TABS) do
-			local count = 0
-			for _, group in ipairs(ns.COLOR_GROUPS) do
-				count = count + (group.tab == tab.key and 1 or 0)
-			end
-			assert.is_true(count > 0)
+			counts[tab.key] = 0
 		end
+		for _, group in ipairs(ns.COLOR_GROUPS) do
+			counts[group.tab] = counts[group.tab] + 1
+		end
+		assert.are.same({ combat = 4, food = 1, alchemy = 5, misc = 0 }, counts)
 	end)
 end)
