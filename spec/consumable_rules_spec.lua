@@ -254,7 +254,7 @@ end)
 
 describe("food data", function()
 	it("describes every food spell it had, so losing one shows up", function()
-		-- The food spells of build 1.60.1.70425: scripts/update-foods.ps1 lists the ones it adds or removes
+		-- The food spells of build 1.60.1.70938: scripts/update-consumables.ps1 lists the ones it adds or removes
 		local expected = {
 			430,
 			431,
@@ -338,6 +338,7 @@ describe("food data", function()
 			1302066,
 			1312719,
 			1319311,
+			1330734,
 		}
 		local spells = {}
 		for spellID in pairs(ns.FOODS) do

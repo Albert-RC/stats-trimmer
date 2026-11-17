@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Food, drink, flask, elixir and potion data come from the game's new build, 1.60.1.70938: Morning Glory Dew gets compact lines, and the Elixir of Wisdom, now +3 intellect for 30 minutes, gets them again. The new Elixirs of Endless... keep their original text.
+- WoW: Forever now installs in `World of Warcraft\_forever_`: install the addon in `_forever_\Interface\AddOns`, not `_classic_beta_`.
+
 ## v0.6.0 (2026-10-18)
 
 - Flasks, elixirs and potions get compact lines too. `Use: Increases the player's maximum health by 1,200 for 2 hrs. You can only have the effect of one flask at a time. This effect persists through death.` becomes `+1200 health (2 hrs)`, and Elixir of the Mongoose shows `+25 agility (30 min)` and `+2% critical strike (30 min)`.

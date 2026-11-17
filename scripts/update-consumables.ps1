@@ -1,7 +1,7 @@
 # Generates StatsTrimmer/FoodData.lua and StatsTrimmer/AlchemyData.lua: what the Use line of each food and drink,
 # and of each potion, elixir and flask, shows, taken from Forever's item and spell tables on wago.tools. Run it
 # again when the client build changes.
-# Usage: ./scripts/update-consumables.ps1 [-Build 1.60.1.70425] [-From <folder>] [-FoodOutput <file>]
+# Usage: ./scripts/update-consumables.ps1 [-Build 1.60.1.70938] [-From <folder>] [-FoodOutput <file>]
 #        [-AlchemyOutput <file>] [-AcceptRemovals]
 #
 # A consumable's Use line is its spell's description, whose numbers the client fills in from the spell data:
@@ -20,7 +20,7 @@
 #    by default) and writes both. Nothing is written when a result is empty, or lacks spells its file had, unless
 #    -AcceptRemovals says that is expected.
 param(
-	[string]$Build = "1.60.1.70425",
+	[string]$Build = "1.60.1.70938",
 	[string]$From,
 	[string]$FoodOutput = (Join-Path (Split-Path -Parent $PSScriptRoot) "StatsTrimmer/FoodData.lua"),
 	[string]$AlchemyOutput = (Join-Path (Split-Path -Parent $PSScriptRoot) "StatsTrimmer/AlchemyData.lua"),
