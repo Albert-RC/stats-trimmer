@@ -92,19 +92,28 @@ function ns.ToLower(text)
 	return IntlToLower and IntlToLower(text) or text:lower()
 end
 
+-- Languages whose nouns are capitalized: their Blizzard texts keep Blizzard's capitals ("+10 Ausdauer (15 Min.)")
+local KEEPS_CAPITALS = { deDE = true }
+
+-- A Blizzard text in a language ("CLIENT" or a bundled one) as the compact lines and the color rows show it:
+-- lowercased (Blizzard's own capitalization is uneven: "Daño Arcano", "golpe"), but as it is in German.
+function ns.DisplayCase(text, language)
+	local locale = language == "CLIENT" and GetLocale() or language
+	return KEEPS_CAPITALS[locale] and text or ns.ToLower(text)
+end
+
 -- The client's stat names, as the rules recognize equip lines with them
 ns.GetClientStatName = ns.TrustedNames(ns.GetClientText, ns.FoldCase)
 
--- Stat name getters for the compact lines: Blizzard's names lowercased like the rest of the line (Blizzard's
--- own capitalization is uneven: "Daño Arcano", "golpe"). Made once per language, since ns.TrustedNames
--- reads every creature type's name.
+-- Stat name getters for the compact lines, with Blizzard's names in the line's case (ns.DisplayCase). Made once
+-- per language, since ns.TrustedNames reads every creature type's name.
 local namesIn = {} -- language -> getter
 local englishNames
 
-local function LowercasedNames(GetName)
+local function DisplayNames(GetName, language)
 	return ns.TrustedNames(function(key)
 		local name = GetName(key)
-		return name and ns.ToLower(name)
+		return name and ns.DisplayCase(name, language)
 	end, ns.FoldCase)
 end
 
@@ -112,9 +121,10 @@ end
 -- one), then in English for any line that language can't name. MP5 and HP5 have no names and stay as they are.
 function ns.InLanguage(lines, language)
 	language = language or ns.GetLanguage()
-	namesIn[language] = namesIn[language] or LowercasedNames(function(key)
-		return ns.GetTextIn(language, key)
-	end)
-	englishNames = englishNames or LowercasedNames(ns.GetEnglishText)
+	namesIn[language] = namesIn[language]
+		or DisplayNames(function(key)
+			return ns.GetTextIn(language, key)
+		end, language)
+	englishNames = englishNames or DisplayNames(ns.GetEnglishText, "enUS")
 	return ns.LocalizeLines(ns.LocalizeLines(lines, namesIn[language]), englishNames)
 end

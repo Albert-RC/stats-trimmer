@@ -891,13 +891,25 @@ describe("Settings window", function()
 		end)
 
 		it("shows the food's details with Blizzard's words, the Well Fed buff's name lowercased", function()
+			LanguageMenu().setSelected("frFR")
+			assert.are.same({
+				"+530 vie (24 sec)",
+				"+6 endurance (bien nourri, 15 min)",
+			}, { FoodPreviewTexts()[2], FoodPreviewTexts()[5] })
+		end)
+
+		it("keeps Blizzard's capitals in German, in the preview and the color rows", function()
 			LanguageMenu().setSelected("deDE")
 			assert.are.same({
-				"+530 gesundheit (24 sek.)",
-				"+803 mana (24 sek.)",
-				"+5% durch siege erhaltene erfahrung",
-				"+6 ausdauer (satt, 15 min.)",
+				"+530 Gesundheit (24 Sek.)",
+				"+803 Mana (24 Sek.)",
+				"+5% Durch Siege erhaltene Erfahrung",
+				"+6 Ausdauer (Satt, 15 Min.)",
 			}, { unpack(FoodPreviewTexts(), 2, 5) })
+			assert.are.equal("+26 Zaubermacht", PreviewTexts()[3 + KindIndex("spellPower")])
+			for _, label in ipairs({ "Zaubermacht", "Angriffskraft gegen …", "Gesundheit", "Ausdauer", "MP5" }) do
+				assert.is_true(HasText(label))
+			end
 		end)
 
 		it("switches every Blizzard text to the chosen language at once", function()
@@ -971,7 +983,7 @@ describe("Settings window", function()
 			ShowStaff()
 			assert.are.same({ "+26 poder con hechizos" }, TooltipTexts(wow.env.GameTooltip))
 			LanguageMenu().setSelected("deDE")
-			assert.are.same({ "+26 zaubermacht" }, TooltipTexts(wow.env.GameTooltip))
+			assert.are.same({ "+26 Zaubermacht" }, TooltipTexts(wow.env.GameTooltip))
 		end)
 
 		it("offers only English besides the client's language on a client without the Latin alphabet", function()
