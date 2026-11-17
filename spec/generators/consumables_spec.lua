@@ -1,10 +1,12 @@
 -- scripts/update-consumables.ps1 on spec/fixtures/consumables, a few rows of Forever's tables (build
--- 1.60.1.70425). scripts/test-generators.ps1 runs it, then this spec reads what it wrote. The expected entries are
--- worked out here from the fixtures' descriptions and effects, not copied from FoodData.lua or AlchemyData.lua.
+-- 1.60.1.70425, and 1.60.1.70938 for the scrolls and other consumables). scripts/test-generators.ps1 runs it, then
+-- this spec reads what it wrote. The expected entries are worked out here from the fixtures' descriptions and
+-- effects, not copied from FoodData.lua, AlchemyData.lua or MiscData.lua.
 local dir = assert(os.getenv("STATS_TRIMMER_GENERATED"), "run scripts/test-generators.ps1")
 local ns = {}
 assert(loadfile(dir .. "/FoodData.lua"))("StatsTrimmer", ns)
 assert(loadfile(dir .. "/AlchemyData.lua"))("StatsTrimmer", ns)
+assert(loadfile(dir .. "/MiscData.lua"))("StatsTrimmer", ns)
 
 -- The spell IDs of a data table, in order
 local function Spells(data)
@@ -119,7 +121,47 @@ describe("update-consumables.ps1, for potions, elixirs and flasks", function()
 
 	it("leaves out what has no stat, a duration in no whole unit, and Use spells of food", function()
 		-- Not 6615 (Free Action Potion), 6612 (Rage Potion, "20 to 40"), 4941 (Lesser Stoneshield Potion, 90
-		-- seconds) or 435 (Spongy Morel)
-		assert.are.same({ 17535, 17538, 17626, 24361, 1251940, 1252559 }, Spells(ns.ALCHEMY))
+		-- seconds) or 435 (Spongy Morel). 673 is Elixir of Minor Defense's.
+		assert.are.same({ 673, 17535, 17538, 17626, 24361, 1251940, 1252559 }, Spells(ns.ALCHEMY))
+	end)
+end)
+
+describe("update-consumables.ps1, for scrolls and other consumables", function()
+	it("writes a scroll's stat, for the target too (Scroll of Agility IV)", function()
+		-- "Increases the target's Agility by $s1 for $d.": aura 29 of 17 for agility (1), 30 minutes
+		assert.are.same(
+			{ numbers = { 17, 30 }, lines = { { stat = "ITEM_MOD_AGILITY_SHORT", value = 17, minutes = 30 } } },
+			ns.MISC[12174]
+		)
+	end)
+
+	it("writes the Blasted Lands' minutes, which are a number in the text (R.O.I.D.S.)", function()
+		-- "Increases Strength by $s1 when consumed. Effect lasts for 60 minutes.": aura 29 of 25 for strength (0),
+		-- and the spell lasts an hour
+		assert.are.same(
+			{ numbers = { 25, 60 }, lines = { { stat = "ITEM_MOD_STRENGTH_SHORT", value = 25, minutes = 60 } } },
+			ns.MISC[10667]
+		)
+	end)
+
+	it("marks the line of a consumable that gets you drunk, without the Grog's joke (Gordok Green Grog)", function()
+		-- "Increases Stamina by $s1 for $d and gets you drunk to boot.  Green means it's good!": aura 29 of 10 for
+		-- stamina (2), 15 minutes
+		assert.are.same({
+			numbers = { 10, 15 },
+			lines = { { stat = "ITEM_MOD_STAMINA_SHORT", value = 10, minutes = 15, drunk = true } },
+		}, ns.MISC[22789])
+	end)
+
+	it("takes the food and drink spells food can't convert (Rumsey Rum Black Label)", function()
+		assert.are.same({
+			numbers = { 15, 15 },
+			lines = { { stat = "ITEM_MOD_STAMINA_SHORT", value = 15, minutes = 15, drunk = true } },
+		}, ns.MISC[25804])
+		assert.is_nil(ns.FOODS[25804])
+	end)
+
+	it("leaves a spell a potion or elixir uses too to them (Oil of Olaf's, Elixir of Minor Defense's)", function()
+		assert.are.same({ 10667, 12174, 20875, 22789, 25804 }, Spells(ns.MISC))
 	end)
 end)

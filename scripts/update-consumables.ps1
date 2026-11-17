@@ -1,8 +1,8 @@
-# Generates StatsTrimmer/FoodData.lua and StatsTrimmer/AlchemyData.lua: what the Use line of each food and drink,
-# and of each potion, elixir and flask, shows, taken from Forever's item and spell tables on wago.tools. Run it
-# again when the client build changes.
+# Generates StatsTrimmer/FoodData.lua, StatsTrimmer/AlchemyData.lua and StatsTrimmer/MiscData.lua: what the Use line
+# of each food and drink, of each potion, elixir and flask, and of each scroll and other consumable shows, taken from
+# Forever's item and spell tables on wago.tools. Run it again when the client build changes.
 # Usage: ./scripts/update-consumables.ps1 [-Build 1.60.1.70938] [-From <folder>] [-FoodOutput <file>]
-#        [-AlchemyOutput <file>] [-AcceptRemovals]
+#        [-AlchemyOutput <file>] [-MiscOutput <file>] [-AcceptRemovals]
 #
 # A consumable's Use line is its spell's description, whose numbers the client fills in from the spell data:
 # "Restores $o1 health over $d." The wording and the order of those numbers vary per language, so the addon matches
@@ -16,14 +16,15 @@
 #    every consumable's effects and spells must be in their tables, or the script stops: a partial download would
 #    otherwise leave consumables out silently.
 # 2. Converts every Use spell, or lists why it keeps its original text.
-# 3. Compares each result with the file it replaces (-FoodOutput, FoodData.lua, and -AlchemyOutput, AlchemyData.lua,
-#    by default) and writes both. Nothing is written when a result is empty, or lacks spells its file had, unless
-#    -AcceptRemovals says that is expected.
+# 3. Compares each result with the file it replaces (-FoodOutput, FoodData.lua, -AlchemyOutput, AlchemyData.lua, and
+#    -MiscOutput, MiscData.lua, by default) and writes them all. Nothing is written when a result is empty, or lacks
+#    spells its file had, unless -AcceptRemovals says that is expected.
 param(
 	[string]$Build = "1.60.1.70938",
 	[string]$From,
 	[string]$FoodOutput = (Join-Path (Split-Path -Parent $PSScriptRoot) "StatsTrimmer/FoodData.lua"),
 	[string]$AlchemyOutput = (Join-Path (Split-Path -Parent $PSScriptRoot) "StatsTrimmer/AlchemyData.lua"),
+	[string]$MiscOutput = (Join-Path (Split-Path -Parent $PSScriptRoot) "StatsTrimmer/MiscData.lua"),
 	[switch]$AcceptRemovals
 )
 
@@ -44,9 +45,12 @@ $tableColumns = [ordered]@{
 	SpellDuration = @("ID", "Duration")
 }
 
-# Consumables (Item class 0) by subclass -> the file their Use spells go to: food and drink, or potions, elixirs
-# and flasks
-$groups = @{ "5" = "food"; "1" = "alchemy"; "2" = "alchemy"; "3" = "alchemy" }
+# Consumables (Item class 0) by subclass -> the file their Use spells go to: food and drink; potions, elixirs and
+# flasks; or scrolls and other consumables (R.O.I.D.S., Rumsey Rum...). A food spell that isn't food's (Rumsey Rum
+# Black Label is food and drink) goes with the other consumables.
+$groups = @{ "5" = "food"; "1" = "alchemy"; "2" = "alchemy"; "3" = "alchemy"; "4" = "misc"; "8" = "misc" }
+# The stats the misc tab has color rows for
+$miscStats = @("ITEM_MOD_STRENGTH_SHORT", "ITEM_MOD_AGILITY_SHORT", "ITEM_MOD_STAMINA_SHORT", "ITEM_MOD_INTELLECT_SHORT", "ITEM_MOD_SPIRIT_SHORT", "ARMOR")
 
 # Forever's well fed foods end with this spell's description, "Additionally, experience gained from kills is
 # increased by 5%.", which the client only shows to some players
@@ -180,7 +184,7 @@ try {
 		$itemEffects[$row.ID] = $row
 	}
 	# Group -> Use spell -> the names of the consumables that use it
-	$spells = @{ food = @{}; alchemy = @{} }
+	$spells = @{ food = @{}; alchemy = @{}; misc = @{} }
 	$missingEffects = [System.Collections.Generic.List[string]]::new()
 	foreach ($row in Read-Table "ItemXItemEffect") {
 		$group = $itemGroups[$row.ItemID]
@@ -234,7 +238,7 @@ finally {
 }
 
 $problems = @()
-foreach ($group in "food", "alchemy") {
+foreach ($group in "food", "alchemy", "misc") {
 	if ($spells[$group].Count -eq 0) {
 		$problems += "no $group item has a Use spell"
 	}
@@ -249,7 +253,14 @@ if ($missingEffects.Count -gt 0) {
 	$problems += "ItemEffect lacks $($missingEffects -join '; ')"
 }
 if ($problems.Count -gt 0) {
-	throw "The tables don't agree, so FoodData.lua and AlchemyData.lua are left as they are: $($problems -join '. ')"
+	throw "The tables don't agree, so FoodData.lua, AlchemyData.lua and MiscData.lua are left as they are: $($problems -join '. ')"
+}
+
+# A spell a food, potion, elixir or flask uses too stays theirs: Oil of Olaf's is Elixir of Minor Defense's
+foreach ($spell in @($spells.misc.Keys)) {
+	if ($spells.food.ContainsKey($spell) -or $spells.alchemy.ContainsKey($spell)) {
+		$spells.misc.Remove($spell)
+	}
 }
 
 function Get-Effect([string]$spell, [string]$index) {
@@ -486,10 +497,10 @@ function Convert-Food([string]$spell) {
 	return [ordered]@{ numbers = $numbers; lines = $lines; experience = $experience }
 }
 
-# The stats some words of a potion's, elixir's or flask's description name ("your Strength", "Intellect and
-# Spirit"), as $alchemyStats entries. Throws for words that name anything else.
+# The stats some words of a potion's, elixir's, flask's or scroll's description name ("your Strength", "the target's
+# Agility", "Intellect and Spirit"), as $alchemyStats entries. Throws for words that name anything else.
 function Get-AlchemyStats([string]$words) {
-	$words = ($words.ToLower() -replace "^(?:your|the player's) ", "")
+	$words = ($words.ToLower() -replace "^(?:your|the player's|the target's) ", "")
 	if ($alchemyStats.ContainsKey($words)) {
 		return , @($alchemyStats[$words])
 	}
@@ -511,9 +522,9 @@ function Assert-Effect([string]$spell, $entry, [int]$points) {
 	throw [SkipSpell]::new("spell $spell has no aura $($entry.aura) of $points for $($entry.stat)")
 }
 
-# What a potion's, elixir's or flask's Use line shows: the numbers it has and its compact lines, each with how
-# long it lasts. Throws SkipSpell for a description this script doesn't understand: that one keeps its original
-# text.
+# What a potion's, elixir's, flask's, scroll's or other consumable's Use line shows: the numbers it has and its
+# compact lines, each with how long it lasts. Throws SkipSpell for a description this script doesn't understand:
+# that one keeps its original text.
 function Convert-Alchemy([string]$spell) {
 	$text = Expand-Description $spell
 	if ($text.Contains($experienceMark)) {
@@ -523,7 +534,7 @@ function Convert-Alchemy([string]$spell) {
 
 	$numbers = [System.Collections.Generic.List[int]]::new()
 	$gains = [System.Collections.Generic.List[object]]::new() # { entry, value, percent }
-	$found = @{ duration = $null }
+	$found = @{ duration = $null; drunk = $false }
 	function Add-Gain($entry, [string]$valueToken, [string]$percent) {
 		$resolved = Resolve-Value $valueToken
 		if ($null -eq $resolved.number) {
@@ -580,6 +591,31 @@ function Convert-Alchemy([string]$spell) {
 			}
 			Set-Duration ($all[2] + $all[3])
 		}
+		elseif ($text -match "^Increases ([a-zA-Z' ]+?) by ($value) when consumed\. Effect lasts for (\d+) minutes\.\s*") {
+			# The Blasted Lands' consumables (R.O.I.D.S.): their duration is a number in the text, not $d
+			$all = $Matches
+			Add-Gains $all[1] $all[2] ""
+			$minutes = [int]$all[3]
+			if ($durations[$spell] -ne $minutes * 60000) {
+				throw [SkipSpell]::new("spell $spell doesn't last $minutes minutes")
+			}
+			if ($found.duration) {
+				throw [SkipSpell]::new("two durations")
+			}
+			$found.duration = @{ number = $minutes; unit = "minutes" }
+			$numbers.Add($minutes)
+		}
+		elseif ($text -match "^Increases ([a-zA-Z' ]+?) by ($value) for ($value) and gets you drunk to boot[.!]\s*") {
+			# Rumsey Rum and Gordok Green Grog: the line ends with Blizzard's words for it (DRUNK in Locales.lua)
+			$all = $Matches
+			Add-Gains $all[1] $all[2] ""
+			Set-Duration $all[3]
+			$found.drunk = $true
+		}
+		elseif ($text -match "^Green means it's good!\s*") {
+			# Gordok Green Grog's joke
+			$all = $Matches
+		}
 		elseif ($text -match "^Drink to gain ([^.]+?)\. Lasts(?: for)? ($value)\.\s*") {
 			$all = $Matches
 			if ($all[1] -match "^($value)(%?) ([a-zA-Z ]+?)(?: and ($value)(%?) ([a-zA-Z ]+))?$") {
@@ -620,12 +656,14 @@ function Convert-Alchemy([string]$spell) {
 	if ($gains.Count -eq 0 -or -not $found.duration) {
 		throw [SkipSpell]::new("nothing to show")
 	}
-	$lines = foreach ($gain in $gains) {
-		$line = [ordered]@{ stat = $gain.entry.stat; value = $gain.value; percent = $gain.percent }
-		$line[$found.duration.unit] = $found.duration.number
-		$line
-	}
-	return [ordered]@{ numbers = $numbers; lines = @($lines) }
+	$lines = @(foreach ($gain in $gains) {
+			$line = [ordered]@{ stat = $gain.entry.stat; value = $gain.value; percent = $gain.percent }
+			$line[$found.duration.unit] = $found.duration.number
+			$line
+		})
+	# Said once, after the last line
+	$lines[-1]["drunk"] = $found.drunk
+	return [ordered]@{ numbers = $numbers; lines = $lines }
 }
 
 function ConvertTo-LuaValue($value) {
@@ -665,8 +703,22 @@ function Convert-Group([string]$group, [scriptblock]$Convert) {
 	return @{ group = $group; converted = $converted; skipped = $skipped }
 }
 
+$foodResult = Convert-Group "food" { param($spell) Convert-Food $spell }
+# Food spells the food rules don't understand may be another consumable's (Rumsey Rum Black Label)
+foreach ($spell in @($foodResult.skipped.Keys)) {
+	if (-not $spells.misc.ContainsKey($spell)) {
+		try {
+			$null = Convert-Alchemy $spell
+			$spells.misc[$spell] = $spells.food[$spell]
+			$foodResult.skipped.Remove($spell)
+		}
+		catch [SkipSpell] {
+		}
+	}
+}
+
 $results = @(
-	(Convert-Group "food" { param($spell) Convert-Food $spell }) + @{
+	$foodResult + @{
 		output = $FoodOutput
 		table = "FOODS"
 		description = @(
@@ -686,13 +738,37 @@ $results = @(
 			"--   lines    the compact lines, in order, each with how long it lasts (seconds, minutes or hours)"
 		)
 	}
+	(Convert-Group "misc" {
+			param($spell)
+			# Only consumables players see, with stats the misc tab has a color row for (ConsumableRules.lua's
+			# MISC_KINDS): any other line would keep its text anyway
+			if ($spells.misc[$spell].Count -eq 0) {
+				throw [SkipSpell]::new("no item with a name")
+			}
+			$data = Convert-Alchemy $spell
+			foreach ($line in $data.lines) {
+				if ($miscStats -notcontains $line.stat) {
+					throw [SkipSpell]::new("$($line.stat) has no color row in the misc tab")
+				}
+			}
+			$data
+		}) + @{
+		output = $MiscOutput
+		table = "MISC"
+		description = @(
+			"-- Scroll and other consumable spell (the spellID of its Use line) -> what that line shows:"
+			"--   numbers  the numbers the line shows"
+			"--   lines    the compact lines, in order, each with how long it lasts (seconds, minutes or hours), the last"
+			"--            with drunk = true when the line ends saying it gets you drunk"
+		)
+	}
 )
 
-# 3. Compared with the files they replace, then written: neither unless both can be
+# 3. Compared with the files they replace, then written: none unless all can be
 foreach ($result in $results) {
 	$converted = $result.converted
 	if ($converted.Count -eq 0) {
-		throw "No $($result.group) spell could be converted, so $($result.output) and the other file are left as they are"
+		throw "No $($result.group) spell could be converted, so $($result.output) and the other files are left as they are"
 	}
 	$previous = @()
 	if (Test-Path $result.output) {
@@ -708,7 +784,7 @@ foreach ($result in $results) {
 		Write-Output "  removed $($result.group) $spell $reason"
 	}
 	if ($removed.Count -gt 0 -and -not $AcceptRemovals) {
-		throw "$($removed.Count) $($result.group) spells would be removed, so $($result.output) and the other file are left as they are. Run again with -AcceptRemovals if that is expected."
+		throw "$($removed.Count) $($result.group) spells would be removed, so $($result.output) and the other files are left as they are. Run again with -AcceptRemovals if that is expected."
 	}
 }
 

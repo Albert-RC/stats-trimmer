@@ -1,3 +1,4 @@
-ID,AuraDescription_lang
-19705,Stamina and Spirit increased by $w1.
-1243969,Experience gained from kills increased by $w1%.
+ID,Description_lang,AuraDescription_lang
+19705,,Stamina and Spirit increased by $w1.
+1243969,"$?pc142418[Additionally, experience gained from kills is increased by $s1%.][]",Experience gained from kills increased by $w1%.
+20875,Increases Stamina by $s1 for $d and gets you drunk to boot!,Stamina increased by $s1.

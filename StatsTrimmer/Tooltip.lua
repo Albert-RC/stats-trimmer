@@ -1,5 +1,6 @@
--- Game-facing glue: reads the item behind a tooltip line and swaps equip lines, and the Use lines of food and of
--- potions, elixirs and flasks, for compact ones, in the chosen language (Localization.lua)
+-- Game-facing glue: reads the item behind a tooltip line and swaps equip lines, and the Use lines of food, of
+-- potions, elixirs and flasks, and of scrolls and other consumables, for compact ones, in the chosen language
+-- (Localization.lua)
 local _, ns = ...
 
 -- Localized "Equip:" and "Use:" prefixes, provided by the client in every locale
@@ -152,18 +153,32 @@ local function ReplaceEquipLine(tooltip, lineData)
 	return true
 end
 
--- A consumable's Use line: its spell's ID says which food (ns.FOODS), or potion, elixir or flask (ns.ALCHEMY),
--- it is
+-- Each settings tab of consumables: its data (spell ID -> entry) and the rules for its Use lines, in order
+local USE_TABS = {
+	{ key = "food", data = "FOODS", replacement = "GetFoodReplacement" },
+	{ key = "alchemy", data = "ALCHEMY", replacement = "GetAlchemyReplacement" },
+	{ key = "misc", data = "MISC", replacement = "GetMiscReplacement" },
+}
+
+-- A consumable's Use line: its spell's ID says which food (ns.FOODS), potion, elixir or flask (ns.ALCHEMY), or
+-- scroll or other consumable (ns.MISC) it is
 local function ReplaceUseLine(tooltip, lineData)
 	local spellID = lineData.spellID
-	local readable = type(spellID) == "number" and not issecretvalue(spellID)
-	local food = readable and ns.FOODS[spellID]
-	local alchemy = readable and ns.ALCHEMY[spellID]
-	local text = lineData.leftText
+	if type(spellID) ~= "number" or issecretvalue(spellID) then
+		return false
+	end
+	local tab, entry
+	for _, candidate in ipairs(USE_TABS) do
+		entry = ns[candidate.data][spellID]
+		if entry then
+			tab = candidate
+			break
+		end
+	end
 	-- ConsumableRules.lua is new in the .toc (it was FoodRules.lua): right after the update, /reload runs with
 	-- FoodData.lua but without it until the client restarts
-	local tabKey = food and "food" or "alchemy"
-	if not (food or alchemy) or not ns.GetFoodReplacement or not CanReplace(tooltip, text, USE_PREFIX, tabKey) then
+	local text = lineData.leftText
+	if not tab or not ns[tab.replacement] or not CanReplace(tooltip, text, USE_PREFIX, tab.key) then
 		return false
 	end
 
@@ -173,12 +188,7 @@ local function ReplaceUseLine(tooltip, lineData)
 		secondsFormat = ns.GetClientText("SECONDS_ABBR"),
 		minutesFormat = ns.GetClientText("MINUTES_ABBR"),
 	}
-	local lines
-	if food then
-		lines = ns.GetFoodReplacement(text, food, context)
-	else
-		lines = ns.GetAlchemyReplacement(text, alchemy, context)
-	end
+	local lines = ns[tab.replacement](text, entry, context)
 	if not lines then
 		return false
 	end

@@ -21,6 +21,7 @@ describe("Stats Trimmer load order", function()
 		assert.is_true(position["Rules.lua"] < position["ConsumableRules.lua"])
 		assert.is_true(position["Config.lua"] < position["FoodData.lua"])
 		assert.is_true(position["Config.lua"] < position["AlchemyData.lua"])
+		assert.is_true(position["Config.lua"] < position["MiscData.lua"])
 		assert.is_true(position["Config.lua"] < position["Core.lua"])
 		assert.are.equal("Core.lua", files[#files])
 	end)
@@ -32,6 +33,7 @@ describe("Stats Trimmer load order", function()
 		assert.are.equal(2, #wow.preCalls)
 		assert.is_not_nil(ns.FOODS[435])
 		assert.is_not_nil(ns.ALCHEMY[17626])
+		assert.is_not_nil(ns.MISC[12174])
 		assert.is_not_nil(wow.env.StatsTrimmerMinimapButton)
 		assert.are.equal(1, #wow.categories)
 	end)
@@ -104,5 +106,22 @@ describe("Stats Trimmer load order", function()
 
 		assert.is_not_nil(ns.FOODS[435])
 		assert.are.same({ MOREL_LINE, TITANS_LINE }, ShowConsumables(wow))
+	end)
+
+	it("works without MiscData.lua, which /reload doesn't load right after the update adding it", function()
+		local wow = fakes.NewWoW()
+		local ns = helpers.LoadAddon("StatsTrimmer", FilesBut({ ["MiscData.lua"] = true }), wow.env)
+		fakes.FireEvent(wow, "ADDON_LOADED", "StatsTrimmer")
+
+		-- Scroll of Agility IV's line keeps its text; food's and alchemy's are compact
+		local scroll = "Usar: Aumenta la agilidad en 17 p. durante 30 min."
+		local onUse = wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse
+		fakes.ShowItem(wow, wow.env.GameTooltip, wow.env.UIParent, "ANCHOR_NONE", {
+			lines = { { leftText = scroll, type = onUse, spellID = 12174 } },
+		})
+		assert.are.equal(scroll, wow.env.GameTooltip.lines[1].text)
+		assert.are.same({ "+530 salud (24 s)", "+1200 salud (2 h)" }, ShowConsumables(wow))
+		ns.ShowOptions()
+		assert.is_true(wow.env.StatsTrimmerOptionsFrame:IsShown())
 	end)
 end)

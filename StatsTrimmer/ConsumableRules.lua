@@ -1,15 +1,16 @@
--- Replacement rules for the Use lines of consumables: food and drink, and potions, elixirs and flasks. No WoW API
--- here: everything that comes from the game is passed in, so this file can be unit tested outside the game.
+-- Replacement rules for the Use lines of consumables: food and drink, potions, elixirs and flasks, and scrolls and
+-- other consumables. No WoW API here: everything that comes from the game is passed in, so this file can be unit
+-- tested outside the game.
 --
 -- context.usePrefix       localized "Use:" prefix
 -- context.cooldownFormat  the client's ITEM_COOLDOWN_TOTAL ("(%s Cooldown)"), or nil
 -- context.secondsFormat   the client's SECONDS_ABBR ("%d |4Sec:Sec;"), how it writes a cooldown in seconds, or nil
 -- context.minutesFormat   the client's MINUTES_ABBR ("%d |4Min:Min;"), the same in minutes, or nil
 --
--- A consumable's Use line is its spell's description, so FoodData.lua and AlchemyData.lua know which numbers it
--- shows and what each one is, whatever the language or their order. The line is only rewritten when it shows
--- exactly those numbers, plus, for food, one for each amount the client computes (the health or mana it restores)
--- and the experience bonus some players see. Anything else keeps its original text.
+-- A consumable's Use line is its spell's description, so FoodData.lua, AlchemyData.lua and MiscData.lua know which
+-- numbers it shows and what each one is, whatever the language or their order. The line is only rewritten when it
+-- shows exactly those numbers, plus, for food, one for each amount the client computes (the health or mana it
+-- restores) and the experience bonus some players see. Anything else keeps its original text.
 local _, ns = ...
 
 local StatLine = ns.StatLine
@@ -55,6 +56,15 @@ local ALCHEMY_KINDS = {
 	ITEM_MOD_NATURE_DAMAGE_DONE_SHORT = "alchemyNatureDamage",
 	ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT = "alchemyShadowDamage",
 }
+-- The stat keys MiscData.lua uses -> line kind, the misc tab's own. Their English names are ns.ENGLISH_NAMES'.
+local MISC_KINDS = {
+	ITEM_MOD_STRENGTH_SHORT = "miscStrength",
+	ITEM_MOD_AGILITY_SHORT = "miscAgility",
+	ITEM_MOD_STAMINA_SHORT = "miscStamina",
+	ITEM_MOD_INTELLECT_SHORT = "miscIntellect",
+	ITEM_MOD_SPIRIT_SHORT = "miscSpirit",
+	ARMOR = "miscArmor",
+}
 -- ITEM_MOD_<stat>_VS_<TYPE>_SHORT -> line kind, for every creature type. Their English names are
 -- ns.GetVsEnglishName's.
 local ALCHEMY_VS_KINDS = {
@@ -68,6 +78,9 @@ local ALCHEMY_VS_KINDS = {
 local FOOD_COOLDOWNS = { { 1, "secondsFormat" } }
 -- Elixirs and flasks share 3 seconds, potions 2 minutes (ItemEffect's category cooldowns)
 local ALCHEMY_COOLDOWNS = { { 3, "secondsFormat" }, { 2, "minutesFormat" } }
+-- Scrolls share 1 second (ItemEffect's cooldown). The Blasted Lands' consumables share an hour, which is worth
+-- knowing: a line that shows it keeps its original text.
+local MISC_COOLDOWNS = { { 1, "secondsFormat" } }
 
 -- The text without the client's plural escapes ("|4Sec:Sec;"): their 4 isn't a number the player sees
 local function WithoutEscapes(text)
@@ -238,6 +251,13 @@ local function AlchemyLine(line, value)
 	return kind and StatLine(kind, value, line.stat, line.percent, line)
 end
 
+-- A scroll's or other consumable's compact line. The data line holds how long it lasts, and the last one whether
+-- the consumable gets you drunk (`drunk`, Rumsey Rum).
+local function MiscLine(line, value)
+	local kind = MISC_KINDS[line.stat]
+	return kind and StatLine(kind, value, line.stat, line.percent, line)
+end
+
 -- Compact lines for a food's Use line, or nil to keep its text. `food` is the line's entry in ns.FOODS.
 function ns.GetFoodReplacement(text, food, context)
 	return GetUseReplacement(text, food, context, FOOD_COOLDOWNS, FoodLine)
@@ -247,4 +267,10 @@ end
 -- in ns.ALCHEMY.
 function ns.GetAlchemyReplacement(text, entry, context)
 	return GetUseReplacement(text, entry, context, ALCHEMY_COOLDOWNS, AlchemyLine)
+end
+
+-- Compact lines for a scroll's or other consumable's Use line, or nil to keep its text. `entry` is the line's entry
+-- in ns.MISC.
+function ns.GetMiscReplacement(text, entry, context)
+	return GetUseReplacement(text, entry, context, MISC_COOLDOWNS, MiscLine)
 end

@@ -37,7 +37,7 @@ $uiKeys = @(
 	"CTRL_KEY", "ALT_KEY", "SHIFT_KEY", "RESET", "PREVIEW", "COLORS", "ITEM_BIND_ON_EQUIP",
 	"STAT_CATEGORY_ATTACK", "STAT_CATEGORY_DEFENSE", "SPELLS", "STAT_CATEGORY_WEAPON_SKILLS", "DAMAGE", "COMBAT",
 	"MINIMAP_TRACKING_VENDOR_FOOD", "HEALTH", "MANA", "COMBAT_XP_GAIN", "ARMOR",
-	"ALCHEMY", "STAT_CATEGORY_ATTRIBUTES",
+	"ALCHEMY", "STAT_CATEGORY_ATTRIBUTES", "MISCELLANEOUS",
 	"INT_SPELL_DURATION_SEC", "INT_SPELL_DURATION_MIN", "INT_SPELL_DURATION_HOURS"
 )
 # The Well Fed buff's name isn't a GlobalString: it is bundled as WELL_FED, from this spell's name (the same
@@ -48,6 +48,12 @@ $wellFedSpell = "19705"
 # "Experience gained from kills increased by $w1%." -> "Experience gained from kills", "Durch Siege erhaltene
 # Erfahrung um $w1% erhöht." -> "Durch Siege erhaltene Erfahrung".
 $experienceSpell = "1243969"
+# Nor is what Rumsey Rum and Gordok Green Grog add at the end of their line, that they get you drunk. It is bundled
+# as DRUNK, from this spell's (Rumsey Rum's) description after its last number: "Increases Stamina by $s1 for $d and
+# gets you drunk to boot!" -> "and gets you drunk to boot!", "Aumenta el aguante en $s1 p. durante $d ¡y por si fuera
+# poco, te emborracha!" -> "¡y por si fuera poco, te emborracha!". Their own text may differ (the Grog's is), but
+# says the same.
+$drunkSpell = "20875"
 # Forever's classes (CLASS_SORT_ORDER in the game): their male names, as LocalizedClassList(false) gives them
 $classes = @("WARRIOR", "PALADIN", "PRIEST", "SHAMAN", "DRUID", "ROGUE", "MAGE", "WARLOCK", "HUNTER")
 
@@ -64,7 +70,7 @@ $tableColumns = @{
 	GlobalStrings = @("BaseTag", "TagText_lang")
 	ChrClasses = @("Filename", "Name_male_lang")
 	SpellName = @("ID", "Name_lang")
-	Spell = @("ID", "AuraDescription_lang")
+	Spell = @("ID", "Description_lang", "AuraDescription_lang")
 	CreatureType = @("ID", "Name_lang")
 }
 
@@ -190,14 +196,20 @@ try {
 		if ($wellFed) {
 			$strings["WELL_FED"] = $wellFed
 		}
-		$experience = Read-Table "Spell" $locale | Where-Object { $_.ID -eq $experienceSpell } | Select-Object -First 1
+		$spellRows = Read-Table "Spell" $locale
+		$experience = $spellRows | Where-Object { $_.ID -eq $experienceSpell } | Select-Object -First 1
 		$aura = if ($experience) { $experience.AuraDescription_lang -replace '\$w1\s*%', '' -replace '\s+', ' ' }
 		if ($aura -and $aura.Trim().TrimEnd('.').Trim() -match '^(.+\S) \S+ \S+$') {
 			$strings["KILL_EXPERIENCE"] = $Matches[1]
 		}
+		$drunk = $spellRows | Where-Object { $_.ID -eq $drunkSpell } | Select-Object -First 1
+		# What follows its last variable, without the punctuation that ends the duration ("$d.", "$d,")
+		if ($drunk -and ($drunk.Description_lang -replace '\s+', ' ') -match '^.*\$[a-z]\d*[\s.,]*(\S.*?)\s*$') {
+			$strings["DRUNK"] = $Matches[1]
+		}
 
 		$statCount = @($strings.Keys | Where-Object { $_ -like "ITEM_MOD_*" }).Count
-		$missing = @(($uiKeys + "WELL_FED", "KILL_EXPERIENCE") | Where-Object { -not $strings.ContainsKey($_) })
+		$missing = @(($uiKeys + "WELL_FED", "KILL_EXPERIENCE", "DRUNK") | Where-Object { -not $strings.ContainsKey($_) })
 		if ($statCount -lt $MinimumStatNames -or $missing.Count -gt 0) {
 			throw "$locale looks incomplete: $statCount stat names, missing $($missing -join ', ')"
 		}

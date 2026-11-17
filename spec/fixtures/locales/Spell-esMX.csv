@@ -1,3 +1,4 @@
-ID,AuraDescription_lang
-19705,El aguante y el espíritu aumentan $w1 p.
-1243969,La experiencia que ganas por eliminar enemigos aumenta un $w1%.
+ID,Description_lang,AuraDescription_lang
+19705,,El aguante y el espíritu aumentan $w1 p.
+1243969,"$?pc142418[Además, la experiencia que ganas por eliminar enemigos aumenta un $s1%.][]",La experiencia que ganas por eliminar enemigos aumenta un $w1%.
+20875,¡Aumenta $s1 p. el aguante durante $d y te emborracha hasta la médula!,Aguante aumentado $s1 p.

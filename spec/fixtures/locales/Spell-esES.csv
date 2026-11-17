@@ -1,3 +1,4 @@
-ID,AuraDescription_lang
-19705,Aguante y espíritu aumentados en $w1 p.
-1243969,Experiencia obtenida al matar enemigos aumentada un $w1%.
+ID,Description_lang,AuraDescription_lang
+19705,,Aguante y espíritu aumentados en $w1 p.
+1243969,"$?pc142418[Además, la experiencia obtenida al matar enemigos aumenta un $s1%.][]",Experiencia obtenida al matar enemigos aumentada un $w1%.
+20875,"Aumenta el aguante en $s1 p. durante $d ¡y por si fuera poco, te emborracha!",Aguante aumentado en $s1 p.

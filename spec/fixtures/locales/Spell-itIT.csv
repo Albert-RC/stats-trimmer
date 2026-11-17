@@ -1,3 +1,4 @@
-ID,AuraDescription_lang
-19705,Tempra e Spirito aumentati di $s1.
-1243969,Experience gained from kills increased by $w1%.
+ID,Description_lang,AuraDescription_lang
+19705,,Tempra e Spirito aumentati di $s1.
+1243969,"$?pc142418[Additionally, experience gained from kills is increased by $s1%.][]",Experience gained from kills increased by $w1%.
+20875,Aumenta la Tempra di $s1 per $d e infonde ubriachezza molesta!,Tempra aumentata di $s1.

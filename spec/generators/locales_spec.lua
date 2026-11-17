@@ -33,6 +33,31 @@ describe("update-locales.ps1", function()
 		}, InEveryLanguage("KILL_EXPERIENCE"))
 	end)
 
+	it("says that Rumsey Rum gets you drunk with its description's words after its last number", function()
+		assert.are.same({
+			enUS = "and gets you drunk to boot!",
+			deDE = "und macht Euch ziemlich betrunken!",
+			esES = "¡y por si fuera poco, te emborracha!",
+			esMX = "y te emborracha hasta la médula!",
+			frFR = "et vous rend complètement saoul !",
+			itIT = "e infonde ubriachezza molesta!",
+			-- Without the comma after the duration
+			ptBR = "além de embebedar você.",
+		}, InEveryLanguage("DRUNK"))
+	end)
+
+	it("names the misc tab with Blizzard's Miscellaneous", function()
+		assert.are.same({
+			enUS = "Miscellaneous",
+			deDE = "Verschiedenes",
+			esES = "Miscelánea",
+			esMX = "Miscelánea",
+			frFR = "Divers",
+			itIT = "Varie",
+			ptBR = "Diversos",
+		}, InEveryLanguage("MISCELLANEOUS"))
+	end)
+
 	it("names the Well Fed buff with its spell's name", function()
 		assert.are.same({
 			enUS = "Well Fed",

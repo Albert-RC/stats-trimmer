@@ -1,3 +1,4 @@
-ID,AuraDescription_lang
-19705,Ausdauer und Willenskraft um $w1 erhöht.
-1243969,Durch Siege erhaltene Erfahrung um $w1% erhöht.
+ID,Description_lang,AuraDescription_lang
+19705,,Ausdauer und Willenskraft um $w1 erhöht.
+1243969,$?pc142418[ Außerdem wird die durch Siege erhaltene Erfahrung um $s1% erhöht.][],Durch Siege erhaltene Erfahrung um $w1% erhöht.
+20875,Erhöht Ausdauer $d lang um $s1 und macht Euch ziemlich betrunken!,Ausdauer um $s1 erhöht.

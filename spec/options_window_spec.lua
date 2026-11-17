@@ -35,14 +35,15 @@ describe("Settings window", function()
 	end
 
 	-- The color of a kind's sample line in the preview: one line per kind, in its tab's tooltip, after the item's
-	-- three lines, the food's name or the potion's name
+	-- three lines, or the food's, the potion's or the consumable's name
 	local function PreviewColor(key)
 		local tooltips = {
 			combat = wow.env.StatsTrimmerPreviewTooltip,
 			food = wow.env.StatsTrimmerFoodPreviewTooltip,
 			alchemy = wow.env.StatsTrimmerAlchemyPreviewTooltip,
+			misc = wow.env.StatsTrimmerMiscPreviewTooltip,
 		}
-		local indexes = { combat = 3, food = 1, alchemy = 1 }
+		local indexes = { combat = 3, food = 1, alchemy = 1, misc = 1 }
 		for _, kind in ipairs(ns.COLOR_KINDS) do
 			local tab = KindTab(kind)
 			indexes[tab] = indexes[tab] + 1
@@ -71,6 +72,10 @@ describe("Settings window", function()
 
 	local function AlchemyPreviewTexts()
 		return TooltipTexts(wow.env.StatsTrimmerAlchemyPreviewTooltip)
+	end
+
+	local function MiscPreviewTexts()
+		return TooltipTexts(wow.env.StatsTrimmerMiscPreviewTooltip)
 	end
 
 	-- Shows Bastón nudoso de nigromancia, with its combined spell power line, in GameTooltip
@@ -113,6 +118,11 @@ describe("Settings window", function()
 	-- Clicks the third tab, alchemy, whatever the language
 	local function ShowAlchemyTab()
 		fakes.Fire(wow.env.StatsTrimmerOptionsFrame.Tabs[3], "OnClick", "LeftButton")
+	end
+
+	-- Clicks the fourth tab, misc, whatever the language
+	local function ShowMiscTab()
+		fakes.Fire(wow.env.StatsTrimmerOptionsFrame.Tabs[4], "OnClick", "LeftButton")
 	end
 
 	-- Whether a kind's row is shown: rows sit in their section's body
@@ -188,10 +198,11 @@ describe("Settings window", function()
 			assert.are.same(GREEN, Swatch("spellDamage").color)
 		end)
 
-		it("previews every line kind in its color, in a sample item, food or potion", function()
+		it("previews every line kind in its color, in a sample item, food, potion or consumable", function()
 			assert.are.equal("Sample Item", wow.env.StatsTrimmerPreviewTooltip.lines[1].text)
 			assert.are.equal("Sample Food", wow.env.StatsTrimmerFoodPreviewTooltip.lines[1].text)
 			assert.are.equal("Sample Potion", wow.env.StatsTrimmerAlchemyPreviewTooltip.lines[1].text)
+			assert.are.equal("Sample Consumable", wow.env.StatsTrimmerMiscPreviewTooltip.lines[1].text)
 			for _, kind in ipairs(ns.COLOR_KINDS) do
 				assert.are.same(ns.db.colors[kind.key], PreviewColor(kind.key))
 			end
@@ -251,6 +262,25 @@ describe("Settings window", function()
 			assert.is_false(item:IsShown())
 		end)
 
+		it("shows the misc tab's lines in a sample consumable, Rumsey Rum's saying it gets you drunk", function()
+			ShowMiscTab()
+			assert.are.same({
+				"Sample Consumable",
+				"+25 fuerza (60 min)",
+				"+17 agilidad (30 min)",
+				"+15 aguante (15 min) ¡y por si fuera poco, te emborracha!",
+				"+16 intelecto (30 min)",
+				"+15 espíritu (30 min)",
+				"+240 armadura (30 min)",
+			}, MiscPreviewTexts())
+			local item, misc = wow.env.StatsTrimmerPreviewTooltip, wow.env.StatsTrimmerMiscPreviewTooltip
+			assert.is_true(misc.points[1][2] == item.points[1][2])
+			assert.is_true(misc:IsShown())
+			assert.is_false(item:IsShown())
+			LanguageMenu().setSelected("enUS")
+			assert.are.equal("+15 stamina (15 min) and gets you drunk to boot!", MiscPreviewTexts()[4])
+		end)
+
 		it("writes an hour in the singular and more in the plural, in English", function()
 			LanguageMenu().setSelected("enUS")
 			ShowAlchemyTab()
@@ -265,10 +295,13 @@ describe("Settings window", function()
 			ns.ShowOptions()
 		end)
 
-		it("are combat, food and drink and alchemy, under the window, with Blizzard's names", function()
+		it("are combat, food and drink, alchemy and misc, under the window, with Blizzard's names", function()
 			local tabs = wow.env.StatsTrimmerOptionsFrame.Tabs
-			assert.are.same({ "Combate", "Comida y bebida", "Alquimia" }, { tabs[1].text, tabs[2].text, tabs[3].text })
-			assert.are.equal(3, wow.env.StatsTrimmerOptionsFrame.numTabs)
+			assert.are.same(
+				{ "Combate", "Comida y bebida", "Alquimia", "Miscelánea" },
+				{ tabs[1].text, tabs[2].text, tabs[3].text, tabs[4].text }
+			)
+			assert.are.equal(4, wow.env.StatsTrimmerOptionsFrame.numTabs)
 			local point, relativeTo, relativePoint, x, y = unpack(tabs[1].points[1])
 			assert.is_true(relativeTo == wow.env.StatsTrimmerOptionsFrame)
 			assert.are.same({ "TOPLEFT", "BOTTOMLEFT", 11, 2 }, { point, relativePoint, x, y })
@@ -308,12 +341,25 @@ describe("Settings window", function()
 			assert.is_false(SplitCheckbox():IsShown())
 		end)
 
+		it("show misc's rows and the sample consumable, without the checkbox, with a click", function()
+			ShowMiscTab()
+			assert.is_true(Tab("Miscelánea").selected)
+			assert.is_false(RowShown("alchemyStrength"))
+			assert.is_true(RowShown("miscStrength"))
+			assert.is_true(RowShown("miscArmor"))
+			assert.is_false(wow.env.StatsTrimmerAlchemyPreviewTooltip:IsShown())
+			assert.is_true(wow.env.StatsTrimmerMiscPreviewTooltip:IsShown())
+			assert.is_false(SplitCheckbox():IsShown())
+		end)
+
 		it("keep the window's size", function()
 			local window = wow.env.StatsTrimmerOptionsFrame
 			local width, height = window:GetWidth(), window:GetHeight()
 			ShowFoodTab()
 			assert.are.same({ width, height }, { window:GetWidth(), window:GetHeight() })
 			ShowAlchemyTab()
+			assert.are.same({ width, height }, { window:GetWidth(), window:GetHeight() })
+			ShowMiscTab()
 			assert.are.same({ width, height }, { window:GetWidth(), window:GetHeight() })
 		end)
 
@@ -328,7 +374,10 @@ describe("Settings window", function()
 		it("follow the language", function()
 			LanguageMenu().setSelected("enUS")
 			local tabs = wow.env.StatsTrimmerOptionsFrame.Tabs
-			assert.are.same({ "Combat", "Food & Drink", "Alchemy" }, { tabs[1].text, tabs[2].text, tabs[3].text })
+			assert.are.same(
+				{ "Combat", "Food & Drink", "Alchemy", "Miscellaneous" },
+				{ tabs[1].text, tabs[2].text, tabs[3].text, tabs[4].text }
+			)
 			assert.are.equal(#"Food & Drink" * 6 + 20, tabs[2]:GetWidth())
 		end)
 	end)
@@ -608,13 +657,13 @@ describe("Settings window", function()
 		end
 
 		-- The preview panel's width: the window's, without the colors panel, the window's sides (12 each) and
-		-- the gap between the panels (8). The item's, the food's and the potion's tooltips, which take turns in the
-		-- same place, need it with a margin of 12 on each side.
+		-- the gap between the panels (8). The item's, the food's, the potion's and the consumable's tooltips, which
+		-- take turns in the same place, need it with a margin of 12 on each side.
 		local function PreviewFits()
 			local room = Window():GetWidth() - ColorsPanel():GetWidth() - 2 * 12 - 8
 			local item, food = wow.env.StatsTrimmerPreviewTooltip, wow.env.StatsTrimmerFoodPreviewTooltip
-			local alchemy = wow.env.StatsTrimmerAlchemyPreviewTooltip
-			return math.max(item:GetWidth(), food:GetWidth(), alchemy:GetWidth()) + 2 * 12 <= room
+			local alchemy, misc = wow.env.StatsTrimmerAlchemyPreviewTooltip, wow.env.StatsTrimmerMiscPreviewTooltip
+			return math.max(item:GetWidth(), food:GetWidth(), alchemy:GetWidth(), misc:GetWidth()) + 2 * 12 <= room
 		end
 
 		-- A row label's room: the colors panel's width without the scroll frame's inset (6) and scroll bar (26),
@@ -998,16 +1047,18 @@ describe("Settings window", function()
 		it("names each tab's lines, checked by default, in every tab", function()
 			ns.ShowOptions()
 			local labels = {}
-			for _, Show in ipairs({ function() end, ShowFoodTab, ShowAlchemyTab }) do
+			for _, Show in ipairs({ function() end, ShowFoodTab, ShowAlchemyTab, ShowMiscTab }) do
 				Show()
 				assert.is_true(CompactCheckbox():IsShown())
 				assert.is_true(CompactCheckbox():GetChecked())
 				table.insert(labels, CompactCheckbox().Text.text)
 			end
-			assert.are.same(
-				{ "Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines" },
-				labels
-			)
+			assert.are.same({
+				"Compact equip lines",
+				"Compact food and drink lines",
+				"Compact flask, elixir and potion lines",
+				"Compact scroll and other consumable lines",
+			}, labels)
 		end)
 
 		it("keeps the tab's lines in their original text when cleared, rebuilding a shown tooltip", function()

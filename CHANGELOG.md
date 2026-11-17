@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 (2026-11-17)
 
 - Food, drink, flask, elixir and potion data come from the game's new build, 1.60.1.70938: Morning Glory Dew gets compact lines, and the Elixir of Wisdom, now +3 intellect for 30 minutes, gets them again. The new Elixirs of Endless... keep their original text.
+- Scrolls and other consumables get compact lines too, in a new Miscellaneous tab of the settings window with its own checkbox, "Compact scroll and other consumable lines", its own colors and a sample consumable. Scroll of Agility IV shows `+17 agility (30 min)`, R.O.I.D.S. `+25 strength (60 min)`, and Rumsey Rum `+10 stamina (15 min) and gets you drunk to boot!`, in the game's own words in the chosen language: `+10 aguante (15 min) ¡y por si fuera poco, te emborracha!`.
+- The 1 second cooldown scrolls share is left out. Any other cooldown keeps the original text.
+- After updating, restart the game instead of using `/reload`: the new file is only loaded on a restart.
 - WoW: Forever now installs in `World of Warcraft\_forever_`: install the addon in `_forever_\Interface\AddOns`, not `_classic_beta_`.
 
 ## v0.6.0 (2026-10-18)

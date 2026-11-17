@@ -1,3 +1,4 @@
-ID,AuraDescription_lang
-19705,Vigor e Espírito aumentados em $w1.
-1243969,Experiência obtida com abates aumentada em $w1%.
+ID,Description_lang,AuraDescription_lang
+19705,,Vigor e Espírito aumentados em $w1.
+1243969,"$?pc142418[Além disso, a experiência obtida com os abates é aumentada em $s1%.][]",Experiência obtida com abates aumentada em $w1%.
+20875,"Aumenta em $s1 o Vigor por $d, além de embebedar você.",Vigor aumentado em $s1.

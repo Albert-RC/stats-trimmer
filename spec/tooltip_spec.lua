@@ -26,6 +26,7 @@ local function Setup(prepare, locale)
 		"Locales.lua",
 		"FoodData.lua",
 		"AlchemyData.lua",
+		"MiscData.lua",
 		"Rules.lua",
 		"ConsumableRules.lua",
 		"Localization.lua",
@@ -525,6 +526,72 @@ describe("Potion, elixir and flask Use lines", function()
 		local consumed, lines = Process(TITANS_LINE, 17627)
 		assert.is_false(consumed)
 		assert.are.same({}, lines)
+	end)
+end)
+
+describe("Scroll and other consumable Use lines", function()
+	-- Scroll of Agility IV and Rumsey Rum on the esES client, from their spells' esES descriptions, the scroll with
+	-- the cooldown scrolls share
+	local SCROLL_LINE = "Usar: Aumenta la agilidad en 17 p. durante 30 min. (1 |4s:s; de tiempo de reutilización)."
+	local RUM_LINE = "Usar: Aumenta el aguante en 10 p. durante 15 min ¡y por si fuera poco, te emborracha!"
+	local wow, ns, preCall
+
+	local function Process(text, spellID)
+		local tooltip = fakes.ItemTooltip(wow, { hyperlink = "item:scroll" })
+		local consumed = preCall(tooltip, {
+			leftText = text,
+			leftColor = fakes.Color(0, 1, 0),
+			type = wow.env.Enum.TooltipDataLineType.ItemSpellTriggerOnUse,
+			spellID = spellID,
+		})
+		return consumed, tooltip.lines
+	end
+
+	before_each(function()
+		wow, ns = Setup()
+		preCall = wow.preCalls[2].handler
+	end)
+
+	it("replaces the line with compact lines in the misc tab's colors, without the shared cooldown", function()
+		ns.db.colors.miscAgility = { r = 1, g = 0, b = 0 }
+		local consumed, lines = Process(SCROLL_LINE, 12174)
+		assert.is_true(consumed)
+		assert.are.same({ { text = "+17 agilidad (30 min)", r = 1, g = 0, b = 0 } }, lines)
+	end)
+
+	it("says that Rumsey Rum gets you drunk, in the language setting", function()
+		assert.are.equal(
+			"+10 aguante (15 min) ¡y por si fuera poco, te emborracha!",
+			select(2, Process(RUM_LINE, 20875))[1].text
+		)
+		ns.db.language = "frFR"
+		assert.are.equal(
+			"+10 endurance (15 min) et vous rend complètement saoul !",
+			select(2, Process(RUM_LINE, 20875))[1].text
+		)
+	end)
+
+	it("is in English, whole, on a client whose language isn't bundled, which lacks those words", function()
+		wow, ns = Setup(nil, "ruRU")
+		preCall = wow.preCalls[2].handler
+		local line =
+			"Использование: Повышение выносливости на 10 ед. на 15 мин. и жуткое опьянение!"
+		assert.are.equal("+10 stamina (15 min) and gets you drunk to boot!", select(2, Process(line, 20875))[1].text)
+	end)
+
+	it("leaves the line alone while the misc tab's checkbox is cleared, but not alchemy's", function()
+		ns.db.disabledTabs.misc = true
+		local consumed, lines = Process(SCROLL_LINE, 12174)
+		assert.is_false(consumed)
+		assert.are.same({}, lines)
+		ns.db.disabledTabs = { alchemy = true }
+		assert.is_true((Process(SCROLL_LINE, 12174)))
+	end)
+
+	it("leaves a spell a potion or elixir uses too to the alchemy tab (Oil of Olaf's)", function()
+		ns.db.disabledTabs.misc = true
+		local line = "Usar: Aumenta la armadura en 50 p. durante 1 h. (3 |4s:s; de tiempo de reutilización)."
+		assert.is_true((Process(line, 673)))
 	end)
 end)
 

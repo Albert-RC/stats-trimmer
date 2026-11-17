@@ -80,19 +80,24 @@ try {
 	New-Item -ItemType Directory -Force -Path $work | Out-Null
 	$foods = Join-Path $work "FoodData.lua"
 	$alchemy = Join-Path $work "AlchemyData.lua"
+	$misc = Join-Path $work "MiscData.lua"
 	$locales = Join-Path $work "Locales.lua"
 	$client = Join-Path $work "ClientStrings-ruRU.lua"
 	# The fixtures have a few stat names per language, not the client's hundred
 	$localeParameters = @{ Output = $locales; Fixture = $client; MinimumStatNames = 3 }
-	# update-consumables.ps1's two files for a case, in the work folder
+	# update-consumables.ps1's three files for a case, in the work folder
 	function Outputs([string]$name) {
-		return @{ FoodOutput = (Join-Path $work "$name-Food.lua"); AlchemyOutput = (Join-Path $work "$name-Alchemy.lua") }
+		return @{
+			FoodOutput = (Join-Path $work "$name-Food.lua")
+			AlchemyOutput = (Join-Path $work "$name-Alchemy.lua")
+			MiscOutput = (Join-Path $work "$name-Misc.lua")
+		}
 	}
 	# The potions', elixirs' and flasks' spells in the fixtures
-	$alchemySpells = @("4941", "6612", "6615", "17535", "17538", "17626", "24361", "1251940", "1252559")
+	$alchemySpells = @("673", "4941", "6612", "6615", "17535", "17538", "17626", "24361", "1251940", "1252559")
 
-	Test-Case "update-consumables.ps1 writes the fixtures' foods, and their potions, elixirs and flasks" {
-		Assert-Written (Invoke-Generator "update-consumables.ps1" @{ From = "spec/fixtures/consumables"; FoodOutput = $foods; AlchemyOutput = $alchemy })
+	Test-Case "update-consumables.ps1 writes the fixtures' foods, potions, elixirs and flasks, and other consumables" {
+		Assert-Written (Invoke-Generator "update-consumables.ps1" @{ From = "spec/fixtures/consumables"; FoodOutput = $foods; AlchemyOutput = $alchemy; MiscOutput = $misc })
 	}
 	Test-Case "update-locales.ps1 writes the fixtures' languages and the ruRU client's strings" {
 		Assert-Written (Invoke-Generator "update-locales.ps1" (With $localeParameters @{ From = "spec/fixtures/locales" }))
@@ -151,9 +156,14 @@ try {
 			throw "it wrote $($outputs.FoodOutput)"
 		}
 	}
-	# Spell 432 is a food's, 17626 a flask's
-	foreach ($removal in @(@{ spell = "432"; group = "food"; label = "a food" }, @{ spell = "17626"; group = "alchemy"; label = "an alchemy" })) {
-		Test-Case "update-consumables.ps1 keeps both files when $($removal.label) spell they had would go, unless told it is expected" {
+	# Spell 432 is a food's, 17626 a flask's, 12174 a scroll's
+	$removals = @(
+		@{ spell = "432"; group = "food"; label = "a food" }
+		@{ spell = "17626"; group = "alchemy"; label = "an alchemy" }
+		@{ spell = "12174"; group = "misc"; label = "a misc" }
+	)
+	foreach ($removal in $removals) {
+		Test-Case "update-consumables.ps1 keeps every file when $($removal.label) spell they had would go, unless told it is expected" {
 			$from = Copy-Fixtures "consumables"
 			Edit-Csv "$from/Spell.csv" {
 				param($rows) $rows | ForEach-Object { if ($_.ID -eq $removal.spell) { $_.Description_lang = "Does something else." }; $_ }
@@ -161,14 +171,15 @@ try {
 			$outputs = Outputs "Previous"
 			Copy-Item $foods $outputs.FoodOutput
 			Copy-Item $alchemy $outputs.AlchemyOutput
-			$before = @($outputs.FoodOutput, $outputs.AlchemyOutput | ForEach-Object { (Get-FileHash $_).Hash })
+			Copy-Item $misc $outputs.MiscOutput
+			$before = @($outputs.FoodOutput, $outputs.AlchemyOutput, $outputs.MiscOutput | ForEach-Object { (Get-FileHash $_).Hash })
 			Assert-Refused (Invoke-Generator "update-consumables.ps1" (With $outputs @{ From = $from })) "1 $($removal.group) spells would be removed"
-			$after = @($outputs.FoodOutput, $outputs.AlchemyOutput | ForEach-Object { (Get-FileHash $_).Hash })
+			$after = @($outputs.FoodOutput, $outputs.AlchemyOutput, $outputs.MiscOutput | ForEach-Object { (Get-FileHash $_).Hash })
 			if (($before -join " ") -ne ($after -join " ")) {
 				throw "it changed a file"
 			}
 			Assert-Written (Invoke-Generator "update-consumables.ps1" (With $outputs @{ From = $from; AcceptRemovals = $true }))
-			if (Select-String -Path $outputs.FoodOutput, $outputs.AlchemyOutput -Pattern "\[$($removal.spell)\]" -Quiet) {
+			if (Select-String -Path $outputs.FoodOutput, $outputs.AlchemyOutput, $outputs.MiscOutput -Pattern "\[$($removal.spell)\]" -Quiet) {
 				throw "$($removal.spell) is still there"
 			}
 		}

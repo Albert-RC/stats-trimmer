@@ -33,11 +33,12 @@ end
 ns.LOCALES = {}
 ns.LOCALE_STRINGS = {}
 ns.LOCALE_CLASS_NAMES = {}
--- What each food's and each potion's, elixir's and flask's Use line shows, filled by FoodData.lua and
--- AlchemyData.lua. Without them, as right after the update that added them, those Use lines keep their original
--- text.
+-- What each food's, each potion's, elixir's and flask's, and each scroll's and other consumable's Use line shows,
+-- filled by FoodData.lua, AlchemyData.lua and MiscData.lua. Without them, as right after the update that added
+-- them, those Use lines keep their original text.
 ns.FOODS = {}
 ns.ALCHEMY = {}
+ns.MISC = {}
 
 -- The bundled languages a client can show, in menu order: all of them on a client with the Latin alphabet,
 -- only English on the others (Cyrillic, Korean and Chinese fonts may lack accented letters)
@@ -59,7 +60,8 @@ function ns.ResolveLanguage(saved, clientLocale)
 	return "CLIENT"
 end
 
--- Tabs of the settings window, in order: items' lines, food's lines, and potions', elixirs' and flasks' lines.
+-- Tabs of the settings window, in order: items' lines, food's lines, potions', elixirs' and flasks' lines, and the
+-- lines of scrolls and other consumables (Blizzard's "Miscellaneous").
 -- `labelGlobal` names Blizzard's text for the tab, `label` is the fallback. `compactLabel` is the addon's text for the
 -- checkbox that turns the tab's lines on and off. `spellPowerSplit` marks the tab that also holds the spell power
 -- split.
@@ -83,6 +85,12 @@ ns.SETTINGS_TABS = {
 		label = "Alchemy",
 		compactLabel = "Compact flask, elixir and potion lines",
 	},
+	{
+		key = "misc",
+		labelGlobal = "MISCELLANEOUS",
+		label = "Miscellaneous",
+		compactLabel = "Compact scroll and other consumable lines",
+	},
 }
 
 -- True when a tab's lines are compacted in the tooltips, as they are unless its checkbox was cleared
@@ -94,7 +102,7 @@ end
 -- `labelGlobal` names Blizzard's text for the section title (its character pane categories, the minimap's
 -- tracking of food vendors), `label` is the fallback and `labelSuffix` is added after either: Blizzard has no
 -- name for spell schools, so that section is its "Damage" plus " extra". The alchemy tab has the primary stats'
--- section, then the combat tab's.
+-- section, then the combat tab's. The misc tab has one section, which its name titles.
 ns.COLOR_GROUPS = {
 	{ key = "attack", tab = "combat", labelGlobal = "STAT_CATEGORY_ATTACK", label = "Attack" },
 	{ key = "defense", tab = "combat", labelGlobal = "STAT_CATEGORY_DEFENSE", label = "Defense" },
@@ -106,6 +114,7 @@ ns.COLOR_GROUPS = {
 	{ key = "alchemyDefense", tab = "alchemy", labelGlobal = "STAT_CATEGORY_DEFENSE", label = "Defense" },
 	{ key = "alchemySpell", tab = "alchemy", labelGlobal = "SPELLS", label = "Spells" },
 	{ key = "alchemySchool", tab = "alchemy", labelGlobal = "DAMAGE", label = "Damage", labelSuffix = " extra" },
+	{ key = "misc", tab = "misc", labelGlobal = "MISCELLANEOUS", label = "Miscellaneous" },
 }
 
 -- True for a section with a header that collapses it: one of several in its tab. The only section of a tab has
@@ -128,7 +137,8 @@ end
 -- percent = ..., stat = ..., details = ... }, where its own `stat` overrides the kind's, the name is
 -- ns.ENGLISH_NAMES' for its stat unless given, and `details` are a consumable line's (ns.FormatDetails). Food
 -- lines also use the attack power, spell damage, spell healing and crit kinds, for those Well Fed buffs.
--- Potions', elixirs' and flasks' lines have kinds of their own, in their own tab.
+-- Potions', elixirs' and flasks' lines have kinds of their own, in their own tab, and so do scrolls' and other
+-- consumables'.
 ns.COLOR_KINDS = {
 	{
 		key = "attackPower",
@@ -502,6 +512,43 @@ ns.COLOR_KINDS = {
 		group = "alchemySchool",
 		stat = "ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT",
 		sample = { 40, details = { minutes = 30 } },
+	},
+	-- Scrolls (Scroll of Agility IV), the Blasted Lands' consumables (R.O.I.D.S.) and Rumsey Rum
+	{
+		key = "miscStrength",
+		group = "misc",
+		stat = "ITEM_MOD_STRENGTH_SHORT",
+		sample = { 25, details = { minutes = 60 } },
+	},
+	{
+		key = "miscAgility",
+		group = "misc",
+		stat = "ITEM_MOD_AGILITY_SHORT",
+		sample = { 17, details = { minutes = 30 } },
+	},
+	{
+		key = "miscStamina",
+		group = "misc",
+		stat = "ITEM_MOD_STAMINA_SHORT",
+		sample = { 15, details = { minutes = 15, drunk = true } },
+	},
+	{
+		key = "miscIntellect",
+		group = "misc",
+		stat = "ITEM_MOD_INTELLECT_SHORT",
+		sample = { 16, details = { minutes = 30 } },
+	},
+	{
+		key = "miscSpirit",
+		group = "misc",
+		stat = "ITEM_MOD_SPIRIT_SHORT",
+		sample = { 15, details = { minutes = 30 } },
+	},
+	{
+		key = "miscArmor",
+		group = "misc",
+		stat = "ARMOR",
+		sample = { 240, details = { minutes = 30 } },
 	},
 }
 
