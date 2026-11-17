@@ -1,4 +1,4 @@
--- ConsumableRules.lua over the generated FoodData.lua and AlchemyData.lua. The enUS lines of Spongy Morel, Melon
+-- ConsumableRules.lua over the generated FoodData.lua, AlchemyData.lua and MiscData.lua. The enUS lines of Spongy Morel, Melon
 -- Juice and Longjaw Mud
 -- Snapper were seen in game; the others are Blizzard's description templates of each language with their
 -- numbers filled in. The health or mana a food restores comes from the line: where the game's is unknown, the
@@ -7,7 +7,7 @@ local helpers = require("spec.helpers")
 local fakes = require("spec.fakes")
 local ns = helpers.LoadAddon(
 	"StatsTrimmer",
-	{ "Util.lua", "Config.lua", "FoodData.lua", "AlchemyData.lua", "Rules.lua", "ConsumableRules.lua" }
+	{ "Util.lua", "Config.lua", "FoodData.lua", "AlchemyData.lua", "MiscData.lua", "Rules.lua", "ConsumableRules.lua" }
 )
 
 -- ITEM_SPELL_TRIGGER_ONUSE, ITEM_COOLDOWN_TOTAL, SECONDS_ABBR and MINUTES_ABBR per locale
@@ -711,6 +711,182 @@ describe("potion, elixir and flask lines in the client's language", function()
 		assert.are.same(
 			{ "+180 Poder de ataque contra bestias (5 min)" },
 			Texts(ns.LocalizeLines(lines, Names(fakes.LocaleStrings("esES"))))
+		)
+	end)
+end)
+
+-- GetMiscReplacement for a scroll's or other consumable's Use line, as { kind, text } lines
+local function ReplaceMisc(text, spellID, locale)
+	local lines = ns.GetMiscReplacement(text, ns.MISC[spellID], CONTEXTS[locale or "enUS"])
+	if not lines then
+		return nil
+	end
+	local shown = {}
+	for _, line in ipairs(lines) do
+		table.insert(shown, { kind = line.kind, text = line.text })
+	end
+	return shown
+end
+
+-- Their spells' descriptions in enUS and esES with their numbers filled in. Scroll of Agility IV's esES one doesn't
+-- say "the target's".
+local SCROLL_EN = "Use: Increases the target's Agility by 17 for 30 min. (1 |4Sec:Sec; Cooldown)"
+local SCROLL_ES = "Usar: Aumenta la agilidad en 17 p. durante 30 min. (1 |4s:s; de tiempo de reutilización)."
+local ROIDS_EN = "Use: Increases Strength by 25 when consumed. Effect lasts for 60 minutes."
+local ROIDS_ES = "Usar: Aumenta la fuerza en 25 p. cuando se consume. El efecto dura 60 minutos."
+local RUM_EN = "Use: Increases Stamina by 10 for 15 min and gets you drunk to boot!"
+local RUM_ES = "Usar: Aumenta el aguante en 10 p. durante 15 min ¡y por si fuera poco, te emborracha!"
+
+describe("scrolls and other consumables", function()
+	it("show a scroll's stat and how long it lasts, without the 1 second cooldown scrolls share", function()
+		assert.are.same({ L("miscAgility", "+17 agility (30 min)") }, ReplaceMisc(SCROLL_EN, 12174))
+		assert.are.same({ L("miscAgility", "+17 agility (30 min)") }, ReplaceMisc(SCROLL_ES, 12174, "esES"))
+	end)
+
+	it("show armor from a scroll (Scroll of Protection IV)", function()
+		local text = "Use: Increases the target's Armor by 240 for 30 min."
+		assert.are.same({ L("miscArmor", "+240 armor (30 min)") }, ReplaceMisc(text, 12175))
+	end)
+
+	it("show the Blasted Lands' consumables, whose duration is a number in their text (R.O.I.D.S.)", function()
+		assert.are.same({ L("miscStrength", "+25 strength (60 min)") }, ReplaceMisc(ROIDS_EN, 10667))
+		assert.are.same({ L("miscStrength", "+25 strength (60 min)") }, ReplaceMisc(ROIDS_ES, 10667, "esES"))
+	end)
+
+	it("say that Rumsey Rum gets you drunk, after how long it lasts", function()
+		assert.are.same(
+			{ L("miscStamina", "+10 stamina (15 min) and gets you drunk to boot!") },
+			ReplaceMisc(RUM_EN, 20875)
+		)
+		assert.are.same(
+			{ L("miscStamina", "+10 stamina (15 min) and gets you drunk to boot!") },
+			ReplaceMisc(RUM_ES, 20875, "esES")
+		)
+	end)
+
+	it("say it for Rumsey Rum Black Label too, a food and drink item", function()
+		local text = "Use: Increases Stamina by 15 for 15 min and gets you drunk to boot!"
+		assert.are.same(
+			{ L("miscStamina", "+15 stamina (15 min) and gets you drunk to boot!") },
+			ReplaceMisc(text, 25804)
+		)
+	end)
+
+	it("keep their text with a cooldown other than the 1 second one (the Blasted Lands' hour)", function()
+		assert.is_nil(ReplaceMisc(ROIDS_EN .. " (1 |4Hr:Hr; Cooldown)", 10667))
+		assert.is_nil(
+			ReplaceMisc("Use: Increases the target's Agility by 17 for 30 min. (3 |4Sec:Sec; Cooldown)", 12174)
+		)
+	end)
+
+	it("keep their text when a number is missing or one too many", function()
+		assert.is_nil(ReplaceMisc("Use: Increases the target's Agility by 17.", 12174))
+		assert.is_nil(ReplaceMisc("Use: Increases the target's Agility by 17 for 30 min, 5 times.", 12174))
+	end)
+end)
+
+describe("misc data", function()
+	it("describes every scroll and other consumable spell it had, so losing one shows up", function()
+		local spells = {}
+		for spellID in pairs(ns.MISC) do
+			table.insert(spells, spellID)
+		end
+		table.sort(spells)
+		assert.are.same({
+			4318,
+			8091,
+			8094,
+			8095,
+			8096,
+			8097,
+			8098,
+			8099,
+			8100,
+			8101,
+			8112,
+			8113,
+			8114,
+			8115,
+			8116,
+			8117,
+			8118,
+			8119,
+			8120,
+			10667,
+			10668,
+			10669,
+			10692,
+			10693,
+			12174,
+			12175,
+			12176,
+			12177,
+			12178,
+			12179,
+			20875,
+			22789,
+			25037,
+			25722,
+			25804,
+			460332,
+		}, spells)
+	end)
+
+	it("leaves a spell a potion or elixir uses too to them (Oil of Olaf's)", function()
+		assert.is_nil(ns.MISC[673])
+		assert.is_not_nil(ns.ALCHEMY[673])
+	end)
+
+	it("renders every scroll and other consumable whose line shows its numbers, in kinds of the misc tab", function()
+		local kinds = {}
+		for _, kind in ipairs(ns.COLOR_KINDS) do
+			if kind.group == "misc" then
+				kinds[kind.key] = true
+			end
+		end
+		for spellID, entry in pairs(ns.MISC) do
+			local lines = ns.GetMiscReplacement("Use: " .. table.concat(entry.numbers, " "), entry, CONTEXTS.enUS)
+			assert.are.same({ spellID, true }, { spellID, lines ~= nil })
+			for _, line in ipairs(lines) do
+				assert.are.same({ spellID, line.kind, true }, { spellID, line.kind, kinds[line.kind] })
+			end
+		end
+	end)
+end)
+
+describe("scroll and other consumable lines in the client's language", function()
+	local function Names(strings)
+		return ns.TrustedNames(function(key)
+			return strings[key]
+		end, fakes.FoldCase)
+	end
+
+	local function Texts(lines)
+		local texts = {}
+		for _, line in ipairs(lines) do
+			table.insert(texts, line.text)
+		end
+		return texts
+	end
+
+	it("say that Rumsey Rum gets you drunk in Blizzard's words", function()
+		local lines = ns.GetMiscReplacement(RUM_EN, ns.MISC[20875], CONTEXTS.enUS)
+		assert.are.same(
+			{ "+10 aguante (15 min) ¡y por si fuera poco, te emborracha!" },
+			Texts(ns.LocalizeLines(lines, Names(fakes.LocaleStrings("esES"))))
+		)
+		assert.are.same(
+			{ "+10 Ausdauer (15 Min.) und macht Euch ziemlich betrunken!" },
+			Texts(ns.LocalizeLines(lines, Names(fakes.LocaleStrings("deDE"))))
+		)
+	end)
+
+	it("stay for the next pass when a language lacks those words", function()
+		local strings = setmetatable({ DRUNK = false }, { __index = fakes.LocaleStrings("esES") })
+		local lines = ns.GetMiscReplacement(RUM_EN, ns.MISC[20875], CONTEXTS.enUS)
+		assert.are.same(
+			{ "+10 stamina (15 min) and gets you drunk to boot!" },
+			Texts(ns.LocalizeLines(lines, Names(strings)))
 		)
 	end)
 end)

@@ -113,6 +113,17 @@ describe("FormatDetails", function()
 		assert.are.equal(" (1 hour)", ns.FormatDetails({ hours = 1 }, English))
 		assert.are.equal(" (2 hrs)", ns.FormatDetails({ hours = 2 }, English))
 	end)
+
+	it("says that Rumsey Rum gets you drunk, in Blizzard's words, after how long it lasts", function()
+		local function Words(name)
+			return name == "DRUNK" and "¡y por si fuera poco, te emborracha!" or Spanish(name)
+		end
+		assert.are.equal(
+			" (15 min) ¡y por si fuera poco, te emborracha!",
+			ns.FormatDetails({ minutes = 15, drunk = true }, Words)
+		)
+		assert.is_nil(ns.FormatDetails({ minutes = 15, drunk = true }, Spanish))
+	end)
 end)
 
 describe("ResolvePlural", function()

@@ -94,7 +94,7 @@ describe("color sections", function()
 	end
 
 	it(
-		"are attack, defense, spells, spell schools, food, and alchemy's, with MP5 among spells and HP5 in defense",
+		"are attack, defense, spells, spell schools, food, alchemy's and misc, with MP5 among spells and HP5 in defense",
 		function()
 			assert.are.same({
 				{
@@ -167,19 +167,32 @@ describe("color sections", function()
 						"alchemyShadowDamage",
 					},
 				},
+				{
+					"misc",
+					{ "miscStrength", "miscAgility", "miscStamina", "miscIntellect", "miscSpirit", "miscArmor" },
+				},
 			}, Sections())
 		end
 	)
 
-	it("are in the combat tab, but food and drink and alchemy's, which have tabs of their own", function()
+	it("are in the combat tab, but food and drink, alchemy's and misc, which have tabs of their own", function()
 		local tabs = {}
 		for _, group in ipairs(ns.COLOR_GROUPS) do
 			table.insert(tabs, group.tab)
 		end
-		assert.are.same(
-			{ "combat", "combat", "combat", "combat", "food", "alchemy", "alchemy", "alchemy", "alchemy", "alchemy" },
-			tabs
-		)
+		assert.are.same({
+			"combat",
+			"combat",
+			"combat",
+			"combat",
+			"food",
+			"alchemy",
+			"alchemy",
+			"alchemy",
+			"alchemy",
+			"alchemy",
+			"misc",
+		}, tabs)
 	end)
 
 	it("collapse only when they share their tab", function()
@@ -190,6 +203,7 @@ describe("color sections", function()
 			assert.is_true(ns.IsCollapsible(key))
 		end
 		assert.is_false(ns.IsCollapsible("food"))
+		assert.is_false(ns.IsCollapsible("misc"))
 		assert.is_false(ns.IsCollapsible("unknown"))
 	end)
 
@@ -223,6 +237,7 @@ describe("color sections", function()
 			{ "STAT_CATEGORY_DEFENSE" },
 			{ "SPELLS" },
 			{ "DAMAGE", " extra" },
+			{ "MISCELLANEOUS" },
 		}, titles)
 	end)
 end)
@@ -422,16 +437,18 @@ describe("settings tabs", function()
 	local ns = LoadConfig()
 
 	it(
-		"are combat, food and drink and alchemy, named with Blizzard's texts, the spell power split in combat",
+		"are combat, food and drink, alchemy and misc, named with Blizzard's texts, the spell power split in combat",
 		function()
 			local tabs = {}
 			for _, tab in ipairs(ns.SETTINGS_TABS) do
 				table.insert(tabs, { tab.key, tab.labelGlobal, tab.spellPowerSplit })
 			end
-			assert.are.same(
-				{ { "combat", "COMBAT", true }, { "food", "MINIMAP_TRACKING_VENDOR_FOOD" }, { "alchemy", "ALCHEMY" } },
-				tabs
-			)
+			assert.are.same({
+				{ "combat", "COMBAT", true },
+				{ "food", "MINIMAP_TRACKING_VENDOR_FOOD" },
+				{ "alchemy", "ALCHEMY" },
+				{ "misc", "MISCELLANEOUS" },
+			}, tabs)
 		end
 	)
 
@@ -456,10 +473,12 @@ describe("settings tabs", function()
 		for _, tab in ipairs(ns.SETTINGS_TABS) do
 			table.insert(labels, tab.compactLabel)
 		end
-		assert.are.same(
-			{ "Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines" },
-			labels
-		)
+		assert.are.same({
+			"Compact equip lines",
+			"Compact food and drink lines",
+			"Compact flask, elixir and potion lines",
+			"Compact scroll and other consumable lines",
+		}, labels)
 	end)
 
 	it("each hold some section", function()

@@ -585,9 +585,10 @@ function fakes.NewWoW(options)
 			env[name] = value
 		end
 		-- Not GlobalStrings: the client gives the first as the Well Fed spell's name, and has no text of its own
-		-- for the second
+		-- for the others
 		env.WELL_FED = nil
 		env.KILL_EXPERIENCE = nil
+		env.DRUNK = nil
 	elseif russian then
 		for name, value in pairs(client.strings) do
 			env[name] = value

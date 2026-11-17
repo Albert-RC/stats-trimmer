@@ -172,6 +172,7 @@ return {
 		MANA = "Мана",
 		MINIMAP_TRACKING_VENDOR_FOOD = "Еда и напитки",
 		MINUTES_ABBR = "%d мин.",
+		MISCELLANEOUS = "Разное",
 		PREVIEW = "Предпросмотр",
 		RESET = "Сброс",
 		SECONDS_ABBR = "%d с.",

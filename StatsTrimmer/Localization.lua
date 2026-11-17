@@ -20,8 +20,8 @@ local function NonEmpty(value)
 end
 
 -- Blizzard's texts that aren't GlobalStrings, by the name the bundled languages give them. The client gives the
--- Well Fed buff's name through its API. The experience from kills comes from a buff's description, which no API
--- gives: the client's language has the bundled one, if any.
+-- Well Fed buff's name through its API. The experience from kills, and that Rumsey Rum gets you drunk, come from
+-- spell descriptions, which no API gives as words: the client's language has the bundled ones, if any.
 local CLIENT_TEXTS = {
 	WELL_FED = function()
 		return C_Spell.GetSpellName(WELL_FED_SPELL)
@@ -29,6 +29,10 @@ local CLIENT_TEXTS = {
 	KILL_EXPERIENCE = function()
 		local strings = ns.LOCALE_STRINGS[GetLocale()]
 		return strings and strings.KILL_EXPERIENCE
+	end,
+	DRUNK = function()
+		local strings = ns.LOCALE_STRINGS[GetLocale()]
+		return strings and strings.DRUNK
 	end,
 }
 

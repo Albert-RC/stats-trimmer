@@ -46,6 +46,18 @@ becomes
 +1200 health (2 hrs)
 ```
 
+and the **Use:** line of scrolls and other consumables (R.O.I.D.S., Rumsey Rum):
+
+```
+Use: Increases Stamina by 10 for 15 min and gets you drunk to boot!
+```
+
+becomes
+
+```
++10 stamina (15 min) and gets you drunk to boot!
+```
+
 - Every compact line starts with `+`: it shows what the item adds to the stat, like Blizzard's item comparison. The original "up to" describes spell coefficients (how much of the bonus each spell gets), not the stat itself.
 - The original line must be recognized in **every client locale**, so nothing may match English text only.
 - The compact lines use Blizzard's own stat names, in lowercase, in the language chosen in the addon (the client's by default): `+10 daño con hechizos` on esES, `+10 spell damage` in English. MP5 and HP5 read the same in every language. See [Localization](#localization).
@@ -109,47 +121,48 @@ The `.toc` loads these files in order:
   - `CompactLine(kind, value, name, stats, percent, details)` builds a compact line (see `Rules.lua` below), and `StatLine(kind, value, key, percent, details)` one for a single stat, named with `ns.ENGLISH_NAMES`. A line without `stats` (MP5, HP5) keeps `name` in every language; only its details are translated.
   - `ns.ENGLISH_NAMES`: the addon's own English for each stat it shows, by the key of Blizzard's name: Blizzard's enUS name, lowercased (`+1% hit`, `+1% critical strike`, `+60 attack power in forms`). The compact lines show it when no language has Blizzard's name, as right after an update. Rules, food rules, samples and row labels take their English from here; groups of weapon skills and creature types build theirs.
 - `Config.lua`: pure settings model.
-  - `ns.SETTINGS_TABS`: the window's tabs, in order, each `{ key, labelGlobal, label, compactLabel, spellPowerSplit }`: combat (`COMBAT`, "Combate"), food and drink (`MINIMAP_TRACKING_VENDOR_FOOD`, "Comida y bebida") and alchemy (`ALCHEMY`, "Alquimia"). `compactLabel` is the addon's text for the tab's checkbox ("Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines"). `spellPowerSplit` marks the tab with the spell power split.
+  - `ns.SETTINGS_TABS`: the window's tabs, in order, each `{ key, labelGlobal, label, compactLabel, spellPowerSplit }`: combat (`COMBAT`, "Combate"), food and drink (`MINIMAP_TRACKING_VENDOR_FOOD`, "Comida y bebida") alchemy (`ALCHEMY`, "Alquimia") and misc (`MISCELLANEOUS`, "Miscelánea"). `compactLabel` is the addon's text for the tab's checkbox ("Compact equip lines", "Compact food and drink lines", "Compact flask, elixir and potion lines", "Compact scroll and other consumable lines"). `spellPowerSplit` marks the tab with the spell power split.
   - `ns.IsCompacting(settings, tabKey)`: whether a tab's lines are compacted in the tooltips. Each tab's checkbox turns them on and off (`disabledTabs`, SETTINGS_TABS key -> true while cleared); they are on by default. User decision (2026-10-18): a cleared tab only leaves its lines in the tooltips as they are; its colors and preview stay editable.
-  - `ns.COLOR_GROUPS`: the window's ten color sections, in order, each `{ key, tab, labelGlobal, label, labelSuffix }`: attack (`STAT_CATEGORY_ATTACK`), defense (`STAT_CATEGORY_DEFENSE`), spells (`SPELLS`) and spell schools in the combat tab; food and drink in its own; and in the alchemy tab, attributes (`STAT_CATEGORY_ATTRIBUTES`, "Atributos") and the combat tab's four again (`alchemyAttributes`, `alchemyAttack`, `alchemyDefense`, `alchemySpell`, `alchemySchool`). Blizzard has no name for spell schools, so that title is `DAMAGE` plus the addon's " extra": "Daño extra", "Damage extra".
+  - `ns.COLOR_GROUPS`: the window's eleven color sections, in order, each `{ key, tab, labelGlobal, label, labelSuffix }`: attack (`STAT_CATEGORY_ATTACK`), defense (`STAT_CATEGORY_DEFENSE`), spells (`SPELLS`) and spell schools in the combat tab; food and drink in its own; and in the alchemy tab, attributes (`STAT_CATEGORY_ATTRIBUTES`, "Atributos") and the combat tab's four again (`alchemyAttributes`, `alchemyAttack`, `alchemyDefense`, `alchemySpell`, `alchemySchool`); and misc in its own (`MISCELLANEOUS`). Blizzard has no name for spell schools, so that title is `DAMAGE` plus the addon's " extra": "Daño extra", "Damage extra".
   - `ns.IsCollapsible(groupKey)`: a section collapses when it shares its tab with others. The only section of a tab has no header: the tab names it.
-  - `ns.COLOR_KINDS`: 58 line kinds, listed section by section, each `{ key, group, label, stat, sample }`. `group` is its section; `stat` names the client's text for the row label, with its `ns.ENGLISH_NAMES` name as the English fallback, or `label` for kinds Blizzard has no single name for (vs type, weapon skills, MP5, HP5, experience); `sample` describes the preview line, which `ns.GetSampleLine(kind)` builds (`details` for a consumable line's), with its stat's English name unless it gives one.
+  - `ns.COLOR_KINDS`: 64 line kinds, listed section by section, each `{ key, group, label, stat, sample }`. `group` is its section; `stat` names the client's text for the row label, with its `ns.ENGLISH_NAMES` name as the English fallback, or `label` for kinds Blizzard has no single name for (vs type, weapon skills, MP5, HP5, experience); `sample` describes the preview line, which `ns.GetSampleLine(kind)` builds (`details` for a consumable line's), with its stat's English name unless it gives one.
     - Attack: attack power, attack power vs type, ranged attack power, feral attack power, hit, crit and weapon skills.
     - Defense: defense, dodge, parry, block (%), block value and HP5.
     - Spells: spell power, spell damage, spell healing, spell damage vs type, spell hit, spell crit, spell penetration and MP5.
     - Spell schools: arcane, fire, frost, holy, nature and shadow damage.
     - Food and drink: health, mana, experience, and the stats only Well Fed buffs give: stamina, intellect, strength, agility, spirit and armor. Well Fed attack power, spell damage, healing and crit use their kinds above.
     - Alchemy, kinds of its own (`alchemy*`), for flasks, elixirs and potions: strength, agility, stamina, intellect and spirit (attributes); attack power, attack power vs type and crit (attack); health, armor, spell resistance and HP5 (defense); mana, spell damage, spell healing, spell damage vs type and MP5 (spells); fire, frost, holy, nature and shadow damage. No potion, elixir or flask adds arcane damage alone, so it has no row.
+    - Misc, kinds of its own (`misc*`), for scrolls and other consumables: strength, agility, stamina, intellect, spirit and armor, the only stats they add. The stamina sample is Rumsey Rum's, which says it gets you drunk.
   - `ns.ORIGINAL_TEXT_KEYS`: Ctrl, Alt, Shift, with the client's text for each (`labelGlobal`).
   - The language setting is `language`: `CLIENT` (the default) or a bundled language.
   - `splitSpellPower` (false by default) shows combined spell power as spell damage and spell healing lines instead of its own line.
   - `ns.GetOfferedLanguages(clientLocale)`: the bundled languages a client's font can show. `ns.ResolveLanguage(saved, clientLocale)`: the language the texts are actually shown in (see [Localization](#localization)).
-  - Empty `ns.LOCALES`, `ns.LOCALE_STRINGS` and `ns.LOCALE_CLASS_NAMES`, which `Locales.lua` replaces, and empty `ns.FOODS` and `ns.ALCHEMY`, which `FoodData.lua` and `AlchemyData.lua` replace.
+  - Empty `ns.LOCALES`, `ns.LOCALE_STRINGS` and `ns.LOCALE_CLASS_NAMES`, which `Locales.lua` replaces, and empty `ns.FOODS`, `ns.ALCHEMY` and `ns.MISC`, which `FoodData.lua`, `AlchemyData.lua` and `MiscData.lua` replace.
   - `ns.DEFAULTS`: every color starts as equip green, the key defaults to Ctrl, the language to the client's, spell power isn't split, no color section is collapsed (`collapsedSections`, COLOR_GROUPS key -> true) and no tab is turned off (`disabledTabs`).
   - `ns.LoadSettings(saved)`: completes and validates the saved table in place (known key and language, a boolean `splitSpellPower`, colors in 0–1, collapsed sections that can collapse, turned off tabs that exist, a finite minimap angle).
 - `Locales.lua`: generated by `scripts/update-locales.ps1` (see [Localization](#localization)). Blizzard's strings in each bundled language: `ns.LOCALES` (menu order), `ns.LOCALE_STRINGS[locale][name]` and the class names, `ns.LOCALE_CLASS_NAMES[locale][classFile]`.
-- `FoodData.lua` and `AlchemyData.lua`: generated by `scripts/update-consumables.ps1`. `ns.FOODS[spellID]` and `ns.ALCHEMY[spellID]`: what each food's, and each potion's, elixir's and flask's, Use line shows (see [Food and drink](#food-and-drink) and [Potions, elixirs and flasks](#potions-elixirs-and-flasks)).
+- `FoodData.lua`, `AlchemyData.lua` and `MiscData.lua`: generated by `scripts/update-consumables.ps1`. `ns.FOODS[spellID]`, `ns.ALCHEMY[spellID]` and `ns.MISC[spellID]`: what each food's, each potion's, elixir's and flask's, and each scroll's and other consumable's Use line shows (see [Food and drink](#food-and-drink), [Potions, elixirs and flasks](#potions-elixirs-and-flasks) and [Scrolls and other consumables](#scrolls-and-other-consumables)).
 - `Rules.lua`: pure. Turns the item's stats into claims and decides which equip lines to rewrite (see [Rules](#rules)).
   - `ns.GetReplacement(text, stats, context)` returns a list of compact lines, `{}` to remove the line, or `nil` to keep it.
   - A compact line is `{ kind, text, value, percent, stats }`. `text` is the English line, `kind` is a `COLOR_KINDS` key (school damage is `<school>Damage`) and `stats` lists the `ITEM_MOD_*_SHORT` keys it shows.
   - `ns.TrustedNames(GetStatName, FoldCase)` makes a stat name getter that leaves out untrusted vs names (see [Creature types](#creature-types)). `context.GetStatName` is one of these, over the client's names.
   - `ns.LocalizeLines(lines, GetStatName)` rebuilds the lines with the names of a `TrustedNames` getter, consumable lines' details included.
   - `ns.GetVsEnglishName(key)` is the addon's English for a vs stat key: `+180 attack power vs beasts`.
-- `ConsumableRules.lua`: pure. `ns.GetFoodReplacement(text, food, context)` and `ns.GetAlchemyReplacement(text, entry, context)` return the compact lines of a food's, or a potion's, elixir's or flask's, Use line, or `nil` to keep it (see [Food and drink](#food-and-drink) and [Potions, elixirs and flasks](#potions-elixirs-and-flasks)). Both match the line the same way; they differ in the line kinds and the shared cooldowns.
+- `ConsumableRules.lua`: pure. `ns.GetFoodReplacement(text, food, context)`, `ns.GetAlchemyReplacement(text, entry, context)` and `ns.GetMiscReplacement(text, entry, context)` return the compact lines of a food's, a potion's, elixir's or flask's, or a scroll's or other consumable's Use line, or `nil` to keep it (see [Food and drink](#food-and-drink), [Potions, elixirs and flasks](#potions-elixirs-and-flasks) and [Scrolls and other consumables](#scrolls-and-other-consumables)). All match the line the same way; they differ in the line kinds and the shared cooldowns.
 - `Localization.lua`: Blizzard's texts in the chosen language, for the tooltips, the window and the palette (see [Localization](#localization)).
   - `ns.GetClientText(name)` reads the client's own strings (for recognition), `ns.GetTextIn(language, name)` a string in a given language (`CLIENT` or a bundled one) and `ns.GetEnglishText(name)` one in English. `ns.GetClassName(classFile)` is a class's name in the chosen language, then in English.
-  - Two of the texts aren't GlobalStrings. `WELL_FED`, the Well Fed buff's name: the client's is `C_Spell.GetSpellName(19705)`, a Well Fed spell. `KILL_EXPERIENCE`, the experience from kills, comes from a buff's description, which no API gives: the client's is the bundled one of its language, if any.
+  - Two of the texts aren't GlobalStrings. `WELL_FED`, the Well Fed buff's name: the client's is `C_Spell.GetSpellName(19705)`, a Well Fed spell. `KILL_EXPERIENCE`, the experience from kills, and `DRUNK`, what Rumsey Rum's line says at its end, come from spell descriptions, which no API gives as words: the client's are the bundled ones of its language, if any.
   - `ns.GetLanguage()` is the language the texts are shown in (`ns.ResolveLanguage` for this client).
   - `ns.InLanguage(lines[, language])` gives the compact lines Blizzard's names in the chosen language (or `language`), lowercased. Its name getters are made once per language.
   - `ns.ToLower(text)` is the display lowercase, `ns.FoldCase(text)` the case fold creature types are searched with, and `ns.GetClientStatName` the `TrustedNames` getter over the client's names that recognition uses.
-- `Tooltip.lua`: the WoW API side. It registers the line pre-calls, for equip lines and for consumables' Use lines, and checks their prefix. It reads the item and its stats (or the line's food, potion, elixir or flask), builds `context`, gives the lines the chosen language's names (`ns.InLanguage`) and colors each line with `ns.db.colors[kind]`, falling back to the original line color. A line of a turned off tab (equip lines are combat's, Use lines food's or alchemy's) keeps its text. It skips tooltips other addons only fill to read an item (see [Other addons' tooltips](#other-addons-tooltips)) and handles the "show original text" key.
+- `Tooltip.lua`: the WoW API side. It registers the line pre-calls, for equip lines and for consumables' Use lines, and checks their prefix. It reads the item and its stats (or the line's food, potion, elixir, flask, scroll or other consumable), builds `context`, gives the lines the chosen language's names (`ns.InLanguage`) and colors each line with `ns.db.colors[kind]`, falling back to the original line color. A line of a turned off tab (equip lines are combat's, Use lines food's, alchemy's or misc's) keeps its text. It skips tooltips other addons only fill to read an item (see [Other addons' tooltips](#other-addons-tooltips)) and handles the "show original text" key.
   - `ns.RefreshItemTooltips()` rebuilds the shown item tooltips (see ["Show original text" key](#show-original-text-key)).
 - `ClassPalette.lua`: the class color palette of the color picker (see the settings window below). `ns.ShowClassPalette()` shows it, right after Stats Trimmer sets up the picker.
 - `OptionsWindow.lua`: the settings window. `ns.ShowOptions()` opens it, `ns.ToggleOptions()` toggles it.
   - Rows: the original text key and the language, for every tab; then a divider and the shown tab's settings: its name (Blizzard's, as on the tab), its checkbox and, in the combat tab, the spell power split; then the shown tab's colors and preview. Changing the language sets every Blizzard text in the window again, with no `/reload`.
   - The divider is the `Options_HorizontalDivider` atlas across the window, the one Blizzard's Options window draws under its title (`Blizzard_SettingsList.xml`, loaded in Forever) and its AddOns list stretches the same way. Forever has no divider template: `HorizontalDividerTemplate` is the Mainline action bar's. User decision (2026-10-18): the tab's settings have a title and no frame, under that divider, so they don't read as settings of the whole window.
   - The tab's checkbox: one for every tab, which takes the shown tab's `compactLabel` and state. Changing it saves `disabledTabs` and rebuilds the shown item tooltips. The window makes room for the longest label, so switching tabs doesn't resize it.
-  - Tabs: `PanelTabButtonTemplate` buttons under the window (`$parentTab1` to `$parentTab3`), as in Blizzard's inspect window, with `PanelTemplates_SetNumTabs`, `PanelTemplates_SetTab` and `PanelTemplates_TabResize`, and the tab sound. Combat holds the item sections, the sample item and the spell power split checkbox; food and drink holds its rows and the sample food; alchemy holds its sections and the sample potion. The window opens on the tab left open, the first one after a `/reload`.
+  - Tabs: `PanelTabButtonTemplate` buttons under the window (`$parentTab1` to `$parentTab4`), as in Blizzard's inspect window, with `PanelTemplates_SetNumTabs`, `PanelTemplates_SetTab` and `PanelTemplates_TabResize`, and the tab sound. Combat holds the item sections, the sample item and the spell power split checkbox; food and drink holds its rows and the sample food; alchemy holds its sections and the sample potion; misc holds its rows and the sample consumable. The window opens on the tab left open, the first one after a `/reload`.
   - The split checkbox: changing it rebuilds the preview and the shown item tooltips; while it is on, the preview leaves out the spell power sample line, which would look like the spell damage and healing ones.
   - The color rows sit in a `ScrollFrameTemplate` inside the colors panel, in one section per `COLOR_GROUPS` entry; `LayoutSections` stacks the shown tab's sections, hides the other tab's and sizes the scroll child. Each row has its swatch, label and Reset button. "Reset these colors" resets the shown tab's colors.
   - A section that shares its tab has a `ListHeaderThreeSliceTemplate` header (Blizzard's collapsible header, as in the currency window) titled with Blizzard's name for it. A click collapses or expands it (`SetClickHandler`, `UpdateCollapsedState`). Collapsed sections are saved in `ns.db.collapsedSections` and left out of the preview. Food and drink, alone in its tab, has no header and always shows.
@@ -159,7 +172,7 @@ The `.toc` loads these files in order:
     - The palette is a child of `ColorPickerFrame`: the picker cancels and hides on any click outside itself (`GLOBAL_MOUSE_DOWN` and `DoesAncestryIncludeAny`).
     - The picker (331×210 without opacity) has no room for it, so it grows by `PALETTE_HEIGHT` while the palette shows and gets its own height back when the pick ends: on `OnHide` while no longer shown (hiding with UIParent, Alt+Z, keeps both), and on every `SetupColorPickerAndShow` (`hooksecurefunc`). Another addon can set up the picker while it still shows, and Blizzard's setup then only calls `Show()`, so no `OnHide` runs (checked in the `forever` branch's `Blizzard_ColorPickerFrame`). Stats Trimmer's own picks show the palette again right after their setup; other addons' picks never show it.
   - Built from Blizzard templates, and Blizzard's divider atlas: `PortraitFrameTemplate`, `PanelTabButtonTemplate`, `InsetFrameTemplate`, `ScrollFrameTemplate`, `ListHeaderThreeSliceTemplate`, `WowStyle1DropdownTemplate` with `MenuUtil.CreateRadioMenu`, `ColorSwatchTemplate`, `UIPanelButtonTemplate`, `UICheckButtonTemplate`.
-  - The preview is real `GameTooltipTemplate` tooltips filled with `AddLine`, in the same place: a sample item (`StatsTrimmerPreviewTooltip`) in the combat tab, a sample food (`StatsTrimmerFoodPreviewTooltip`) in the food tab and a sample potion (`StatsTrimmerAlchemyPreviewTooltip`) in the alchemy tab. All are filled and measured every time, and the other tabs' hidden.
+  - The preview is real `GameTooltipTemplate` tooltips filled with `AddLine`, in the same place: a sample item (`StatsTrimmerPreviewTooltip`) in the combat tab, a sample food (`StatsTrimmerFoodPreviewTooltip`) in the food tab a sample potion (`StatsTrimmerAlchemyPreviewTooltip`) in the alchemy tab and a sample consumable (`StatsTrimmerMiscPreviewTooltip`) in the misc tab. All are filled and measured every time, and the other tabs' hidden.
   - The window is strata HIGH, so the color picker (DIALOG) stays above it.
   - `FitWindow` sizes the window to its texts after opening and after every language, split, section or tab change (a color change only refills the preview): the colors panel to its longest row label in any tab (`GetUnboundedStringWidth`) plus the swatch and Reset button, and the window to that panel, the largest preview tooltip with its margins, the rows above the panels and the preview's height. Every tab counts, so switching tabs doesn't resize the window. The panels grow for longer texts, but never get smaller than with Spanish texts and every section open (`REFERENCE_LANGUAGE`): those sizes are measured once, on the window's own labels, Reset button and preview, which then get the chosen language's texts back before anything is drawn. The window is never smaller than 600×690 either. A screen too small for it (a large UI scale) gets it scaled down, tabs included (`SetScale`): their height below the frame counts towards the required height and extends the bottom screen boundary (`SetClampRectInsets`), so dragging the window cannot hide them either. `UI_SCALE_CHANGED` and `DISPLAY_SIZE_CHANGED` fit the shown window again; a hidden window fits when reopened.
 - `MinimapButton.lua`: `StatsTrimmerMinimapButton`, a child of `Minimap` with Blizzard's minimap button textures.
@@ -331,7 +344,7 @@ Retail-only keys (haste, mastery, versatility, `CR_*`, crafting stats, PvP, resi
 
 ## Food and drink
 
-Food and drink, and potions, elixirs and flasks (see [Potions, elixirs and flasks](#potions-elixirs-and-flasks)), are handled: bandages and other consumables keep their text.
+Food and drink, potions, elixirs and flasks (see [Potions, elixirs and flasks](#potions-elixirs-and-flasks)), and scrolls and other consumables (see [Scrolls and other consumables](#scrolls-and-other-consumables)) are handled: bandages and the rest keep their text.
 
 ### What the client gives
 
@@ -347,7 +360,7 @@ Checked on 2026-10-15 with a dump of the bag items with a Use spell (`C_TooltipI
 
 ### FoodData.lua
 
-`scripts/update-consumables.ps1 [-Build <build>] [-From <folder>] [-FoodOutput <file>] [-AlchemyOutput <file>] [-AcceptRemovals]` generates it, and `AlchemyData.lua` (see [Potions, elixirs and flasks](#potions-elixirs-and-flasks)), from Forever's Item, ItemSparse, ItemEffect, ItemXItemEffect, Spell, SpellEffect, SpellMisc and SpellDuration tables on wago.tools. It reads each food's English description to learn which numbers the line shows and what each one is:
+`scripts/update-consumables.ps1 [-Build <build>] [-From <folder>] [-FoodOutput <file>] [-AlchemyOutput <file>] [-MiscOutput <file>] [-AcceptRemovals]` generates it, and `AlchemyData.lua` (see [Potions, elixirs and flasks](#potions-elixirs-and-flasks)) and `MiscData.lua` (see [Scrolls and other consumables](#scrolls-and-other-consumables)), from Forever's Item, ItemSparse, ItemEffect, ItemXItemEffect, Spell, SpellEffect, SpellMisc and SpellDuration tables on wago.tools. It reads each food's English description to learn which numbers the line shows and what each one is:
 
 - `$d` is a duration, `$s1` an effect's base points, `$t2` its period, `$o1` its total: a percentage total for health and mana percentage auras (20, 21), and for health and mana regeneration (84, 85) an amount the client computes, which only the line gives. A formula (`${($430s1/5)*$430d}`) with one base points variable of a regeneration effect is such an amount too.
 - `ns.FOODS[spellID]` is `{ numbers, lines, experience }`: the numbers the line shows besides the amounts and the experience bonus; the compact lines (a stat key, a `value` or an `amount` with its base points, and their details); and the bonus, when the line can end with it.
@@ -358,7 +371,7 @@ It works in three steps, and writes nothing when one fails:
 
 1. Reads the tables, downloaded for `-Build` or from `-From`, a folder with one `<Table>.csv` each (`spec/fixtures/consumables` in the specs). Each must have rows and the columns the script reads, and every food's effects and spells must be in their tables: a partial download would otherwise leave foods out silently.
 2. Converts every food spell, or says why it keeps its original text. A Use spell in neither Spell nor SpellEffect doesn't exist in the build (Rage Potion's 6614): its item keeps its text. One with effects but no Spell row means a partial download, and stops the script.
-3. Compares each result with the file it replaces (`-FoodOutput`, `-AlchemyOutput`) and lists the spells added and removed. Neither file is written unless both can be. An empty result is refused, and so are removals unless `-AcceptRemovals` says they are expected. On build 1.60.1.70425 that caught the drinks' new formula, which the script didn't understand yet.
+3. Compares each result with the file it replaces (`-FoodOutput`, `-AlchemyOutput`, `-MiscOutput`) and lists the spells added and removed. No file is written unless all can be. An empty result is refused, and so are removals unless `-AcceptRemovals` says they are expected. On build 1.60.1.70425 that caught the drinks' new formula, which the script didn't understand yet.
 
 **Run it again when the client build changes**, read what it adds and removes, and commit the new file. On build 1.60.1.70425 it described the same 82 food spells as on 1.60.1.70338; build 1.60.1.70938 adds Morning Glory Dew, so it describes 83 and leaves out 35. `spec/consumable_rules_spec.lua` lists the 83, so losing one fails the tests.
 
@@ -428,6 +441,46 @@ On build 1.60.1.70938 it describes 85 spells and leaves out 101: the 93 of build
 
 The duration is Blizzard's `INT_SPELL_DURATION_SEC`, `INT_SPELL_DURATION_MIN` or `INT_SPELL_DURATION_HOURS` ("%d |4hour:hrs;", "%d |4h:h;" on esES), with its plural escape resolved for the number.
 
+## Scrolls and other consumables
+
+User decision (2026-11-17): the Use lines of scrolls and other consumables that add a stat for a while, read like Alchemy's, in a fourth tab, Misc, named with Blizzard's `MISCELLANEOUS` ("Miscelánea"), with its own color rows and no section header. Rumsey Rum and Gordok Green Grog get you drunk, which their compact line says at its end in Blizzard's words.
+
+### What the client gives
+
+From Forever's tables of build 1.60.1.70938 (wago.tools), not yet checked in game:
+
+- Scrolls are class 0, subclass 4; other consumables (the Blasted Lands' R.O.I.D.S. and the like, Rumsey Rum, Gordok Green Grog, Call of the Raptor) subclass 8. Rumsey Rum Black Label is food and drink (5).
+- Their descriptions read like elixirs': "Increases the target's Agility by $s1 for $d." The Blasted Lands' write their duration as a number: "Increases Strength by $s1 when consumed. Effect lasts for 60 minutes." Rumsey Rum's ends "for $d and gets you drunk to boot!", and the Grog's adds "Green means it's good!".
+- ItemEffect gives scrolls a 1 second cooldown, and the Blasted Lands' an hour of category cooldown (category 103). Whether the tooltip shows them is unverified; the rum has none.
+
+### MiscData.lua
+
+`scripts/update-consumables.ps1` generates it with `FoodData.lua` and `AlchemyData.lua`, reading each description like a potion's, with three more sentences:
+
+- "the target's <stat>" names the stat like "your <stat>";
+- "Increases <stat> by $s1 when consumed. Effect lasts for N minutes.", where the spell must last N minutes;
+- "Increases <stat> by $s1 for $d and gets you drunk to boot[.!]", which marks the last line `drunk`, and "Green means it's good!", dropped.
+
+It takes:
+
+- the Use spells of subclasses 4 and 8, but those a food, potion, elixir or flask uses too, which stay theirs (Oil of Olaf's is Elixir of Minor Defense's, `ALCHEMY`);
+- food and drink spells the food rules don't understand but these do (Rumsey Rum Black Label);
+- only spells of an item with a name, whose stats have a misc color row (`$miscStats`: the primary stats and armor).
+
+`ns.MISC[spellID]` is `{ numbers, lines }`, like `ns.ALCHEMY`'s, the last line with `drunk = true` for the rum. On build 1.60.1.70938 it describes 36 spells: the 24 stat scrolls (I to IV), the five Blasted Lands' consumables, five rums and the Grog, and Call of the Raptor. `spec/consumable_rules_spec.lua` lists them. The script lists the 817 it leaves out, most of them no stat buff at all.
+
+### Matching a Use line
+
+`ns.GetMiscReplacement(text, entry, context)` matches like the others. The only shared cooldown it drops is 1 second (`SECONDS_ABBR`), the scrolls'. The Blasted Lands' hour is worth knowing: a line that shows it keeps its text.
+
+| Line | English | esES |
+|---|---|---|
+| Scroll | `+17 agility (30 min)` | `+17 agilidad (30 min)` |
+| Blasted Lands | `+25 strength (60 min)` | `+25 fuerza (60 min)` |
+| Rumsey Rum | `+10 stamina (15 min) and gets you drunk to boot!` | `+10 aguante (15 min) ¡y por si fuera poco, te emborracha!` |
+
+What follows the rum's duration is `DRUNK` (see [Localization](#localization)), lowercased like the rest of the line. A language without it sends the line to the English pass whole, as ruRU clients do.
+
 ## Localization
 
 Stats Trimmer has no translations of its own: everything it shows in a language other than English is one of Blizzard's own strings.
@@ -437,7 +490,7 @@ Stats Trimmer has no translations of its own: everything it shows in a language 
 `ns.db.language` is `CLIENT` (default) or one of the bundled languages. It covers everything that comes from Blizzard: the compact lines, the color row labels and the window's Blizzard texts. Changing it in the window applies at once: the window's texts, the preview and the shown item tooltips are rebuilt.
 
 The client only loads its own language's strings, so the other languages are bundled:
-- `StatsTrimmer/Locales.lua` holds the strings of **enUS, deDE, esES, esMX, frFR, itIT and ptBR**: every `ITEM_MOD_*_SHORT` stat name, the few interface strings the window uses, the words of consumable lines (`HEALTH`, `MANA`, `COMBAT_XP_GAIN`, `ARMOR`, `INT_SPELL_DURATION_SEC`, `INT_SPELL_DURATION_MIN`, `INT_SPELL_DURATION_HOURS`), the alchemy tab's names (`ALCHEMY`, `STAT_CATEGORY_ATTRIBUTES`), the Well Fed buff's name as `WELL_FED`, the experience from kills as `KILL_EXPERIENCE`, and the male names of Forever's 9 classes.
+- `StatsTrimmer/Locales.lua` holds the strings of **enUS, deDE, esES, esMX, frFR, itIT and ptBR**: every `ITEM_MOD_*_SHORT` stat name, the few interface strings the window uses, the words of consumable lines (`HEALTH`, `MANA`, `COMBAT_XP_GAIN`, `ARMOR`, `INT_SPELL_DURATION_SEC`, `INT_SPELL_DURATION_MIN`, `INT_SPELL_DURATION_HOURS`), the alchemy tab's names (`ALCHEMY`, `STAT_CATEGORY_ATTRIBUTES`), the misc tab's (`MISCELLANEOUS`), the Well Fed buff's name as `WELL_FED`, the experience from kills as `KILL_EXPERIENCE`, what Rumsey Rum's line says at its end as `DRUNK`, and the male names of Forever's 9 classes.
 - It is generated by `./scripts/update-locales.ps1 [-Build <build>] [-LocaleBuilds @{ <locale> = <build> }] [-From <folder>]` from Forever's `GlobalStrings`, `ChrClasses`, `SpellName` and `Spell` on wago.tools (`https://wago.tools/db2/GlobalStrings/csv?build=<build>&locale=<locale>`, and the same for the others). For build 1.60.1.70338 the GlobalStrings match the client exactly (checked against an in-game dump); for 1.60.1.70425, `SECONDS_ABBR`, `ITEM_COOLDOWN_TOTAL`, `STAT_CATEGORY_WEAPON_SKILLS` and `ITEM_MOD_MANA_REGENERATION_SHORT` were checked in game on 2026-10-16.
   - It writes nothing when a table lacks rows or a column it reads, a language lacks a string the addon shows (or has fewer than `-MinimumStatNames` stat names), a language's texts are all the English ones, or a string the file had would go, unless `-AcceptRemovals` says that is expected.
   - Since build 1.60.1.70374, wago.tools gives the English texts for itIT. Its texts come from 1.60.1.70338, the last build with Italian ones (`-LocaleBuilds`, which the file's header names).
@@ -445,10 +498,11 @@ The client only loads its own language's strings, so the other languages are bun
   - `ChrClasses`' `Name_male_lang` matches `LocalizedClassList(false)`.
   - `WELL_FED` is spell 19705's name, the same spell the client is asked for.
   - `KILL_EXPERIENCE` is the aura description of the experience bonus (spell 1243969) without its number and the two words before it: "Experience gained from kills increased by $w1%." gives "Experience gained from kills", "Experiencia obtenida al matar enemigos aumentada un $w1%." gives "Experiencia obtenida al matar enemigos", and "Durch Siege erhaltene Erfahrung um $w1% erhöht." gives "Durch Siege erhaltene Erfahrung". The bonus only counts for kills, and Blizzard has no shorter string that says so. Check the result in every language when the build changes. itIT's is in English, as its description isn't translated.
+  - `DRUNK` is Rumsey Rum's description (spell 20875) after its last variable, without the punctuation that ends the duration: "Increases Stamina by $s1 for $d and gets you drunk to boot!" gives "and gets you drunk to boot!", and "Aumenta el aguante en $s1 p. durante $d ¡y por si fuera poco, te emborracha!" gives "¡y por si fuera poco, te emborracha!". ptBR's "$d, além de embebedar você." gives "além de embebedar você.". The Grog's own words differ ("füllt Euch bis oben hin ab!") but say the same. Blizzard has no shorter string for being drunk: only chat messages like "You feel drunk. Woah!". Check the result in every language when the build changes.
 - Forever's itIT data has no class names, so Italian shows the English ones, and a few of its strings are in English too ("Weapon Skills").
 - **Run the script again when the client build changes**, and commit the new file.
 - These are Blizzard's texts, not covered by the addon's MIT license.
-- `/reload` doesn't load a file new in the `.toc`, so right after the update that added `Locales.lua` the addon runs without it until the client restarts. `Config.lua` starts both tables empty: the texts are the client's and the English fallback is the addon's own (`ns.ENGLISH_NAMES`), with no Lua errors. The same goes for `FoodData.lua`: with `ns.FOODS` empty, food's Use lines keep their text until the restart. 0.6.0 added `AlchemyData.lua` and renamed `FoodRules.lua` to `ConsumableRules.lua`, so a `/reload` right after it loads `FoodData.lua` without the rules: `Tooltip.lua` then leaves every Use line as it is (`ns.GetFoodReplacement` is missing), and `ns.ALCHEMY` stays empty. `Localization.lua` and `ClassPalette.lua` (0.5.1) have no such fallback: until the restart, tooltips and the color picker give Lua errors.
+- `/reload` doesn't load a file new in the `.toc`, so right after the update that added `Locales.lua` the addon runs without it until the client restarts. `Config.lua` starts both tables empty: the texts are the client's and the English fallback is the addon's own (`ns.ENGLISH_NAMES`), with no Lua errors. The same goes for `FoodData.lua`: with `ns.FOODS` empty, food's Use lines keep their text until the restart. 0.6.0 added `AlchemyData.lua` and renamed `FoodRules.lua` to `ConsumableRules.lua`, so a `/reload` right after it loads `FoodData.lua` without the rules: `Tooltip.lua` then leaves every Use line as it is (`ns.GetFoodReplacement` is missing), and `ns.ALCHEMY` stays empty. `MiscData.lua`, new in the `.toc` after 0.6.0, is the same: until the restart, `ns.MISC` stays empty and scrolls and other consumables keep their text. `Localization.lua` and `ClassPalette.lua` (0.5.1) have no such fallback: until the restart, tooltips and the color picker give Lua errors.
 
 Which languages the dropdown offers depends on the client's font (`ns.GetOfferedLanguages`):
 - clients with the Latin alphabet: their own language plus every bundled one;
@@ -469,7 +523,7 @@ Text lookup:
 - The names are lowercased with `C_Intl.ToLower` (display lowercase that follows the client's language rules; `string.lower` if it returns nothing). Blizzard's own capitalization is uneven ("Daño Arcano", "golpe").
 - A line naming several stats becomes one line per stat: a group of weapon skills, or several creature types on one line.
 - MP5 and HP5 lines have no stat names, so they read `+4 MP5` and `+5 HP5` in every language.
-- Consumable lines' details use Blizzard's words too, lowercased like the names: `INT_SPELL_DURATION_SEC` ("%d s"), `INT_SPELL_DURATION_MIN`, `INT_SPELL_DURATION_HOURS` (its plural escape resolved: "1 hour", "2 hrs", "2 Stunden") and `WELL_FED`. A line lacking one of them goes to the English pass whole. `/s` is the same in every language. MP5 and HP5 lines keep their name and get only their duration translated: `+12 HP5 (1 h)`.
+- Consumable lines' details use Blizzard's words too, lowercased like the names: `INT_SPELL_DURATION_SEC` ("%d s"), `INT_SPELL_DURATION_MIN`, `INT_SPELL_DURATION_HOURS` (its plural escape resolved: "1 hour", "2 hrs", "2 Stunden"), `WELL_FED` and `DRUNK`. A line lacking one of them goes to the English pass whole. `/s` is the same in every language. MP5 and HP5 lines keep their name and get only their duration translated: `+12 HP5 (1 h)`.
 - The experience bonus is named `KILL_EXPERIENCE`, not `COMBAT_XP_GAIN` ("Experience"): it only counts for kills. Its color row is still labelled with `COMBAT_XP_GAIN`.
 - A name is skipped when it is missing or untrusted (see [Creature types](#creature-types)), and the line goes to the next pass. The addon's own English (`ns.ENGLISH_NAMES`, `+10 spell damage`) is only the last resort.
 
@@ -487,13 +541,13 @@ Blizzard's data has mistakes that fall back to English:
 | Headers | `COLORS`, `PREVIEW` |
 | Reset buttons | `RESET` |
 | Preview | `ITEM_BIND_ON_EQUIP`, `ITEM_MOD_STAMINA_SHORT` |
-| Tabs | `COMBAT`, `MINIMAP_TRACKING_VENDOR_FOOD`, `ALCHEMY` ("Combate", "Comida y bebida", "Alquimia" on esES) |
+| Tabs | `COMBAT`, `MINIMAP_TRACKING_VENDOR_FOOD`, `ALCHEMY`, `MISCELLANEOUS` ("Combate", "Comida y bebida", "Alquimia", "Miscelánea" on esES) |
 | Color section titles | `STAT_CATEGORY_ATTACK`, `STAT_CATEGORY_DEFENSE`, `SPELLS`, and `DAMAGE` followed by the addon's " extra" ("Ataque", "Defensa", "Hechizos", "Daño extra" on esES); in the alchemy tab, `STAT_CATEGORY_ATTRIBUTES` ("Atributos") first |
-| Color row labels | each kind's `stat`, lowercased. MP5 and HP5 read "MP5" and "HP5". "Attack power vs type" is `ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT` without its last word: "poder de ataque contra …"; "spell damage vs type" is `ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT` the same way. Weapon skills are `STAT_CATEGORY_WEAPON_SKILLS`. Food and drink: `HEALTH`, `MANA`, `COMBAT_XP_GAIN`, the primary stats' `ITEM_MOD_*_SHORT` and `ARMOR`. Alchemy: the same, and `ITEM_MOD_SPELL_RESISTANCE_ALL_SCHOOLS_SHORT` |
+| Color row labels | each kind's `stat`, lowercased. MP5 and HP5 read "MP5" and "HP5". "Attack power vs type" is `ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT` without its last word: "poder de ataque contra …"; "spell damage vs type" is `ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT` the same way. Weapon skills are `STAT_CATEGORY_WEAPON_SKILLS`. Food and drink: `HEALTH`, `MANA`, `COMBAT_XP_GAIN`, the primary stats' `ITEM_MOD_*_SHORT` and `ARMOR`. Alchemy: the same, and `ITEM_MOD_SPELL_RESISTANCE_ALL_SCHOOLS_SHORT`. Misc: the primary stats' and `ARMOR` |
 | Class color palette | the class names on hover: `LocalizedClassList(false)` on the client's language (Forever has no `LOCALIZED_CLASS_NAMES_MALE`), `ns.LOCALE_CLASS_NAMES` on the others |
 | Language options | `LocaleUtil.GetLocaleDisplayName` |
 
-Each falls back to Blizzard's English, then to the addon's English. The rest are the addon's own phrases and stay in English: the row titles, the help text, the tabs' and the spell power checkboxes, "Reset these colors", "Sample Item", "Sample Food", "Sample Potion", the minimap tooltip and the Options panel.
+Each falls back to Blizzard's English, then to the addon's English. The rest are the addon's own phrases and stay in English: the row titles, the help text, the tabs' and the spell power checkboxes, "Reset these colors", "Sample Item", "Sample Food", "Sample Potion", "Sample Consumable", the minimap tooltip and the Options panel.
 
 Translated text can be longer, so:
 - buttons are sized to their text plus a padding with `SetTextToFit` (`UIButtonFitToTextBehaviorMixin`, part of `UIPanelButtonTemplate`, which lets them get narrower too: `fitTextCanWidthDecrease`);
@@ -526,9 +580,9 @@ Unit tests run on LuaJIT 2.1 (Lua 5.1 compatible) through `spec/runner.lua`, a m
 - Expected values (labels, names) are written in the spec, not copied from the code's tables, so typos are caught.
 - When adding tests, check that they catch a real bug: change the code on purpose, see the right test fail, restore.
 
-Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. The generated files (`Locales.lua`, `FoodData.lua`, `AlchemyData.lua`: their first line says "Generated by") are mostly data, which any spec that loads them covers whole, so `coverage.ps1` reports them apart and requires 95% of the hand-written code. On 2026-11-17 it was 100% of 1340 hand-written lines and of 742 generated ones, with 403 tests.
+Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. The generated files (`Locales.lua`, `FoodData.lua`, `AlchemyData.lua`, `MiscData.lua`: their first line says "Generated by") are mostly data, which any spec that loads them covers whole, so `coverage.ps1` reports them apart and requires 95% of the hand-written code. On 2026-11-17 it was 100% of 1375 hand-written lines and of 799 generated ones, with 424 tests.
 
-The generators are tested on CSV fixtures, a few real rows of each table (`spec/fixtures/consumables`, `spec/fixtures/locales`, from build 1.60.1.70425, and 1.60.1.70338 for itIT), with no network: `test-generators.ps1` runs them, `spec/generators/*_spec.lua` check what they wrote against expected values written in the specs, and it checks what they refuse to write (a missing column or row, tables that don't agree, a language that is all English, removals). `test-release.sh` runs `publish-release.sh` against stand-ins for `git` and `gh`, from every state a failed release can leave.
+The generators are tested on CSV fixtures, a few real rows of each table (`spec/fixtures/consumables`, `spec/fixtures/locales`, from build 1.60.1.70425, 1.60.1.70938 for the scrolls, other consumables and Rumsey Rum's descriptions, and 1.60.1.70338 for itIT), with no network: `test-generators.ps1` runs them, `spec/generators/*_spec.lua` check what they wrote against expected values written in the specs, and it checks what they refuse to write (a missing column or row, tables that don't agree, a language that is all English, removals). `test-release.sh` runs `publish-release.sh` against stand-ins for `git` and `gh`, from every state a failed release can leave.
 
 The tests cover the logic. Game-facing behavior still has to be checked in game, and so do two things the specs only check as numbers: dragging the settings window to the screen's bottom edge (the fake doesn't clamp), and what a scaled window looks like.
 

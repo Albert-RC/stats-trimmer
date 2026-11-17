@@ -19,6 +19,7 @@ Each line shows what the item adds, as in the game's own item comparison. The or
 - **Compact stat lines** in item tooltips: bags, character pane, chat links and comparison tooltips.
 - **Compact food and drink lines:** what a food restores and how long it takes, its Well Fed buff, and the experience bonus.
 - **Compact flask, elixir and potion lines:** what each one adds and how long it lasts.
+- **Compact scroll and other consumable lines:** stat scrolls, the Blasted Lands' R.O.I.D.S. and the like, and Rumsey Rum, which still says it gets you drunk.
 - **Any client language.** Lines are recognized through the game's own data, not English text. The compact lines use the game's own stat names, in your client's language or another one you pick.
 - **Original text on demand.** Hold **Ctrl** over an item to see the original lines. You can switch the key to Alt or Shift.
 - **Your colors.** Pick a color for each kind of line, or one of the game's class colors, and see it live in a preview tooltip. Everything starts in the usual equip green, so nothing changes until you want it to.

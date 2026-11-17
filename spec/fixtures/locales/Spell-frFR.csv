@@ -1,3 +1,4 @@
-ID,AuraDescription_lang
-19705,Endurance et Esprit augmentés de $w1.
-1243969,Expérience gagnée en tuant des adversaires augmentée de $w1 %.
+ID,Description_lang,AuraDescription_lang
+19705,,Endurance et Esprit augmentés de $w1.
+1243969,$?pc142418[L’expérience que vous gagnez en éliminant des adversaires est également augmentée de $s1 %.][],Expérience gagnée en tuant des adversaires augmentée de $w1 %.
+20875,Augmente l'Endurance de $s1 pendant $d et vous rend complètement saoul !,Endurance augmentée de $s1.

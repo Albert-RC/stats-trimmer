@@ -103,6 +103,7 @@ local ENGLISH_DETAILS = {
 	INT_SPELL_DURATION_MIN = "%d min",
 	INT_SPELL_DURATION_HOURS = "%d |4hour:hrs;",
 	WELL_FED = "well fed",
+	DRUNK = "and gets you drunk to boot!",
 }
 
 local function EnglishDetail(name)
@@ -130,32 +131,44 @@ local DURATIONS = {
 	{ "hours", "INT_SPELL_DURATION_HOURS" },
 }
 
--- What follows a consumable line's stat name: "/s" for a rate (`perSecond`), then how long a Well Fed buff lasts
--- (`wellFedMinutes`), " (well fed, 15 min)", or how long a restore takes or a potion, elixir or flask lasts
--- (`seconds`, `minutes` or `hours`), " (24 sec)", " (2 hrs)". GetText(name) gives the words: Blizzard's
--- INT_SPELL_DURATION_SEC, INT_SPELL_DURATION_MIN, INT_SPELL_DURATION_HOURS and WELL_FED, the buff's name. "" without
--- details, nil when GetText lacks a word they need. "/s" reads the same in every language, like MP5.
-function ns.FormatDetails(details, GetText)
-	if not details then
-		return ""
-	end
-	local text = details.perSecond and "/s" or ""
+-- How long a restore takes or a consumable lasts, " (24 sec)", or a Well Fed buff, " (well fed, 15 min)", or "" for
+-- details without one. nil when GetText lacks a word it needs.
+local function FormatLength(details, GetText)
 	if details.wellFedMinutes then
 		local name, minutes = GetText("WELL_FED"), GetText("INT_SPELL_DURATION_MIN")
 		if not (name and minutes) then
 			return nil
 		end
-		return text .. (" (%s, %s)"):format(name, FormatDuration(minutes, details.wellFedMinutes))
+		return (" (%s, %s)"):format(name, FormatDuration(minutes, details.wellFedMinutes))
 	end
 	for _, duration in ipairs(DURATIONS) do
 		local unit, formatName = unpack(duration)
 		if details[unit] then
 			local format = GetText(formatName)
-			if not format then
-				return nil
-			end
-			return text .. (" (%s)"):format(FormatDuration(format, details[unit]))
+			return format and (" (%s)"):format(FormatDuration(format, details[unit]))
 		end
+	end
+	return ""
+end
+
+-- What follows a consumable line's stat name: "/s" for a rate (`perSecond`), then how long a Well Fed buff lasts
+-- (`wellFedMinutes`), " (well fed, 15 min)", or how long a restore takes or a potion, elixir, flask or scroll lasts
+-- (`seconds`, `minutes` or `hours`), " (24 sec)", " (2 hrs)", then, for Rumsey Rum (`drunk`), that it gets you
+-- drunk, " and gets you drunk to boot!". GetText(name) gives the words: Blizzard's INT_SPELL_DURATION_SEC,
+-- INT_SPELL_DURATION_MIN, INT_SPELL_DURATION_HOURS, WELL_FED, the buff's name, and DRUNK, Rumsey Rum's. "" without
+-- details, nil when GetText lacks a word they need. "/s" reads the same in every language, like MP5.
+function ns.FormatDetails(details, GetText)
+	if not details then
+		return ""
+	end
+	local length = FormatLength(details, GetText)
+	if not length then
+		return nil
+	end
+	local text = (details.perSecond and "/s" or "") .. length
+	if details.drunk then
+		local drunk = GetText("DRUNK")
+		return drunk and text .. " " .. drunk
 	end
 	return text
 end
