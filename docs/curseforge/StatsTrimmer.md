@@ -1,6 +1,6 @@
 # Stats Trimmer
 
-Item tooltips spell out their bonuses as full sentences. Stats Trimmer trims those green **Equip:** lines down to short stat lines, so you can compare gear at a glance, and does the same for the **Use:** lines of food and drink, flasks, elixirs and potions.
+Item tooltips spell out their bonuses as full sentences. Stats Trimmer trims those green **Equip:** lines down to short stat lines, so you can compare gear at a glance, and does the same for the **Use:** lines of food and drink, flasks, elixirs, potions, scrolls and other consumables.
 
 ```
 Equip: Increases damage and healing done by magical spells and effects by up to 2.
