@@ -60,7 +60,7 @@ becomes
 
 - Every compact line starts with `+`: it shows what the item adds to the stat, like Blizzard's item comparison. The original "up to" describes spell coefficients (how much of the bonus each spell gets), not the stat itself.
 - The original line must be recognized in **every client locale**, so nothing may match English text only.
-- The compact lines use Blizzard's own stat names, in lowercase, in the language chosen in the addon (the client's by default): `+10 daño con hechizos` on esES, `+10 spell damage` in English. MP5 and HP5 read the same in every language. See [Localization](#localization).
+- The compact lines use Blizzard's own stat names, in lowercase, in the language chosen in the addon (the client's by default): `+10 daño con hechizos` on esES, `+10 spell damage` in English. German keeps Blizzard's capitals, as its nouns are capitalized: `+10 Zauberschaden`. MP5 and HP5 read the same in every language. See [Localization](#localization).
 
 ## Repository layout
 
@@ -153,7 +153,8 @@ The `.toc` loads these files in order:
   - `ns.GetClientText(name)` reads the client's own strings (for recognition), `ns.GetTextIn(language, name)` a string in a given language (`CLIENT` or a bundled one) and `ns.GetEnglishText(name)` one in English. `ns.GetClassName(classFile)` is a class's name in the chosen language, then in English.
   - Two of the texts aren't GlobalStrings. `WELL_FED`, the Well Fed buff's name: the client's is `C_Spell.GetSpellName(19705)`, a Well Fed spell. `KILL_EXPERIENCE`, the experience from kills, and `DRUNK`, what Rumsey Rum's line says at its end, come from spell descriptions, which no API gives as words: the client's are the bundled ones of its language, if any.
   - `ns.GetLanguage()` is the language the texts are shown in (`ns.ResolveLanguage` for this client).
-  - `ns.InLanguage(lines[, language])` gives the compact lines Blizzard's names in the chosen language (or `language`), lowercased. Its name getters are made once per language.
+  - `ns.InLanguage(lines[, language])` gives the compact lines Blizzard's names in the chosen language (or `language`), in `ns.DisplayCase`. Its name getters are made once per language.
+  - `ns.DisplayCase(text, language)` is a Blizzard text in a language as the compact lines and the color rows show it: lowercased, but as it is in German (see [Compact lines](#compact-lines)).
   - `ns.ToLower(text)` is the display lowercase, `ns.FoldCase(text)` the case fold creature types are searched with, and `ns.GetClientStatName` the `TrustedNames` getter over the client's names that recognition uses.
 - `Tooltip.lua`: the WoW API side. It registers the line pre-calls, for equip lines and for consumables' Use lines, and checks their prefix. It reads the item and its stats (or the line's food, potion, elixir, flask, scroll or other consumable), builds `context`, gives the lines the chosen language's names (`ns.InLanguage`) and colors each line with `ns.db.colors[kind]`, falling back to the original line color. A line of a turned off tab (equip lines are combat's, Use lines food's, alchemy's or misc's) keeps its text. It skips tooltips other addons only fill to read an item (see [Other addons' tooltips](#other-addons-tooltips)) and handles the "show original text" key.
   - `ns.RefreshItemTooltips()` rebuilds the shown item tooltips (see ["Show original text" key](#show-original-text-key)).
@@ -479,7 +480,7 @@ It takes:
 | Blasted Lands | `+25 strength (60 min)` | `+25 fuerza (60 min)` |
 | Rumsey Rum | `+10 stamina (15 min) and gets you drunk to boot!` | `+10 aguante (15 min) ¡y por si fuera poco, te emborracha!` |
 
-What follows the rum's duration is `DRUNK` (see [Localization](#localization)), lowercased like the rest of the line. A language without it sends the line to the English pass whole, as ruRU clients do.
+What follows the rum's duration is `DRUNK` (see [Localization](#localization)), lowercased like the rest of the line (German keeps its capitals: "macht Euch ziemlich betrunken!"). A language without it sends the line to the English pass whole, as ruRU clients do.
 
 ## Localization
 
@@ -521,9 +522,10 @@ Text lookup:
 
 `ns.InLanguage` runs `ns.LocalizeLines` twice: with the chosen language's names, then with English names for any line still left.
 - The names are lowercased with `C_Intl.ToLower` (display lowercase that follows the client's language rules; `string.lower` if it returns nothing). Blizzard's own capitalization is uneven ("Daño Arcano", "golpe").
+- German keeps Blizzard's capitals (`ns.DisplayCase`), in the names, the details and the color row labels: German nouns are capitalized, and lowercasing them is wrong (`+10 Ausdauer (15 Min.)`, not `+10 ausdauer (15 min.)`). User decision (2026-11-17, issue #13). It applies to German chosen in the addon, and to the client's language on a deDE client. Two names then start with a capital that mid-line German wouldn't have, as Blizzard writes them: `+1% Kritischer Trefferwert`, `+5% Durch Siege erhaltene Erfahrung`. Its English fallback is lowercased like any other.
 - A line naming several stats becomes one line per stat: a group of weapon skills, or several creature types on one line.
 - MP5 and HP5 lines have no stat names, so they read `+4 MP5` and `+5 HP5` in every language.
-- Consumable lines' details use Blizzard's words too, lowercased like the names: `INT_SPELL_DURATION_SEC` ("%d s"), `INT_SPELL_DURATION_MIN`, `INT_SPELL_DURATION_HOURS` (its plural escape resolved: "1 hour", "2 hrs", "2 Stunden"), `WELL_FED` and `DRUNK`. A line lacking one of them goes to the English pass whole. `/s` is the same in every language. MP5 and HP5 lines keep their name and get only their duration translated: `+12 HP5 (1 h)`.
+- Consumable lines' details use Blizzard's words too, in the names' case: `INT_SPELL_DURATION_SEC` ("%d s"), `INT_SPELL_DURATION_MIN`, `INT_SPELL_DURATION_HOURS` (its plural escape resolved: "1 hour", "2 hrs", "2 Stunden"), `WELL_FED` and `DRUNK`. A line lacking one of them goes to the English pass whole. `/s` is the same in every language. MP5 and HP5 lines keep their name and get only their duration translated: `+12 HP5 (1 h)`.
 - The experience bonus is named `KILL_EXPERIENCE`, not `COMBAT_XP_GAIN` ("Experience"): it only counts for kills. Its color row is still labelled with `COMBAT_XP_GAIN`.
 - A name is skipped when it is missing or untrusted (see [Creature types](#creature-types)), and the line goes to the next pass. The addon's own English (`ns.ENGLISH_NAMES`, `+10 spell damage`) is only the last resort.
 
@@ -543,7 +545,7 @@ Blizzard's data has mistakes that fall back to English:
 | Preview | `ITEM_BIND_ON_EQUIP`, `ITEM_MOD_STAMINA_SHORT` |
 | Tabs | `COMBAT`, `MINIMAP_TRACKING_VENDOR_FOOD`, `ALCHEMY`, `MISCELLANEOUS` ("Combate", "Comida y bebida", "Alquimia", "Miscelánea" on esES) |
 | Color section titles | `STAT_CATEGORY_ATTACK`, `STAT_CATEGORY_DEFENSE`, `SPELLS`, and `DAMAGE` followed by the addon's " extra" ("Ataque", "Defensa", "Hechizos", "Daño extra" on esES); in the alchemy tab, `STAT_CATEGORY_ATTRIBUTES` ("Atributos") first |
-| Color row labels | each kind's `stat`, lowercased. MP5 and HP5 read "MP5" and "HP5". "Attack power vs type" is `ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT` without its last word: "poder de ataque contra …"; "spell damage vs type" is `ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT` the same way. Weapon skills are `STAT_CATEGORY_WEAPON_SKILLS`. Food and drink: `HEALTH`, `MANA`, `COMBAT_XP_GAIN`, the primary stats' `ITEM_MOD_*_SHORT` and `ARMOR`. Alchemy: the same, and `ITEM_MOD_SPELL_RESISTANCE_ALL_SCHOOLS_SHORT`. Misc: the primary stats' and `ARMOR` |
+| Color row labels | each kind's `stat`, lowercased (as it is in German). MP5 and HP5 read "MP5" and "HP5". "Attack power vs type" is `ITEM_MOD_ATTACK_POWER_VS_BEAST_SHORT` without its last word: "poder de ataque contra …"; "spell damage vs type" is `ITEM_MOD_SPELL_DAMAGE_VS_UNDEAD_SHORT` the same way. Weapon skills are `STAT_CATEGORY_WEAPON_SKILLS`. Food and drink: `HEALTH`, `MANA`, `COMBAT_XP_GAIN`, the primary stats' `ITEM_MOD_*_SHORT` and `ARMOR`. Alchemy: the same, and `ITEM_MOD_SPELL_RESISTANCE_ALL_SCHOOLS_SHORT`. Misc: the primary stats' and `ARMOR` |
 | Class color palette | the class names on hover: `LocalizedClassList(false)` on the client's language (Forever has no `LOCALIZED_CLASS_NAMES_MALE`), `ns.LOCALE_CLASS_NAMES` on the others |
 | Language options | `LocaleUtil.GetLocaleDisplayName` |
 

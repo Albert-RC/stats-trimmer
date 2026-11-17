@@ -122,7 +122,26 @@ describe("Tooltip line pre-call", function()
 			ns.db.language = "enUS"
 			assert.are.same({ "+10 spell damage", "+30 spell healing" }, Texts(COSEDORA_LINE))
 			ns.db.language = "deDE"
-			assert.are.same({ "+10 zauberschaden", "+30 zauberheilung" }, Texts(COSEDORA_LINE))
+			assert.are.same({ "+10 Zauberschaden", "+30 Zauberheilung" }, Texts(COSEDORA_LINE))
+		end)
+
+		it("keeps Blizzard's capitals in German, but not in the English it falls back to", function()
+			ns.LOCALE_STRINGS.deDE.ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = nil
+			ns.db.language = "deDE"
+			assert.are.same({ "+10 spell damage", "+30 Zauberheilung" }, Texts(COSEDORA_LINE))
+		end)
+
+		it("keeps Blizzard's capitals on a German client", function()
+			-- The client's own names are German; its Equip prefix stays the fake's esES one
+			wow, ns, preCall = Setup(function(world)
+				world.env.GetLocale = function()
+					return "deDE"
+				end
+				world.env.ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "Zauberschaden"
+				world.env.ITEM_MOD_SPELL_HEALING_DONE_SHORT = "Zauberheilung"
+			end)
+			assert.are.equal("CLIENT", ns.db.language)
+			assert.are.same({ "+10 Zauberschaden", "+30 Zauberheilung" }, Texts(COSEDORA_LINE))
 		end)
 
 		it("uses the client's strings when it is saved as the client's own language", function()

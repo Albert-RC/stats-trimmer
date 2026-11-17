@@ -76,16 +76,28 @@ local function Text(globalName, fallback, language)
 	return ns.GetTextIn(language or ns.GetLanguage(), globalName) or ns.GetEnglishText(globalName) or fallback
 end
 
--- A color row's label, lowercased like the compact lines, in the chosen language or `language`. MP5 and HP5
--- read the same in every language. "Attack power vs type" has no Blizzard name of its own: it is a vs stat's
--- name without its creature type.
+-- A Blizzard name in the chosen language (or `language`) in the compact lines' case (ns.DisplayCase), then in
+-- English, lowercased, or nil
+local function DisplayName(globalName, language)
+	language = language or ns.GetLanguage()
+	local text = ns.GetTextIn(language, globalName)
+	if text then
+		return ns.DisplayCase(text, language)
+	end
+	text = ns.GetEnglishText(globalName)
+	return text and ns.ToLower(text)
+end
+
+-- A color row's label, in the compact lines' case, in the chosen language or `language`. MP5 and HP5 read the
+-- same in every language. "Attack power vs type" has no Blizzard name of its own: it is a vs stat's name without
+-- its creature type.
 local function RowLabel(kind, language)
 	if kind.typeStat then
-		local name = Text(kind.typeStat, nil, language)
+		local name = DisplayName(kind.typeStat, language)
 		local stem = name and name:match("^(.-%S)%s+%S+$")
-		return ns.ToLower(stem and stem .. " …" or kind.label)
+		return stem and stem .. " …" or ns.ToLower(kind.label)
 	elseif kind.stat then
-		return ns.ToLower(Text(kind.stat, ns.ENGLISH_NAMES[kind.stat] or kind.label, language))
+		return DisplayName(kind.stat, language) or ns.ToLower(ns.ENGLISH_NAMES[kind.stat] or kind.label)
 	end
 	return kind.label
 end

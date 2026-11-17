@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- German keeps the game's capitals, as German nouns are capitalized: `+10 Ausdauer (15 Min.)` instead of `+10 ausdauer (15 min.)`, in the tooltips, the preview and the color rows. Other languages stay in lowercase.
+
 ## v0.7.0 (2026-11-17)
 
 - Food, drink, flask, elixir and potion data come from the game's new build, 1.60.1.70938: Morning Glory Dew gets compact lines, and the Elixir of Wisdom, now +3 intellect for 30 minutes, gets them again. The new Elixirs of Endless... keep their original text.
