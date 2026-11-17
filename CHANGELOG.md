@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.1 (2026-11-17)
 
 - German keeps the game's capitals, as German nouns are capitalized: `+10 Ausdauer (15 Min.)` instead of `+10 ausdauer (15 min.)`, in the tooltips, the preview and the color rows. Other languages stay in lowercase.
 
