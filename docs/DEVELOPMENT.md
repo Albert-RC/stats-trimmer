@@ -64,10 +64,10 @@ becomes
 1. Link the addon folder into the Forever client with a directory junction (in `cmd`), so edits reach the game directly:
 
    ```bat
-   mklink /J "<WoW>\_classic_beta_\Interface\AddOns\StatsTrimmer" "<repo>\StatsTrimmer"
+   mklink /J "<WoW>\_forever_\Interface\AddOns\StatsTrimmer" "<repo>\StatsTrimmer"
    ```
 
-   `rmdir "<WoW>\_classic_beta_\Interface\AddOns\StatsTrimmer"` removes the link without touching the code. Other folders under `<WoW>` (`_retail_`, `_classic_era_`, …) are different game versions.
+   `rmdir "<WoW>\_forever_\Interface\AddOns\StatsTrimmer"` removes the link without touching the code. Forever moved from `_classic_beta_` to `_forever_` with build 1.60.1.70938 (November 2026), with its own `Interface` and `WTF`: a junction in `_classic_beta_` no longer reaches the game. Other folders under `<WoW>` (`_retail_`, `_classic_era_`, …) are different game versions.
 2. Tools:
    - [StyLua](https://github.com/JohnnyMorganz/StyLua), for formatting.
    - [Luacheck](https://github.com/lunarmodules/luacheck), for static analysis.
@@ -172,7 +172,7 @@ UI rule: use Blizzard templates wherever possible; don't hand-roll frames or bac
 
 ### Tooltip mechanism
 
-Verified against the `forever` branch of [wow-ui-source](https://github.com/Gethe/wow-ui-source) (builds 1.60.1.70291, 1.60.1.70338 and 1.60.1.70425):
+Verified against the `forever` branch of [wow-ui-source](https://github.com/Gethe/wow-ui-source) (builds 1.60.1.70291, 1.60.1.70338, 1.60.1.70425 and 1.60.1.70938):
 
 - Item tooltips are data-driven. `Blizzard_GameTooltip` only ships the Mainline variant, where `GameTooltipTemplate` uses `GameTooltipDataMixin` and `ShoppingTooltipTemplate` uses `TooltipDataHandlerMixin`.
 - `TooltipDataProcessor.AddLinePreCall(lineType, func(tooltip, lineData))`: if `func` returns `true`, the original line is not added (`TooltipDataHandlerMixin:ProcessLineData` in `Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua`). Addon callbacks run insecurely through an attribute delegate, but they can still consume the line.
@@ -360,7 +360,7 @@ It works in three steps, and writes nothing when one fails:
 2. Converts every food spell, or says why it keeps its original text. A Use spell in neither Spell nor SpellEffect doesn't exist in the build (Rage Potion's 6614): its item keeps its text. One with effects but no Spell row means a partial download, and stops the script.
 3. Compares each result with the file it replaces (`-FoodOutput`, `-AlchemyOutput`) and lists the spells added and removed. Neither file is written unless both can be. An empty result is refused, and so are removals unless `-AcceptRemovals` says they are expected. On build 1.60.1.70425 that caught the drinks' new formula, which the script didn't understand yet.
 
-**Run it again when the client build changes**, read what it adds and removes, and commit the new file. On build 1.60.1.70425 it describes the same 82 food spells as on 1.60.1.70338 and leaves out 35. `spec/food_rules_spec.lua` lists the 82, so losing one fails the tests.
+**Run it again when the client build changes**, read what it adds and removes, and commit the new file. On build 1.60.1.70425 it described the same 82 food spells as on 1.60.1.70338; build 1.60.1.70938 adds Morning Glory Dew, so it describes 83 and leaves out 35. `spec/consumable_rules_spec.lua` lists the 83, so losing one fails the tests.
 
 ### Matching a Use line
 
@@ -410,7 +410,7 @@ From Forever's tables of build 1.60.1.70425 (wago.tools), not yet checked in gam
 - `ns.ALCHEMY[spellID]` is `{ numbers, lines }`: every number the line shows, and the compact lines, each `{ stat, value, percent, seconds | minutes | hours }`.
 - It leaves out, with their original text: instant restores, Rage potions ("20 to 40"), absorbs, invisibility, detection, water breathing and walking, size changes (Giant Growth, Firewater), physical damage (Elixir of Minor Force), movement and swim speed, Gift of Arthas, and the four Natural flasks, whose bonus only works in Mount Hyjal, Hyjal Summit and the Barrow Deeps. The script lists them.
 
-On build 1.60.1.70425 it describes 85 spells and leaves out 93. `spec/consumable_rules_spec.lua` lists the 85.
+On build 1.60.1.70938 it describes 85 spells and leaves out 101: the 93 of build 1.60.1.70425 and Forever's eight new Elixirs of Endless..., whose percentage stacks. That build also halved the Elixir of Wisdom's spell (3166), now 3 Intellect for 30 minutes. `spec/consumable_rules_spec.lua` lists the 85.
 
 ### Matching a Use line
 
@@ -526,7 +526,7 @@ Unit tests run on LuaJIT 2.1 (Lua 5.1 compatible) through `spec/runner.lua`, a m
 - Expected values (labels, names) are written in the spec, not copied from the code's tables, so typos are caught.
 - When adding tests, check that they catch a real bug: change the code on purpose, see the right test fail, restore.
 
-Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. The generated files (`Locales.lua`, `FoodData.lua`, `AlchemyData.lua`: their first line says "Generated by") are mostly data, which any spec that loads them covers whole, so `coverage.ps1` reports them apart and requires 95% of the hand-written code. On 2026-10-18 it was 100% of 1340 hand-written lines and of 741 generated ones, with 403 tests.
+Coverage uses LuaCov, configured in `.luacov` (only `^StatsTrimmer/`). It runs with `luajit -joff`, because JIT-compiled code skips line hooks. The generated files (`Locales.lua`, `FoodData.lua`, `AlchemyData.lua`: their first line says "Generated by") are mostly data, which any spec that loads them covers whole, so `coverage.ps1` reports them apart and requires 95% of the hand-written code. On 2026-11-17 it was 100% of 1340 hand-written lines and of 742 generated ones, with 403 tests.
 
 The generators are tested on CSV fixtures, a few real rows of each table (`spec/fixtures/consumables`, `spec/fixtures/locales`, from build 1.60.1.70425, and 1.60.1.70338 for itIT), with no network: `test-generators.ps1` runs them, `spec/generators/*_spec.lua` check what they wrote against expected values written in the specs, and it checks what they refuse to write (a missing column or row, tables that don't agree, a language that is all English, removals). `test-release.sh` runs `publish-release.sh` against stand-ins for `git` and `gh`, from every state a failed release can leave.
 

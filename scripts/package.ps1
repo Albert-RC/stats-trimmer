@@ -63,7 +63,7 @@ $section
 ## Installation
 
 1. Download ``$zipName`` below.
-2. Extract it into the Forever client's ``Interface\AddOns`` folder. You should end up with ``World of Warcraft\_classic_beta_\Interface\AddOns\$addon\$addon.toc``.
+2. Extract it into the Forever client's ``Interface\AddOns`` folder. You should end up with ``World of Warcraft\_forever_\Interface\AddOns\$addon\$addon.toc``.
 3. Restart the game.
 "@
 

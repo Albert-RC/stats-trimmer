@@ -3,7 +3,7 @@
 # build changes.
 # It also generates spec/fixtures/ClientStrings-ruRU.lua, the strings of a client whose language Stats Trimmer
 # doesn't bundle, for the fake ruRU client of the specs (with CreatureType too).
-# Usage: ./scripts/update-locales.ps1 [-Build 1.60.1.70425] [-LocaleBuilds @{ itIT = "1.60.1.70338" }]
+# Usage: ./scripts/update-locales.ps1 [-Build 1.60.1.70938] [-LocaleBuilds @{ itIT = "1.60.1.70338" }]
 #        [-From <folder>] [-Output <file>] [-Fixture <file>] [-MinimumStatNames 100] [-AcceptRemovals]
 #
 # The tables are downloaded for -Build, or for a language's build in -LocaleBuilds, or read from -From, a folder
@@ -15,7 +15,7 @@
 # Since build 1.60.1.70374, wago.tools gives the English texts for itIT: its texts come from 1.60.1.70338, the
 # last build with Italian ones, through -LocaleBuilds.
 param(
-	[string]$Build = "1.60.1.70425",
+	[string]$Build = "1.60.1.70938",
 	[hashtable]$LocaleBuilds = @{ itIT = "1.60.1.70338" },
 	[string]$From,
 	[string]$Output = (Join-Path (Split-Path -Parent $PSScriptRoot) "StatsTrimmer/Locales.lua"),
